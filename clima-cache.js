@@ -1,16 +1,11 @@
 // clima-cache.js
 // PIEZA 4b - jalador de clima con cache.
-// Primera vez: jala 2026-03-26 -> ayer. Despues: solo ultimos 3 dias + nuevos.
-// Combina sin duplicar por game_id. Reusa la logica de clima original.
-// Usa: estadios.js (STADIUM_INDEX, stadiumNorm) y mlb-routes.js (WORKER_BASE).
 
 const CLIMA_CACHE_KEY = "MLBPRO_CLIMA_CACHE_2026";
 const CLIMA_START_FIJO = "2026-03-26";
 const CLIMA_DIAS_RESOLAPE = 3;
-
 const OPENMETEO_ARCHIVE = "https://archive-api.open-meteo.com/v1/archive";
 
-// --- lectura/escritura del cache (localStorage) ---
 function climaLeerCache() {
   try {
     const raw = localStorage.getItem(CLIMA_CACHE_KEY);
@@ -18,7 +13,7 @@ function climaLeerCache() {
     const arr = JSON.parse(raw);
     return Array.isArray(arr) ? arr : [];
   } catch (e) {
-    return []; // cache corrupto -> se trata como vacio, no se inventa
+    return [];
   }
 }
 
@@ -26,7 +21,6 @@ function climaGuardarCache(records) {
   localStorage.setItem(CLIMA_CACHE_KEY, JSON.stringify(records));
 }
 
-// --- helpers de fecha ---
 function climaAyerISO() {
   const d = new Date();
   d.setDate(d.getDate() - 1);
@@ -35,7 +29,6 @@ function climaAyerISO() {
     ("0" + d.getDate()).slice(-2);
 }
 
-// desde cuando jalar: si hay cache, (ayer - 3 dias); si no, el fijo
 function climaStartDesde(records) {
   if (!records || records.length === 0) return CLIMA_START_FIJO;
   const d = new Date();
@@ -43,11 +36,9 @@ function climaStartDesde(records) {
   const reSolape = d.getFullYear() + "-" +
     ("0" + (d.getMonth() + 1)).slice(-2) + "-" +
     ("0" + d.getDate()).slice(-2);
-  // nunca antes del inicio fijo de temporada
   return reSolape < CLIMA_START_FIJO ? CLIMA_START_FIJO : reSolape;
 }
 
-// --- key horaria por timezone (igual que la app original) ---
 function climaKeyTZ(utcISO, tz) {
   const p = new Intl.DateTimeFormat("en-US", {
     timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit",
@@ -57,7 +48,6 @@ function climaKeyTZ(utcISO, tz) {
   return g("year") + "-" + g("month") + "-" + g("day") + "T" + g("hour") + ":00";
 }
 
-// --- fetch clima Open-Meteo (igual que la app original) ---
 async function climaFetchWeather(s, start, end) {
   const url = OPENMETEO_ARCHIVE +
     "?latitude=" + s.lat + "&longitude=" + s.lon +
@@ -73,4 +63,21 @@ async function climaFetchWeather(s, start, end) {
   if (!h || !Array.isArray(h.time)) throw new Error("OPENMETEO sin horas");
   const m = new Map();
   for (let i = 0; i < h.time.length; i++) {
-    m.set(h
+    m.set(h.time[i], {
+      temperature_f: h.temperature_2m[i],
+      humidity_pct: h.relative_humidity_2m[i],
+      precipitation_mm: h.precipitation[i],
+      windspeed_mph: h.wind_speed_10m[i],
+      wind_dir: h.wind_direction_10m[i]
+    });
+  }
+  return m;
+}
+
+function climaMerge(viejos, nuevos) {
+  const map = new Map();
+  viejos.forEach(function (r) { map.set(r.game_id, r); });
+  nuevos.forEach(function (r) { map.set(r.game_id, r); });
+  return Array.from(map.values());
+}
+
