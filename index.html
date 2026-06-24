@@ -63,7 +63,7 @@
       await jalarClima(log);
       log("Trayendo juegos de hoy...");
       var hoy = hoyISO();
-      var mlbUrl = "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date="+hoy;
+      var mlbUrl = "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date="+hoy+"&hydrate=probablePitcher";
       var resp = await fetch(MLB_ROUTES.WORKER_BASE + encodeURIComponent(mlbUrl));
       if(!resp.ok) throw new Error("Schedule hoy HTTP "+resp.status);
       var data = await resp.json();
@@ -77,18 +77,20 @@
         var venue = g.venue ? g.venue.name : "";
         var away = (g.teams&&g.teams.away&&g.teams.away.team)? g.teams.away.team.name : "?";
         var home = (g.teams&&g.teams.home&&g.teams.home.team)? g.teams.home.team.name : "?";
+        var pitcherAway = (g.teams&&g.teams.away&&g.teams.away.probablePitcher) ? g.teams.away.probablePitcher.fullName : "TBD";
+        var pitcherHome = (g.teams&&g.teams.home&&g.teams.home.probablePitcher) ? g.teams.home.probablePitcher.fullName : "TBD";
         var s = STADIUM_INDEX.get(stadiumNorm(venue));
-        if(!s){ html+=tarjeta(away,home,venue,null,i,null); continue; }
+        if(!s){ html+=tarjeta(away,home,venue,null,i,null,pitcherAway,pitcherHome); continue; }
         var w = await climaFetchWeather(s, hoy, hoy);
         var hit = w.get(climaKeyTZ(g.gameDate, s.timezone));
-        if(!hit){ html+=tarjeta(away,home,venue,null,i,null); continue; }
+        if(!hit){ html+=tarjeta(away,home,venue,null,i,null,pitcherAway,pitcherHome); continue; }
         var today = {
           temperature_f: hit.temperature_f, windspeed_mph: hit.windspeed_mph,
           humidity_pct: hit.humidity_pct, precipitation_mm: hit.precipitation_mm,
           wind_dir: hit.wind_dir, venueName: venue
         };
         var r = calcularCoincidencia(today);
-        html += tarjeta(away,home,venue,r,i,today);
+        html += tarjeta(away,home,venue,r,i,today,pitcherAway,pitcherHome);
       }
       listaEl.innerHTML = html;
       log("LISTO.");
@@ -99,12 +101,11 @@
     }
   });
 
-  function tarjeta(away,home,venue,r,idx,today){
+  function tarjeta(away,home,venue,r,idx,today,pitcherAway,pitcherHome){
     var sc = r && r.top ? r.top.score : null;
     var cls = r ? r.cls : "bad";
     var txt = (sc===null) ? "SIN COINCIDENCIA" : (sc+"%");
 
-    // clima de HOY (arriba)
     var climaHoy = "";
     if(today){
       climaHoy = '<div class="estadio">HOY: '+
@@ -114,13 +115,13 @@
         ' · hum '+(today.humidity_pct!==undefined?today.humidity_pct+"%":"?")+'</div>';
     }
 
-    // 5 líneas + acumular para promedios
+    var pitchers = '<div class="estadio">⚾ '+(pitcherAway||"TBD")+' vs '+(pitcherHome||"TBD")+'</div>';
+
     var det = "";
     var sumScore=0, nScore=0, sumRuns=0, nRuns=0;
     if(r && r.ranked && r.ranked.length){
       for(var j=0;j<r.ranked.length;j++){
         var h=r.ranked[j];
-
         var ar = (h.away_runs!==undefined && h.away_runs!==null) ? h.away_runs : null;
         var hr = (h.home_runs!==undefined && h.home_runs!==null) ? h.home_runs : null;
         var carreras;
@@ -131,9 +132,7 @@
         } else {
           carreras = "— sin marcador";
         }
-
         if(typeof h.score === "number"){ sumScore += h.score; nScore++; }
-
         det += '<div class="hrow">'+
           (h.date||"?")+' · '+(h.away_team||"?")+' / '+(h.home_team||"?")+
           ' · '+(h.temperature_f!==undefined?h.temperature_f+"°":"?")+
@@ -146,7 +145,6 @@
       det = '<div class="hrow">Sin históricos para mostrar.</div>';
     }
 
-    // conclusión: cada número en su renglón, centrado
     var conclusion = "";
     if(nScore>0 || nRuns>0){
       var promScore = nScore>0 ? Math.round(sumScore/nScore) : null;
@@ -164,6 +162,7 @@
       '<div class="matchup">'+away+' @ '+home+'</div>'+
       '<div class="estadio">'+(venue||"SIN PARQUE")+'</div>'+
       climaHoy +
+      pitchers +
       '<div class="score '+cls+'">Coincidencia: '+txt+'</div>'+
       '<div class="ver">Toca para ver los 5 parecidos ▼</div>'+
       '<div class="detalle" id="det'+idx+'">'+det+conclusion+'</div>'+
