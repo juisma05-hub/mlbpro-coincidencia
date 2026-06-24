@@ -13,11 +13,15 @@
   main { padding:16px; max-width:900px; margin:0 auto; }
   .go { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#fff; background:#238636; cursor:pointer; }
   .go:disabled { background:#30363d; color:#8b949e; }
-  .juego { background:#161b22; border:1px solid #30363d; border-radius:10px; padding:12px; margin-top:12px; }
+  .juego { background:#161b22; border:1px solid #30363d; border-radius:10px; padding:12px; margin-top:12px; cursor:pointer; }
   .matchup { font-size:16px; font-weight:800; }
   .estadio { font-size:13px; color:#bbb; margin:2px 0; }
   .score { font-size:22px; font-weight:800; margin-top:6px; }
   .ok{color:#32d74b;} .mid{color:#ffd60a;} .bad{color:#ff453a;}
+  .ver { font-size:12px; color:#79c0ff; margin-top:6px; }
+  .detalle { display:none; margin-top:10px; border-top:1px solid #30363d; padding-top:10px; }
+  .detalle.abierto { display:block; }
+  .hrow { font-size:12px; color:#ccc; padding:4px 0; border-bottom:1px solid #21262d; }
   #console { margin-top:16px; background:#010409; border:1px solid #30363d; border-radius:8px; padding:12px; min-height:60px; max-height:30vh; overflow:auto; font-family:ui-monospace,monospace; font-size:12px; white-space:pre-wrap; }
 </style>
 </head>
@@ -50,10 +54,7 @@
     var btn=this; btn.disabled=true; btn.textContent="TRABAJANDO…";
     consoleEl.textContent=""; listaEl.innerHTML="";
     try {
-      // 1. asegura el cache (jala historico con cache de 3 dias)
       await jalarClima(log);
-
-      // 2. trae juegos de HOY con su clima
       log("Trayendo juegos de hoy...");
       var hoy = hoyISO();
       var mlbUrl = "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date="+hoy;
@@ -62,10 +63,8 @@
       var data = await resp.json();
       var games = (data.dates && data.dates[0]) ? data.dates[0].games : [];
       log("Juegos hoy: "+games.length);
-
       if(games.length===0){ log("No hay juegos hoy ("+hoy+")."); return; }
 
-      // 3. para cada juego de hoy: clima del venue + coincidencia
       var html="";
       for(var i=0;i<games.length;i++){
         var g=games[i];
@@ -73,22 +72,17 @@
         var away = (g.teams&&g.teams.away&&g.teams.away.team)? g.teams.away.team.name : "?";
         var home = (g.teams&&g.teams.home&&g.teams.home.team)? g.teams.home.team.name : "?";
         var s = STADIUM_INDEX.get(stadiumNorm(venue));
-        if(!s){ html+=tarjeta(away,home,venue,null); continue; }
-
+        if(!s){ html+=tarjeta(away,home,venue,null,i); continue; }
         var w = await climaFetchWeather(s, hoy, hoy);
         var hit = w.get(climaKeyTZ(g.gameDate, s.timezone));
-        if(!hit){ html+=tarjeta(away,home,venue,null); continue; }
-
+        if(!hit){ html+=tarjeta(away,home,venue,null,i); continue; }
         var today = {
-          temperature_f: hit.temperature_f,
-          windspeed_mph: hit.windspeed_mph,
-          humidity_pct: hit.humidity_pct,
-          precipitation_mm: hit.precipitation_mm,
-          wind_dir: hit.wind_dir,
-          venueName: venue
+          temperature_f: hit.temperature_f, windspeed_mph: hit.windspeed_mph,
+          humidity_pct: hit.humidity_pct, precipitation_mm: hit.precipitation_mm,
+          wind_dir: hit.wind_dir, venueName: venue
         };
         var r = calcularCoincidencia(today);
-        html += tarjeta(away,home,venue,r);
+        html += tarjeta(away,home,venue,r,i);
       }
       listaEl.innerHTML = html;
       log("LISTO.");
@@ -99,15 +93,36 @@
     }
   });
 
-  function tarjeta(away,home,venue,r){
+  function tarjeta(away,home,venue,r,idx){
     var sc = r && r.top ? r.top.score : null;
     var cls = r ? r.cls : "bad";
     var txt = (sc===null) ? "SIN COINCIDENCIA" : (sc+"%");
-    return '<div class="juego">'+
+    var det = "";
+    if(r && r.ranked && r.ranked.length){
+      for(var j=0;j<r.ranked.length;j++){
+        var h=r.ranked[j];
+        det += '<div class="hrow">'+
+          (h.date||"?")+' · '+(h.away_team||"?")+' / '+(h.home_team||"?")+
+          ' · '+(h.temperature_f!==undefined?h.temperature_f+"°":"?")+
+          ' · viento '+(h.windspeed_mph!==undefined?h.windspeed_mph:"?")+
+          ' · hum '+(h.humidity_pct!==undefined?h.humidity_pct+"%":"?")+
+          ' · score '+h.score+'%</div>';
+      }
+    } else {
+      det = '<div class="hrow">Sin históricos para mostrar.</div>';
+    }
+    return '<div class="juego" onclick="toggleDet('+idx+')">'+
       '<div class="matchup">'+away+' @ '+home+'</div>'+
       '<div class="estadio">'+(venue||"SIN PARQUE")+'</div>'+
       '<div class="score '+cls+'">Coincidencia: '+txt+'</div>'+
+      '<div class="ver">Toca para ver los 5 parecidos ▼</div>'+
+      '<div class="detalle" id="det'+idx+'">'+det+'</div>'+
       '</div>';
+  }
+
+  function toggleDet(idx){
+    var d=document.getElementById("det"+idx);
+    if(d){ d.classList.toggle("abierto"); }
   }
 </script>
 </body>
