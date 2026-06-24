@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>MLBPro · Coincidencia</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; font-family:-apple-system,system-ui,sans-serif; background:#0d1117; color:#e6edf3; }
+  header { padding:14px 16px; border-bottom:1px solid #30363d; }
+  h1 { font-size:17px; margin:0; }
+  main { padding:16px; max-width:900px; margin:0 auto; }
+  .go { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#fff; background:#238636; cursor:pointer; }
+  .go:disabled { background:#30363d; color:#8b949e; }
+  #console { margin-top:16px; background:#010409; border:1px solid #30363d; border-radius:8px; padding:12px; min-height:120px; max-height:50vh; overflow:auto; font-family:ui-monospace,monospace; font-size:12px; white-space:pre-wrap; word-break:break-word; }
+</style>
+</head>
+<body>
+<header><h1>MLBPro · Coincidencia</h1></header>
+<main>
+  <button id="go" class="go">COINCIDENCIA MLBPRO</button>
+  <div id="console">Pulsa el botón.</div>
+</main>
+
+<!-- piezas en orden -->
+<script src="mlb-routes.js"></script>
+<script src="estadios.js"></script>
+<script src="clima-cache.js"></script>
+<script src="jalar-clima.js"></script>
+
+<script>
+  var consoleEl = document.getElementById("console");
+  function log(t){ var d=document.createElement("div"); d.textContent=t; consoleEl.appendChild(d); consoleEl.scrollTop=consoleEl.scrollHeight; }
+
+  document.getElementById("go").addEventListener("click", async function(){
+    var btn=this; btn.disabled=true; btn.textContent="TRABAJANDO…";
+    consoleEl.textContent="";
+    try {
+      var total = await jalarClima(log);
+      log("OK · " + total.length + " filas en cache.");
+    } catch(e) {
+      log("ERROR: " + (e && e.message ? e.message : e));
+      log("Si dice 'Load failed': ábrelo en Safari real, no dentro de otra app.");
+    } finally {
+      btn.disabled=false; btn.textContent="COINCIDENCIA MLBPRO";
+    }
+  });
+</script>
+</body>
+</html>
