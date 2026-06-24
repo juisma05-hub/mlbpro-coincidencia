@@ -13,39 +13,102 @@
   main { padding:16px; max-width:900px; margin:0 auto; }
   .go { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#fff; background:#238636; cursor:pointer; }
   .go:disabled { background:#30363d; color:#8b949e; }
-  #console { margin-top:16px; background:#010409; border:1px solid #30363d; border-radius:8px; padding:12px; min-height:120px; max-height:50vh; overflow:auto; font-family:ui-monospace,monospace; font-size:12px; white-space:pre-wrap; word-break:break-word; }
+  .juego { background:#161b22; border:1px solid #30363d; border-radius:10px; padding:12px; margin-top:12px; }
+  .matchup { font-size:16px; font-weight:800; }
+  .estadio { font-size:13px; color:#bbb; margin:2px 0; }
+  .score { font-size:22px; font-weight:800; margin-top:6px; }
+  .ok{color:#32d74b;} .mid{color:#ffd60a;} .bad{color:#ff453a;}
+  #console { margin-top:16px; background:#010409; border:1px solid #30363d; border-radius:8px; padding:12px; min-height:60px; max-height:30vh; overflow:auto; font-family:ui-monospace,monospace; font-size:12px; white-space:pre-wrap; }
 </style>
 </head>
 <body>
 <header><h1>MLBPro · Coincidencia</h1></header>
 <main>
   <button id="go" class="go">COINCIDENCIA MLBPRO</button>
+  <div id="lista"></div>
   <div id="console">Pulsa el botón.</div>
 </main>
 
-<!-- piezas en orden -->
 <script src="mlb-routes.js"></script>
 <script src="estadios.js"></script>
 <script src="clima-cache.js"></script>
 <script src="jalar-clima.js"></script>
+<script src="score-match.js"></script>
+<script src="calcular-coincidencia.js"></script>
 
 <script>
   var consoleEl = document.getElementById("console");
+  var listaEl = document.getElementById("lista");
   function log(t){ var d=document.createElement("div"); d.textContent=t; consoleEl.appendChild(d); consoleEl.scrollTop=consoleEl.scrollHeight; }
+
+  function hoyISO(){
+    var d=new Date();
+    return d.getFullYear()+"-"+("0"+(d.getMonth()+1)).slice(-2)+"-"+("0"+d.getDate()).slice(-2);
+  }
 
   document.getElementById("go").addEventListener("click", async function(){
     var btn=this; btn.disabled=true; btn.textContent="TRABAJANDO…";
-    consoleEl.textContent="";
+    consoleEl.textContent=""; listaEl.innerHTML="";
     try {
-      var total = await jalarClima(log);
-      log("OK · " + total.length + " filas en cache.");
+      // 1. asegura el cache (jala historico con cache de 3 dias)
+      await jalarClima(log);
+
+      // 2. trae juegos de HOY con su clima
+      log("Trayendo juegos de hoy...");
+      var hoy = hoyISO();
+      var mlbUrl = "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date="+hoy;
+      var resp = await fetch(MLB_ROUTES.WORKER_BASE + encodeURIComponent(mlbUrl));
+      if(!resp.ok) throw new Error("Schedule hoy HTTP "+resp.status);
+      var data = await resp.json();
+      var games = (data.dates && data.dates[0]) ? data.dates[0].games : [];
+      log("Juegos hoy: "+games.length);
+
+      if(games.length===0){ log("No hay juegos hoy ("+hoy+")."); return; }
+
+      // 3. para cada juego de hoy: clima del venue + coincidencia
+      var html="";
+      for(var i=0;i<games.length;i++){
+        var g=games[i];
+        var venue = g.venue ? g.venue.name : "";
+        var away = (g.teams&&g.teams.away&&g.teams.away.team)? g.teams.away.team.name : "?";
+        var home = (g.teams&&g.teams.home&&g.teams.home.team)? g.teams.home.team.name : "?";
+        var s = STADIUM_INDEX.get(stadiumNorm(venue));
+        if(!s){ html+=tarjeta(away,home,venue,null); continue; }
+
+        var w = await climaFetchWeather(s, hoy, hoy);
+        var hit = w.get(climaKeyTZ(g.gameDate, s.timezone));
+        if(!hit){ html+=tarjeta(away,home,venue,null); continue; }
+
+        var today = {
+          temperature_f: hit.temperature_f,
+          windspeed_mph: hit.windspeed_mph,
+          humidity_pct: hit.humidity_pct,
+          precipitation_mm: hit.precipitation_mm,
+          wind_dir: hit.wind_dir,
+          venueName: venue
+        };
+        var r = calcularCoincidencia(today);
+        html += tarjeta(away,home,venue,r);
+      }
+      listaEl.innerHTML = html;
+      log("LISTO.");
     } catch(e) {
       log("ERROR: " + (e && e.message ? e.message : e));
-      log("Si dice 'Load failed': ábrelo en Safari real, no dentro de otra app.");
     } finally {
       btn.disabled=false; btn.textContent="COINCIDENCIA MLBPRO";
     }
   });
+
+  function tarjeta(away,home,venue,r){
+    var sc = r && r.top ? r.top.score : null;
+    var cls = r ? r.cls : "bad";
+    var txt = (sc===null) ? "SIN COINCIDENCIA" : (sc+"%");
+    return '<div class="juego">'+
+      '<div class="matchup">'+away+' @ '+home+'</div>'+
+      '<div class="estadio">'+(venue||"SIN PARQUE")+'</div>'+
+      '<div class="score '+cls+'">Coincidencia: '+txt+'</div>'+
+      '</div>';
+  }
 </script>
 </body>
 </html>
