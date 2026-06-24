@@ -107,7 +107,7 @@
     var txt = (sc===null) ? "SIN COINCIDENCIA" : (sc+"%");
       var brisaInfo = (typeof BRISA_GEO_PARQUES_MLB_2026 !== "undefined" && BRISA_GEO_PARQUES_MLB_2026[venue]) ? BRISA_GEO_PARQUES_MLB_2026[venue] : null;
       var brisaHtml = brisaInfo ? '<div class="estadio">🌬️ '+brisaInfo.variante+'</div>' : "";
-      if(!brisaInfo) brisaHtml = '<div class="estadio" style="color:#f55">🔍 venue crudo: ['+venue+']</div>';
+      
 
     var climaHoy = "";
     if(today){
