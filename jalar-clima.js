@@ -1,5 +1,5 @@
 // jalar-clima.js
-// PIEZA 4c - jalado completo: schedule + clima + cache.
+// PIEZA 4c - jalado completo: schedule + clima + carreras + cache.
 // Primera vez jala todo; despues solo (ayer - 3 dias). Combina sin duplicar.
 // Usa: clima-cache.js, estadios.js, mlb-routes.js
 // Devuelve el array completo de records (viejos + nuevos), ya guardado en cache.
@@ -65,7 +65,30 @@ async function jalarClima(logFn) {
     }
   }
 
-  // 5. armar cada fila (mismo formato que la app original)
+  // 4b. carreras por juego Final (mismo estilo, error real, no inventa)
+  const runsMap = new Map();
+  let m = 0;
+  for (const g of games) {
+    m++;
+    if (g.status !== "Final") { continue; }
+    try {
+      log("Carreras " + m + "/" + games.length + ": " + g.game_id);
+      const urlLs = MLB_ROUTES.WORKER_BASE +
+        encodeURIComponent("https://statsapi.mlb.com/api/v1/game/" + g.game_id + "/linescore");
+      const resLs = await fetch(urlLs);
+      if (!resLs.ok) throw new Error("LINESCORE HTTP " + resLs.status);
+      const dLs = await resLs.json();
+      if (!dLs.teams || !dLs.teams.home || !dLs.teams.away) throw new Error("SIN teams.runs");
+      const hr = dLs.teams.home.runs;
+      const ar = dLs.teams.away.runs;
+      if (typeof hr !== "number" || typeof ar !== "number") throw new Error("runs no numerico");
+      runsMap.set(g.game_id, { home_runs: hr, away_runs: ar });
+    } catch (err) {
+      log("FALLO carreras " + g.game_id + ": " + err.message);
+    }
+  }
+
+  // 5. armar cada fila
   const nuevos = [];
   games.forEach(function (g) {
     const k = stadiumNorm(g.venue);
@@ -93,13 +116,17 @@ async function jalarClima(logFn) {
       }
     }
 
+    const rc = runsMap.get(g.game_id);
     nuevos.push({
       date: g.date, game_id: g.game_id,
       home_team: g.home_team, away_team: g.away_team,
       venue: g.venue, status: g.status,
       temperature_f: w.temperature_f, windspeed_mph: w.windspeed_mph,
       wind_dir: w.wind_dir, precipitation_mm: w.precipitation_mm,
-      humidity_pct: w.humidity_pct, roof: roof, timezone: tz
+      humidity_pct: w.humidity_pct, roof: roof, timezone: tz,
+      home_runs: rc ? rc.home_runs : null,
+      away_runs: rc ? rc.away_runs : null,
+      total_runs: rc ? (rc.home_runs + rc.away_runs) : null
     });
   });
 
