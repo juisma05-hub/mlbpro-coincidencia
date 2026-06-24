@@ -105,6 +105,8 @@
     var sc = r && r.top ? r.top.score : null;
     var cls = r ? r.cls : "bad";
     var txt = (sc===null) ? "SIN COINCIDENCIA" : (sc+"%");
+      var brisaInfo = (typeof BRISA_GEO_PARQUES_MLB_2026 !== "undefined" && BRISA_GEO_PARQUES_MLB_2026[venue]) ? BRISA_GEO_PARQUES_MLB_2026[venue] : null;
+      var brisaHtml = brisaInfo ? '<div class="estadio">🌬️ '+brisaInfo.variante+'</div>' : "";
 
     var climaHoy = "";
     if(today){
@@ -162,6 +164,8 @@
       '<div class="matchup">'+away+' @ '+home+'</div>'+
       '<div class="estadio">'+(venue||"SIN PARQUE")+'</div>'+
       climaHoy +
+              brisaHtml +
+
       pitchers +
       '<div class="score '+cls+'">Coincidencia: '+txt+'</div>'+
       '<div class="ver">Toca para ver los 5 parecidos ▼</div>'+
