@@ -22,6 +22,10 @@
   .detalle { display:none; margin-top:10px; border-top:1px solid #30363d; padding-top:10px; }
   .detalle.abierto { display:block; }
   .hrow { font-size:12px; color:#ccc; padding:4px 0; border-bottom:1px solid #21262d; }
+  .concl { text-align:center; border-top:1px solid #30363d; margin-top:10px; padding-top:10px; }
+  .concl .lbl { font-size:12px; color:#8b949e; }
+  .concl .val { font-size:20px; font-weight:800; color:#79c0ff; }
+  .concl .sep { margin-top:8px; }
   #console { margin-top:16px; background:#010409; border:1px solid #30363d; border-radius:8px; padding:12px; min-height:60px; max-height:30vh; overflow:auto; font-family:ui-monospace,monospace; font-size:12px; white-space:pre-wrap; }
 </style>
 </head>
@@ -72,17 +76,17 @@
         var away = (g.teams&&g.teams.away&&g.teams.away.team)? g.teams.away.team.name : "?";
         var home = (g.teams&&g.teams.home&&g.teams.home.team)? g.teams.home.team.name : "?";
         var s = STADIUM_INDEX.get(stadiumNorm(venue));
-        if(!s){ html+=tarjeta(away,home,venue,null,i); continue; }
+        if(!s){ html+=tarjeta(away,home,venue,null,i,null); continue; }
         var w = await climaFetchWeather(s, hoy, hoy);
         var hit = w.get(climaKeyTZ(g.gameDate, s.timezone));
-        if(!hit){ html+=tarjeta(away,home,venue,null,i); continue; }
+        if(!hit){ html+=tarjeta(away,home,venue,null,i,null); continue; }
         var today = {
           temperature_f: hit.temperature_f, windspeed_mph: hit.windspeed_mph,
           humidity_pct: hit.humidity_pct, precipitation_mm: hit.precipitation_mm,
           wind_dir: hit.wind_dir, venueName: venue
         };
         var r = calcularCoincidencia(today);
-        html += tarjeta(away,home,venue,r,i);
+        html += tarjeta(away,home,venue,r,i,today);
       }
       listaEl.innerHTML = html;
       log("LISTO.");
@@ -93,30 +97,74 @@
     }
   });
 
-  function tarjeta(away,home,venue,r,idx){
+  function tarjeta(away,home,venue,r,idx,today){
     var sc = r && r.top ? r.top.score : null;
     var cls = r ? r.cls : "bad";
     var txt = (sc===null) ? "SIN COINCIDENCIA" : (sc+"%");
+
+    // clima de HOY (arriba)
+    var climaHoy = "";
+    if(today){
+      climaHoy = '<div class="estadio">HOY: '+
+        (today.temperature_f!==undefined?today.temperature_f+"°":"?")+
+        ' · viento '+(today.windspeed_mph!==undefined?today.windspeed_mph:"?")+
+        ' · dir '+(today.wind_dir!==undefined && today.wind_dir!==null && today.wind_dir!==""?today.wind_dir:"NO CONFIRMADO")+
+        ' · hum '+(today.humidity_pct!==undefined?today.humidity_pct+"%":"?")+'</div>';
+    }
+
+    // 5 líneas + acumular para promedios
     var det = "";
+    var sumScore=0, nScore=0, sumRuns=0, nRuns=0;
     if(r && r.ranked && r.ranked.length){
       for(var j=0;j<r.ranked.length;j++){
         var h=r.ranked[j];
+
+        var ar = (h.away_runs!==undefined && h.away_runs!==null) ? h.away_runs : null;
+        var hr = (h.home_runs!==undefined && h.home_runs!==null) ? h.home_runs : null;
+        var carreras;
+        if(ar!==null && hr!==null){
+          var tot = ar + hr;
+          carreras = ar+"-"+hr+" ("+tot+" carreras)";
+          sumRuns += tot; nRuns++;
+        } else {
+          carreras = "— sin marcador";
+        }
+
+        if(typeof h.score === "number"){ sumScore += h.score; nScore++; }
+
         det += '<div class="hrow">'+
           (h.date||"?")+' · '+(h.away_team||"?")+' / '+(h.home_team||"?")+
           ' · '+(h.temperature_f!==undefined?h.temperature_f+"°":"?")+
           ' · viento '+(h.windspeed_mph!==undefined?h.windspeed_mph:"?")+
           ' · hum '+(h.humidity_pct!==undefined?h.humidity_pct+"%":"?")+
-          ' · score '+h.score+'%</div>';
+          ' · score '+h.score+'%'+
+          ' · '+carreras+'</div>';
       }
     } else {
       det = '<div class="hrow">Sin históricos para mostrar.</div>';
     }
+
+    // conclusión: cada número en su renglón, centrado
+    var conclusion = "";
+    if(nScore>0 || nRuns>0){
+      var promScore = nScore>0 ? Math.round(sumScore/nScore) : null;
+      var promRuns  = nRuns>0  ? (sumRuns/nRuns).toFixed(1) : null;
+      conclusion =
+        '<div class="concl">'+
+          '<div class="lbl">COINCIDENCIA PROMEDIO</div>'+
+          '<div class="val">'+(promScore!==null?promScore+"%":"—")+'</div>'+
+          '<div class="lbl sep">PROMEDIO DE CARRERAS</div>'+
+          '<div class="val">'+(promRuns!==null?promRuns:"—")+'</div>'+
+        '</div>';
+    }
+
     return '<div class="juego" onclick="toggleDet('+idx+')">'+
       '<div class="matchup">'+away+' @ '+home+'</div>'+
       '<div class="estadio">'+(venue||"SIN PARQUE")+'</div>'+
+      climaHoy +
       '<div class="score '+cls+'">Coincidencia: '+txt+'</div>'+
       '<div class="ver">Toca para ver los 5 parecidos ▼</div>'+
-      '<div class="detalle" id="det'+idx+'">'+det+'</div>'+
+      '<div class="detalle" id="det'+idx+'">'+det+conclusion+'</div>'+
       '</div>';
   }
 
