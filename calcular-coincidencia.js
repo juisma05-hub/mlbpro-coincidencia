@@ -16,8 +16,13 @@ function calcularCoincidencia(today) {
   });
   const base = mismoParque.length > 0 ? mismoParque : hist;
 
+  // solo juegos Final con carreras reales (excluye hoy y sin marcador)
+  const baseFiltrada = base.filter(function(h){
+    return h.status === "Final" && h.home_runs !== null && h.home_runs !== undefined;
+  });
+
   // mapear cada historico con su score (tu logica linea 401-404)
-  const ranked = base
+  const ranked = baseFiltrada
     .map(function (h) {
       const hAdaptado = {
         temperature_f: h.temperature_f,
@@ -35,5 +40,5 @@ function calcularCoincidencia(today) {
   const top = ranked[0] || null;
   const cls = top && top.score >= 80 ? "ok" : (top && top.score >= 60 ? "mid" : "bad");
 
-  return { top: top, ranked: ranked, cls: cls, base_usada: base.length };
+  return { top: top, ranked: ranked, cls: cls, base_usada: baseFiltrada.length };
 }
