@@ -18,6 +18,7 @@
 
 <script src="clima-cache.js"></script>
 <script src="bloques-serie.js"></script>
+<script src="bloques-trayectoria.js"></script>
 <script>
   var out = document.getElementById("out");
   try {
@@ -28,8 +29,11 @@
     var html = "";
     for (var i=0; i<bloques.length; i++){
       var b = bloques[i];
+      var tr = analizarTrayectoria(b);
+      var saltosTxt = tr.saltos.length ? (' · ⚠️ '+tr.saltos.length+' salto(s) anormal(es)') : '';
       html += '<div class="b"><div class="t">'+b.home_team+' · '+b.venue+'</div>'+
-        '<div class="s">'+b.fecha_inicio+' a '+b.fecha_fin+' · '+b.n_juegos+' juegos</div>';
+        '<div class="s">'+b.fecha_inicio+' a '+b.fecha_fin+' · '+b.n_juegos+' juegos · '+
+        tr.tendencia+' ('+tr.min+'° a '+tr.max+'°)'+saltosTxt+'</div>';
       for (var j=0;j<b.juegos.length;j++){
         var g=b.juegos[j];
         html += '<div class="g">'+g.date+' · '+(g.away_team||"?")+' / '+(g.home_team||"?")+
