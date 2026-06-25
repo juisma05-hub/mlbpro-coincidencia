@@ -4,9 +4,23 @@
 //   tempF->temperature_f, windMph->windspeed_mph, humidity->humidity_pct,
 //   precip->precipitation_mm, windDir->wind_dir, venue->venueName
 // Mismos pesos: 30, 25, 20, 10, direccion 10. No se inventa nada.
+//
+// PIEZA 1 (domo fijo): si el parque tiene roof "fixed_dome" (hoy solo Tropicana
+// en estadios.js), el viento exterior NO entra al score, porque en un domo fijo
+// el viento de afuera no toca la pelota. NO se inventa brisa interna: el viento
+// simplemente no se evalua. Los retractables NO se tocan en esta pieza (Pieza 2).
 
 function scoreMatch(today, h) {
   let score = 0;
+
+  // --- interruptor de domo fijo (lee roof de estadios.js, ya cargado antes) ---
+  let vientoCuenta = true;
+  if (typeof STADIUM_INDEX !== "undefined" && today.venueName) {
+    const s = STADIUM_INDEX.get(stadiumNorm(today.venueName));
+    if (s && s.roof === "fixed_dome") {
+      vientoCuenta = false;
+    }
+  }
 
   const tempDiff   = Math.abs(Number(today.temperature_f)   - Number(h.temperature_f));
   const windDiff   = Math.abs(Number(today.windspeed_mph)   - Number(h.windspeed_mph));
@@ -14,12 +28,15 @@ function scoreMatch(today, h) {
   const precipDiff = Math.abs(Number(today.precipitation_mm) - Number(h.precipitation_mm));
 
   score += Math.max(0, 30 - tempDiff);
-  score += Math.max(0, 25 - (windDiff * 2));
+  if (vientoCuenta) {
+    score += Math.max(0, 25 - (windDiff * 2));
+  }
   score += Math.max(0, 20 - (humDiff / 3));
   score += Math.max(0, 10 - (precipDiff * 10));
 
   // direccion del viento solo cuenta si es el MISMO parque (igual que tu app)
-  if (today.venueName && h.venueName && today.venueName === h.venueName) {
+  // y solo si el viento cuenta (en domo fijo tampoco aplica la direccion)
+  if (vientoCuenta && today.venueName && h.venueName && today.venueName === h.venueName) {
     const td = Number(today.wind_dir);
     const hd = Number(h.wind_dir);
     if (Number.isFinite(td) && Number.isFinite(hd)) {
