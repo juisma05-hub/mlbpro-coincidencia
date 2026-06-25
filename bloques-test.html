@@ -19,6 +19,7 @@
 <script src="clima-cache.js"></script>
 <script src="bloques-serie.js"></script>
 <script src="bloques-trayectoria.js"></script>
+<script src="bloques-carreraje.js"></script>
 <script>
   var out = document.getElementById("out");
   try {
@@ -31,9 +32,12 @@
       var b = bloques[i];
       var tr = analizarTrayectoria(b);
       var saltosTxt = tr.saltos.length ? (' · ⚠️ '+tr.saltos.length+' salto(s) anormal(es)') : '';
+      var c = auditarCarreraje(b);
+      var carrTxt = (c.estado==="NO CONFIRMADO") ? "NO CONFIRMADO" : (c.estado+" · prom "+c.prom+" ("+c.min+"-"+c.max+") · "+c.n+" juegos");
       html += '<div class="b"><div class="t">'+b.home_team+' · '+b.venue+'</div>'+
         '<div class="s">'+b.fecha_inicio+' a '+b.fecha_fin+' · '+b.n_juegos+' juegos · '+
-        tr.tendencia+' ('+tr.min+'° a '+tr.max+'°)'+saltosTxt+'</div>';
+        tr.tendencia+' ('+tr.min+'° a '+tr.max+'°)'+saltosTxt+'</div>'+
+        '<div class="s">CARRERAJE: '+carrTxt+'</div>';
       for (var j=0;j<b.juegos.length;j++){
         var g=b.juegos[j];
         html += '<div class="g">'+g.date+' · '+(g.away_team||"?")+' / '+(g.home_team||"?")+
