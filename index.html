@@ -44,6 +44,7 @@
 <script src="jalar-clima.js"></script>
 <script src="score-match.js"></script>
 <script src="calcular-coincidencia.js"></script>
+<script src="jalar-condition.js"></script>
 <script src="brisa-geo-parques.js"></script>
 
 <script>
@@ -84,11 +85,14 @@
         var w = await climaFetchWeather(s, hoy, hoy);
         var hit = w.get(climaKeyTZ(g.gameDate, s.timezone));
         if(!hit){ html+=tarjeta(away,home,venue,null,i,null,pitcherAway,pitcherHome); continue; }
+        var condHoy = await jalarCondition(g.gamePk);
         var today = {
           temperature_f: hit.temperature_f, windspeed_mph: hit.windspeed_mph,
           humidity_pct: hit.humidity_pct, precipitation_mm: hit.precipitation_mm,
-          wind_dir: hit.wind_dir, venueName: venue
+          wind_dir: hit.wind_dir, venueName: venue,
+          condition: condHoy
         };
+        log("condition " + venue + ": " + condHoy);
         var r = calcularCoincidencia(today);
         html += tarjeta(away,home,venue,r,i,today,pitcherAway,pitcherHome);
       }
