@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Venideros · Test</title>
+<style>
+  body { margin:0; font-family:-apple-system,system-ui,sans-serif; background:#0d1117; color:#e6edf3; padding:16px; }
+  .b { background:#161b22; border:1px solid #30363d; border-radius:10px; padding:12px; margin-bottom:12px; }
+  .t { font-weight:800; font-size:15px; }
+  .s { font-size:12px; color:#8b949e; margin-top:4px; }
+  .g { font-size:12px; color:#ccc; padding:3px 0; border-bottom:1px solid #21262d; }
+</style>
+</head>
+<body>
+<h2>Series venideras (7 días)</h2>
+<div id="console" style="font-size:12px;color:#8b949e;margin-bottom:10px;">Cargando...</div>
+<div id="out"></div>
+
+<script src="mlb-routes.js"></script>
+<script src="bloques-serie.js"></script>
+<script src="venideros-schedule.js"></script>
+<script>
+  var cons = document.getElementById("console");
+  var out = document.getElementById("out");
+  function log(t){ var d=document.createElement("div"); d.textContent=t; cons.appendChild(d); }
+  (async function(){
+    try {
+      var bloques = await veniderosSchedule(log);
+      bloques.sort(function(a,b){ return a.fecha_inicio < b.fecha_inicio ? -1 : 1; });
+      var html = "";
+      for (var i=0;i<bloques.length;i++){
+        var b = bloques[i];
+        html += '<div class="b"><div class="t">'+b.home_team+' · '+b.venue+'</div>'+
+          '<div class="s">'+b.fecha_inicio+' a '+b.fecha_fin+' · '+b.n_juegos+' juegos</div>';
+        for (var j=0;j<b.juegos.length;j++){
+          var g=b.juegos[j];
+          html += '<div class="g">'+g.date+' · '+(g.away_team||"?")+' / '+(g.home_team||"?")+'</div>';
+        }
+        html += '</div>';
+      }
+      out.innerHTML = html;
+    } catch(e){
+      out.innerHTML = "ERROR: " + (e && e.message ? e.message : e);
+    }
+  })();
+</script>
+</body>
+</html>
