@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>MLBPro · Roster Test</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; font-family:-apple-system,system-ui,sans-serif; background:#0d1117; color:#e6edf3; }
+  header { padding:14px 16px; border-bottom:1px solid #30363d; }
+  h1 { font-size:17px; margin:0; }
+  main { padding:16px; max-width:900px; margin:0 auto; }
+  .go { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#fff; background:#8957e5; cursor:pointer; }
+  .go:disabled { background:#30363d; color:#8b949e; }
+  .juego { background:#161b22; border:1px solid #30363d; border-radius:10px; padding:12px; margin-top:12px; }
+  .matchup { font-size:15px; font-weight:800; }
+  .row { font-size:13px; color:#ccc; padding:4px 0; border-bottom:1px solid #21262d; }
+  .ok{color:#32d74b;} .bad{color:#ff453a;}
+  #console { margin-top:16px; background:#010409; border:1px solid #30363d; border-radius:8px; padding:12px; min-height:60px; max-height:35vh; overflow:auto; font-family:ui-monospace,monospace; font-size:12px; white-space:pre-wrap; }
+</style>
+</head>
+<body>
+<header><h1>MLBPro · Roster Test (temporal)</h1></header>
+<main>
+  <button id="go" class="go">PROBAR ROSTER (juegos de hoy)</button>
+  <div id="lista"></div>
+  <div id="console">Pulsa el botón.</div>
+</main>
+
+<script>
+  // WORKER_BASE real (mismo valor que mlb-routes.js). Se define aqui para que
+  // el test no dependa del orden de carga. NO sustituye a mlb-routes.js en la app.
+  if (typeof MLB_ROUTES === "undefined") {
+    window.MLB_ROUTES = { WORKER_BASE: "https://mlb-score-proxy.jip0512.workers.dev/?url=" };
+  }
+</script>
+<script src="jalar-roster.js"></script>
+
+<script>
+  var consoleEl = document.getElementById("console");
+  var listaEl = document.getElementById("lista");
+  function log(t){ var d=document.createElement("div"); d.textContent=t; consoleEl.appendChild(d); consoleEl.scrollTop=consoleEl.scrollHeight; }
+
+  function hoyISO(){
+    var d=new Date(Date.now() - 6*60*60*1000);
+    return d.getFullYear()+"-"+("0"+(d.getMonth()+1)).slice(-2)+"-"+("0"+d.getDate()).slice(-2);
+  }
+
+  document.getElementById("go").addEventListener("click", async function(){
+    var btn=this; btn.disabled=true; btn.textContent="TRABAJANDO…";
+    consoleEl.textContent=""; listaEl.innerHTML="";
+    try {
+      var hoy = hoyISO();
+      log("Trayendo juegos de hoy ("+hoy+")...");
+      var mlbUrl = "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date="+hoy;
+      var resp = await fetch(MLB_ROUTES.WORKER_BASE + encodeURIComponent(mlbUrl));
+      if(!resp.ok) throw new Error("Schedule HTTP "+resp.status);
+      var data = await resp.json();
+      var games = (data.dates && data.dates[0]) ? data.dates[0].games : [];
+      log("Juegos hoy: "+games.length);
+      if(games.length===0){ log("No hay juegos hoy."); return; }
+
+      // prueba con los primeros 3 juegos para no tardar
+      var n = Math.min(3, games.length);
+      var html = "";
+      for(var i=0;i<n;i++){
+        var g = games[i];
+        var gamePk = g.gamePk;
+        var away = (g.teams&&g.teams.away&&g.teams.away.team)? g.teams.away.team.name : "?";
+        var home = (g.teams&&g.teams.home&&g.teams.home.team)? g.teams.home.team.name : "?";
+        log("Roster de gamePk "+gamePk+" ("+away+" @ "+home+")...");
+        var r = await jalarRoster(gamePk);
+        log(JSON.stringify(r));
+
+        function okbad(v){ return (v==="NO_CONFIRMADO" || v===null) ? '<span class="bad">'+v+'</span>' : '<span class="ok">'+v+'</span>'; }
+        html += '<div class="juego">'+
+          '<div class="matchup">'+away+' @ '+home+' · gamePk '+gamePk+'</div>'+
+          '<div class="row">pitcher_away_id: '+okbad(r.pitcher_away_id)+'</div>'+
+          '<div class="row">pitcher_home_id: '+okbad(r.pitcher_home_id)+'</div>'+
+          '<div class="row">catcher_away_id: '+okbad(r.catcher_away_id)+'</div>'+
+          '<div class="row">catcher_home_id: '+okbad(r.catcher_home_id)+'</div>'+
+          '<div class="row">umpire_home: '+okbad(r.umpire_home)+'</div>'+
+          (r.error ? '<div class="row bad">error: '+r.error+'</div>' : '')+
+        '</div>';
+      }
+      listaEl.innerHTML = html;
+      log("LISTO.");
+    } catch(e) {
+      log("ERROR: " + (e && e.message ? e.message : e));
+    } finally {
+      btn.disabled=false; btn.textContent="PROBAR ROSTER (juegos de hoy)";
+    }
+  });
+</script>
+</body>
+</html>
