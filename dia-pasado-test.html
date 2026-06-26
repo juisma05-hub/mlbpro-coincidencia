@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>MLBPro · Día Pasado TEST</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; font-family:-apple-system,system-ui,sans-serif; background:#0d1117; color:#e6edf3; }
+  header { padding:14px 16px; border-bottom:1px solid #30363d; }
+  h1 { font-size:17px; margin:0; }
+  main { padding:16px; max-width:900px; margin:0 auto; }
+  .fila { display:flex; gap:8px; align-items:center; margin-bottom:12px; }
+  input[type="date"] { flex:1; background:#161b22; color:#e6edf3; border:1px solid #30363d; border-radius:10px; padding:14px; font-size:16px; }
+  .go { border:0; border-radius:10px; padding:14px 18px; font-size:16px; font-weight:800; color:#fff; background:#238636; cursor:pointer; }
+  .go:disabled { background:#30363d; color:#8b949e; }
+  .juego { background:#161b22; border:1px solid #30363d; border-radius:10px; padding:12px; margin-top:12px; cursor:pointer; }
+  .matchup { font-size:16px; font-weight:800; }
+  .estadio { font-size:13px; color:#bbb; margin:2px 0; }
+  .score { font-size:22px; font-weight:800; margin-top:6px; }
+  .ok{color:#32d74b;} .mid{color:#ffd60a;} .bad{color:#ff453a;}
+  .ver { font-size:12px; color:#79c0ff; margin-top:6px; }
+  .detalle { display:none; margin-top:10px; border-top:1px solid #30363d; padding-top:10px; }
+  .detalle.abierto { display:block; }
+  .hrow { font-size:12px; color:#ccc; padding:4px 0; border-bottom:1px solid #21262d; }
+  .concl { text-align:center; border-top:1px solid #30363d; margin-top:10px; padding-top:10px; }
+  .concl .lbl { font-size:12px; color:#8b949e; }
+  .concl .val { font-size:20px; font-weight:800; color:#79c0ff; }
+  .concl .sep { margin-top:8px; }
+  #console { margin-top:16px; background:#010409; border:1px solid #30363d; border-radius:8px; padding:12px; min-height:50px; max-height:25vh; overflow:auto; font-family:ui-monospace,monospace; font-size:12px; white-space:pre-wrap; }
+</style>
+</head>
+<body>
+<header><h1>MLBPro · Día Pasado TEST</h1></header>
+<main>
+  <div class="fila">
+    <input type="date" id="fecha" />
+    <button id="go" class="go">VER</button>
+  </div>
+  <div id="lista"></div>
+  <div id="console">Elige una fecha pasada y pulsa VER.</div>
+</main>
+
+<script src="mlb-routes.js"></script>
+<script src="estadios.js"></script>
+<script src="clima-cache.js"></script>
+<script src="score-match.js"></script>
+<script src="calcular-coincidencia.js"></script>
+
+<script>
+  var consoleEl = document.getElementById("console");
+  var listaEl = document.getElementById("lista");
+  function log(t){ var d=document.createElement("div"); d.textContent=t; consoleEl.appendChild(d); consoleEl.scrollTop=consoleEl.scrollHeight; }
+
+  document.getElementById("go").addEventListener("click", function(){
+    var btn=this; btn.disabled=true;
+    consoleEl.textContent=""; listaEl.innerHTML="";
+    try {
+      var fecha = document.getElementById("fecha").value; // YYYY-MM-DD
+      if(!fecha){ log("No elegiste fecha."); return; }
+      log("Fecha pedida: " + fecha);
+
+      var cache = climaLeerCache();
+      log("Filas en cache: " + cache.length);
+      if(cache.length === 0){
+        log("CACHE VACIO. Abre primero el index y pulsa COINCIDENCIA para llenar el cache.");
+        return;
+      }
+
+      // filtra los juegos de esa fecha (campo date confirmado: YYYY-MM-DD)
+      var delDia = cache.filter(function(r){ return r.date === fecha; });
+      log("Juegos en cache ese dia: " + delDia.length);
+      if(delDia.length === 0){
+        log("No hay juegos guardados para " + fecha + ". (Solo aparecen dias ya jalados al cache.)");
+        return;
+      }
+
+      var html = "";
+      for(var i=0;i<delDia.length;i++){
+        var g = delDia[i];
+
+        // arma el objeto clima de ESE juego desde el cache (no en vivo)
+        var clima = {
+          temperature_f: g.temperature_f,
+          windspeed_mph: g.windspeed_mph,
+          humidity_pct: g.humidity_pct,
+          precipitation_mm: g.precipitation_mm,
+          wind_dir: g.wind_dir,
+          venueName: g.venue
+        };
+
+        // solo calcula coincidencia si el clima de esa fila es numerico (no ERR:...)
+        var climaOk = (typeof g.temperature_f === "number");
+        var r = climaOk ? calcularCoincidencia(clima) : null;
+
+        html += tarjeta(g, r, i, climaOk);
+      }
+      listaEl.innerHTML = html;
+      log("LISTO.");
+    } catch(e) {
+      log("ERROR REAL: " + (e && e.message ? e.message : e));
+    } finally {
+      btn.disabled=false;
+    }
+  });
+
+  function tarjeta(g, r, idx, climaOk){
+    var away = g.away_team || "?";
+    var home = g.home_team || "?";
+    var venue = g.venue || "SIN PARQUE";
+
+    var sc = r && r.top ? r.top.score : null;
+    var cls = r ? r.cls : "bad";
+    var txt = (!climaOk) ? "CLIMA NO NUMERICO (" + g.temperature_f + ")"
+            : (sc===null ? "SIN COINCIDENCIA" : sc+"%");
+
+    // marcador real de ESE juego (ya guardado en cache)
+    var marcador = "";
+    if(g.away_runs!==null && g.away_runs!==undefined && g.home_runs!==null && g.home_runs!==undefined){
+      marcador = '<div class="estadio">Marcador: '+g.away_runs+'-'+g.home_runs+' ('+g.total_runs+' carreras) · '+(g.status||"")+'</div>';
+    } else {
+      marcador = '<div class="estadio">Marcador: — sin datos · '+(g.status||"")+'</div>';
+    }
+
+    var climaHoy = '<div class="estadio">CLIMA: '+
+      (g.temperature_f!==undefined?g.temperature_f+"°":"?")+
+      ' · viento '+(g.windspeed_mph!==undefined?g.windspeed_mph:"?")+
+      ' · dir '+(g.wind_dir!==undefined && g.wind_dir!==null && g.wind_dir!==""?g.wind_dir:"NO CONFIRMADO")+
+      ' · hum '+(g.humidity_pct!==undefined?g.humidity_pct+"%":"?")+'</div>';
+
+    var det = "";
+    var sumScore=0, nScore=0, sumRuns=0, nRuns=0;
+    if(r && r.ranked && r.ranked.length){
+      for(var j=0;j<r.ranked.length;j++){
+        var h=r.ranked[j];
+        var ar = (h.away_runs!==undefined && h.away_runs!==null) ? h.away_runs : null;
+        var hr = (h.home_runs!==undefined && h.home_runs!==null) ? h.home_runs : null;
+        var carreras;
+        if(ar!==null && hr!==null){
+          var tot = ar + hr;
+          carreras = ar+"-"+hr+" ("+tot+" carreras)";
+          sumRuns += tot; nRuns++;
+        } else {
+          carreras = "— sin marcador";
+        }
+        if(typeof h.score === "number"){ sumScore += h.score; nScore++; }
+        det += '<div class="hrow">'+
+          (h.date||"?")+' · '+(h.away_team||"?")+' / '+(h.home_team||"?")+
+          ' · '+(h.temperature_f!==undefined?h.temperature_f+"°":"?")+
+          ' · viento '+(h.windspeed_mph!==undefined?h.windspeed_mph:"?")+
+          ' · hum '+(h.humidity_pct!==undefined?h.humidity_pct+"%":"?")+
+          ' · score '+h.score+'%'+
+          ' · '+carreras+'</div>';
+      }
+    } else if(climaOk){
+      det = '<div class="hrow">Sin históricos para mostrar.</div>';
+    } else {
+      det = '<div class="hrow">No se calcula coincidencia: el clima guardado de este juego no es numérico.</div>';
+    }
+
+    var conclusion = "";
+    if(nScore>0 || nRuns>0){
+      var promScore = nScore>0 ? Math.round(sumScore/nScore) : null;
+      var promRuns  = nRuns>0  ? (sumRuns/nRuns).toFixed(1) : null;
+      conclusion =
+        '<div class="concl">'+
+          '<div class="lbl">COINCIDENCIA PROMEDIO</div>'+
+          '<div class="val">'+(promScore!==null?promScore+"%":"—")+'</div>'+
+          '<div class="lbl sep">PROMEDIO DE CARRERAS (de los 5 parecidos)</div>'+
+          '<div class="val">'+(promRuns!==null?promRuns:"—")+'</div>'+
+        '</div>';
+    }
+
+    return '<div class="juego" onclick="toggleDet('+idx+')">'+
+      '<div class="matchup">'+away+' @ '+home+'</div>'+
+      '<div class="estadio">'+venue+'</div>'+
+      marcador +
+      climaHoy +
+      '<div class="score '+cls+'">Coincidencia: '+txt+'</div>'+
+      '<div class="ver">Toca para ver los 5 parecidos ▼</div>'+
+      '<div class="detalle" id="det'+idx+'">'+det+conclusion+'</div>'+
+      '</div>';
+  }
+
+  function toggleDet(idx){
+    var d=document.getElementById("det"+idx);
+    if(d){ d.classList.toggle("abierto"); }
+  }
+</script>
+</body>
+</html>
