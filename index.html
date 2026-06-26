@@ -56,7 +56,8 @@
   function log(t){ var d=document.createElement("div"); d.textContent=t; consoleEl.appendChild(d); consoleEl.scrollTop=consoleEl.scrollHeight; }
 
   function hoyISO(){
-    var d=new Date();
+    // Corte 6 AM: antes de las 6 AM se sigue mostrando el dia anterior.
+    var d=new Date(Date.now() - 6*60*60*1000);
     return d.getFullYear()+"-"+("0"+(d.getMonth()+1)).slice(-2)+"-"+("0"+d.getDate()).slice(-2);
   }
 
