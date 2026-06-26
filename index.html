@@ -66,6 +66,8 @@
 <script src="traducir-pitcher.js"></script>
 <script src="catchers-master.js"></script>
 <script src="traducir-catcher.js"></script>
+<script src="umpires-master.js"></script>
+<script src="traducir-umpire.js"></script>
 
 <script src="bloques-serie.js"></script>
 <script src="bloques-trayectoria.js"></script>
@@ -218,6 +220,18 @@
     return series;
   }
 
+  // --- texto corto de stats de umpire (recibe el objeto de traducirUmpire) ---
+  function umpireTxt(u){
+    if(!u || u.zone_type === "NO_CONFIRMADO"){
+      return (u && u.nombre ? u.nombre : "NO_CONFIRMADO") + " (stats NO_CONFIRMADO)";
+    }
+    return u.nombre +
+      " (zona "+u.zone_type+
+      " · K/j "+u.k_per_game+
+      " · BB/j "+u.bb_per_game+
+      " · "+u.k_tier+")";
+  }
+
   // --- html del bloque serie, mismo patron que serie-pasada-test.html ---
   function serieParqueHtml(venue, bloquesSerie, rosterMap){
     var b = serieDelParque(venue, bloquesSerie);
@@ -271,7 +285,8 @@
         var ch = traducirCatcher(ros.catcher_home_id);
         catcherFila = ' · 🧤 '+ca.nombre+' vs '+ch.nombre;
 
-        umpireFila = ' · 🧑‍⚖️ '+(ros.umpire_home || "NO_CONFIRMADO");
+        var uf = traducirUmpire(ros.umpire_home);
+        umpireFila = ' · 🧑‍⚖️ '+umpireTxt(uf);
       } else {
         pitcherFila = ' · ⚾ NO_CONFIRMADO';
         catcherFila = ' · 🧤 NO_CONFIRMADO';
@@ -342,8 +357,9 @@
     }
     var catchersHtml = '<div class="estadio">🧤 '+ca.nombre+rvTxt(ca.rv_tot)+' vs '+ch.nombre+rvTxt(ch.rv_tot)+'</div>';
 
-    // --- umpire de plato de HOY (nombre real, sin master, viene directo del feed) ---
-    var umpireHtml = '<div class="estadio">🧑‍⚖️ Umpire de plato: '+(umpireHomeHoy || "NO_CONFIRMADO")+'</div>';
+    // --- umpire de plato de HOY (nombre real del feed + stats via traducirUmpire) ---
+    var uHoy = traducirUmpire(umpireHomeHoy);
+    var umpireHtml = '<div class="estadio">🧑‍⚖️ Umpire de plato: '+umpireTxt(uHoy)+'</div>';
 
     var det = "";
     var sumScore=0, nScore=0, sumRuns=0, nRuns=0;
