@@ -9,7 +9,9 @@ var SALTO_ANORMAL = 6;
 function analizarTrayectoria(bloque) {
   var temps = [];
   (bloque.juegos || []).forEach(function (g) {
-    var t = Number(g.temperature_f);
+    var raw = g.temperature_f;
+    if (raw === "" || raw === null || raw === undefined) return;
+    var t = Number(raw);
     if (Number.isFinite(t)) temps.push({ date: g.date, t: t });
   });
 
