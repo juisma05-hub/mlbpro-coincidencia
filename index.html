@@ -14,6 +14,7 @@
   .go { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#fff; background:#238636; cursor:pointer; }
   .go:disabled { background:#30363d; color:#8b949e; }
   .go-venideros { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#fff; background:#1f6feb; cursor:pointer; margin-top:12px; }
+  .go-pasados { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#fff; background:#d2691e; cursor:pointer; margin-top:12px; }
   .juego { background:#161b22; border:1px solid #30363d; border-radius:10px; padding:12px; margin-top:12px; cursor:pointer; }
   .matchup { font-size:16px; font-weight:800; }
   .estadio { font-size:13px; color:#bbb; margin:2px 0; }
@@ -35,6 +36,7 @@
 <main>
   <button id="go" class="go">COINCIDENCIA MLBPRO</button>
   <button id="goVenideros" class="go-venideros">SERIES VENIDERAS (7 días)</button>
+  <button id="goPasados" class="go-pasados">DÍAS PASADOS</button>
   <div id="lista"></div>
   <div id="console">Pulsa el botón.</div>
 </main>
@@ -63,6 +65,10 @@
 
   document.getElementById("goVenideros").addEventListener("click", function(){
     location.href = "venideros-test.html";
+  });
+
+  document.getElementById("goPasados").addEventListener("click", function(){
+    location.href = "dia-pasado-test.html";
   });
 
   document.getElementById("go").addEventListener("click", async function(){
