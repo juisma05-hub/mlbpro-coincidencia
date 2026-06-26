@@ -18,8 +18,11 @@
 <div id="out"></div>
 
 <script src="mlb-routes.js"></script>
+<script src="estadios.js"></script>
 <script src="bloques-serie.js"></script>
+<script src="bloques-trayectoria.js"></script>
 <script src="venideros-schedule.js"></script>
+<script src="venideros-pronostico.js"></script>
 <script>
   var cons = document.getElementById("console");
   var out = document.getElementById("out");
@@ -27,19 +30,26 @@
   (async function(){
     try {
       var bloques = await veniderosSchedule(log);
+      log("Trayendo pronóstico...");
+      await pronosticoVenideros(bloques, log);
       bloques.sort(function(a,b){ return a.fecha_inicio < b.fecha_inicio ? -1 : 1; });
       var html = "";
       for (var i=0;i<bloques.length;i++){
         var b = bloques[i];
+        var tr = analizarTrayectoria(b);
+        var saltosTxt = tr.saltos.length ? (' · ⚠️ '+tr.saltos.length+' salto(s)') : '';
         html += '<div class="b"><div class="t">'+b.home_team+' · '+b.venue+'</div>'+
-          '<div class="s">'+b.fecha_inicio+' a '+b.fecha_fin+' · '+b.n_juegos+' juegos</div>';
+          '<div class="s">'+b.fecha_inicio+' a '+b.fecha_fin+' · '+b.n_juegos+' juegos · '+
+          tr.tendencia+' ('+tr.min+'° a '+tr.max+'°)'+saltosTxt+'</div>';
         for (var j=0;j<b.juegos.length;j++){
           var g=b.juegos[j];
-          html += '<div class="g">'+g.date+' · '+(g.away_team||"?")+' / '+(g.home_team||"?")+'</div>';
+          html += '<div class="g">'+g.date+' · '+(g.away_team||"?")+' / '+(g.home_team||"?")+
+            ' · '+(g.temperature_f!==undefined && g.temperature_f!==""?g.temperature_f+"°":"PENDIENTE")+'</div>';
         }
         html += '</div>';
       }
       out.innerHTML = html;
+      log("LISTO.");
     } catch(e){
       out.innerHTML = "ERROR: " + (e && e.message ? e.message : e);
     }
