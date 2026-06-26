@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>MLBPro · Serie Pasada TEST</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; font-family:-apple-system,system-ui,sans-serif; background:#0d1117; color:#e6edf3; }
+  header { padding:14px 16px; border-bottom:1px solid #30363d; }
+  h1 { font-size:17px; margin:0; }
+  main { padding:16px; max-width:900px; margin:0 auto; }
+  .fila { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
+  input[type="text"] { flex:1; background:#161b22; color:#e6edf3; border:1px solid #30363d; border-radius:10px; padding:14px; font-size:16px; }
+  .go { border:0; border-radius:10px; padding:14px 18px; font-size:16px; font-weight:800; color:#fff; background:#d2691e; cursor:pointer; }
+  .go:disabled { background:#30363d; color:#8b949e; }
+  .hint { font-size:12px; color:#8b949e; margin-bottom:12px; }
+  .serie { background:#161b22; border:1px solid #30363d; border-radius:10px; padding:12px; margin-top:14px; }
+  .serie .ttl { font-size:16px; font-weight:800; }
+  .serie .sub { font-size:13px; color:#bbb; margin:4px 0 2px; }
+  .serie .tray { font-size:13px; font-weight:700; margin:2px 0; }
+  .up{color:#ff9f0a;} .down{color:#64d2ff;} .flat{color:#8b949e;}
+  .salto { font-size:12px; color:#ffd60a; margin:2px 0; }
+  .grow { font-size:12px; color:#ccc; padding:5px 0; border-bottom:1px solid #21262d; }
+  .prom { text-align:center; border-top:1px solid #30363d; margin-top:8px; padding-top:8px; }
+  .prom .lbl { font-size:12px; color:#8b949e; }
+  .prom .val { font-size:20px; font-weight:800; color:#79c0ff; }
+  #console { margin-top:16px; background:#010409; border:1px solid #30363d; border-radius:8px; padding:12px; min-height:50px; max-height:25vh; overflow:auto; font-family:ui-monospace,monospace; font-size:12px; white-space:pre-wrap; }
+</style>
+</head>
+<body>
+<header><h1>MLBPro · Serie Pasada TEST</h1></header>
+<main>
+  <div class="fila">
+    <input type="text" id="filtro" placeholder="Equipo o parque (ej: Tigers o Comerica)" />
+    <button id="go" class="go">VER</button>
+  </div>
+  <div class="hint">Escribe parte del nombre del equipo local o del parque. Muestra solo series en casa de ese equipo/parque.</div>
+  <div id="out"></div>
+  <div id="console">Escribe un equipo o parque y pulsa VER.</div>
+</main>
+
+<script src="mlb-routes.js"></script>
+<script src="estadios.js"></script>
+<script src="clima-cache.js"></script>
+<script src="bloques-serie.js"></script>
+<script src="bloques-trayectoria.js"></script>
+
+<script>
+  var consoleEl = document.getElementById("console");
+  var outEl = document.getElementById("out");
+  function log(t){ var d=document.createElement("div"); d.textContent=t; consoleEl.appendChild(d); consoleEl.scrollTop=consoleEl.scrollHeight; }
+
+  document.getElementById("go").addEventListener("click", function(){
+    var btn=this; btn.disabled=true;
+    consoleEl.textContent=""; outEl.innerHTML="";
+    try {
+      var filtro = (document.getElementById("filtro").value || "").trim().toLowerCase();
+      if(!filtro){ log("Escribe un equipo o parque."); return; }
+
+      var cache = climaLeerCache();
+      log("Filas en cache: " + cache.length);
+      if(cache.length === 0){
+        log("CACHE VACIO. Abre el index, pulsa COINCIDENCIA, y vuelve.");
+        return;
+      }
+
+      // arma TODOS los bloques del cache (mismo venue + dias seguidos)
+      var todos = armarBloques(cache);
+      log("Bloques totales en cache: " + todos.length);
+
+      // filtra: solo bloques cuyo venue o home_team contenga el texto
+      var bloques = todos.filter(function(b){
+        var v = (b.venue||"").toLowerCase();
+        var h = (b.home_team||"").toLowerCase();
+        return v.indexOf(filtro) !== -1 || h.indexOf(filtro) !== -1;
+      });
+      log("Series que coinciden con \"" + filtro + "\": " + bloques.length);
+      if(bloques.length === 0){
+        log("No hay series para ese equipo/parque. Prueba otro nombre.");
+        return;
+      }
+
+      // ordena por fecha de inicio, mas reciente primero
+      bloques.sort(function(a,b){ return a.fecha_inicio < b.fecha_inicio ? 1 : -1; });
+
+      var html = "";
+      for(var i=0;i<bloques.length;i++){
+        html += serieCard(bloques[i]);
+      }
+      outEl.innerHTML = html;
+      log("LISTO.");
+    } catch(e) {
+      log("ERROR REAL: " + (e && e.message ? e.message : e));
+    } finally {
+      btn.disabled=false;
+    }
+  });
+
+  function serieCard(b){
+    var tr = analizarTrayectoria(b);
+
+    var clsTend = tr.tendencia==="SUBE" ? "up" : (tr.tendencia==="BAJA" ? "down" : "flat");
+    var rango = (tr.min!==null && tr.max!==null) ? (" ("+tr.min+"° a "+tr.max+"°)") : "";
+    var trayHtml = '<div class="tray '+clsTend+'">Clima: '+tr.tendencia+rango+'</div>';
+
+    var saltosHtml = "";
+    if(tr.saltos && tr.saltos.length){
+      for(var s=0;s<tr.saltos.length;s++){
+        var sa = tr.saltos[s];
+        saltosHtml += '<div class="salto">⚠️ Salto '+sa.date+': '+sa.de+'° → '+sa.a+'° ('+(sa.dif>0?"+":"")+sa.dif+'°)</div>';
+      }
+    }
+
+    var filas = "";
+    var sumRuns=0, nRuns=0;
+    for(var j=0;j<b.juegos.length;j++){
+      var g=b.juegos[j];
+      var ar = (g.away_runs!==undefined && g.away_runs!==null) ? g.away_runs : null;
+      var hr = (g.home_runs!==undefined && g.home_runs!==null) ? g.home_runs : null;
+      var carreras;
+      if(ar!==null && hr!==null){
+        var tot = ar+hr;
+        carreras = ar+"-"+hr+" ("+tot+" carreras)";
+        sumRuns += tot; nRuns++;
+      } else {
+        carreras = "— sin marcador";
+      }
+      var temp = (g.temperature_f!==undefined && g.temperature_f!==null && g.temperature_f!=="") ? g.temperature_f+"°" : "PENDIENTE";
+      filas += '<div class="grow">'+
+        g.date+' · '+(g.away_team||"?")+' @ '+(g.home_team||"?")+
+        ' · '+temp+
+        ' · viento '+(g.windspeed_mph!==undefined?g.windspeed_mph:"?")+
+        ' · hum '+(g.humidity_pct!==undefined?g.humidity_pct+"%":"?")+
+        ' · '+carreras+'</div>';
+    }
+
+    var prom = "";
+    if(nRuns>0){
+      var promRuns = (sumRuns/nRuns).toFixed(1);
+      prom = '<div class="prom">'+
+        '<div class="lbl">PROMEDIO DE CARRERAS DE LA SERIE ('+nRuns+' juegos con marcador)</div>'+
+        '<div class="val">'+promRuns+'</div>'+
+      '</div>';
+    } else {
+      prom = '<div class="prom"><div class="lbl">Sin marcadores en esta serie.</div></div>';
+    }
+
+    return '<div class="serie">'+
+      '<div class="ttl">'+(b.home_team||"?")+' · '+(b.venue||"?")+'</div>'+
+      '<div class="sub">'+b.fecha_inicio+' a '+b.fecha_fin+' · '+b.n_juegos+' juegos</div>'+
+      trayHtml +
+      saltosHtml +
+      filas +
+      prom +
+    '</div>';
+  }
+</script>
+</body>
+</html>
