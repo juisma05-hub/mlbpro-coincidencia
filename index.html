@@ -87,11 +87,13 @@
         var home = (g.teams&&g.teams.home&&g.teams.home.team)? g.teams.home.team.name : "?";
         var pitcherAway = (g.teams&&g.teams.away&&g.teams.away.probablePitcher) ? g.teams.away.probablePitcher.fullName : "TBD";
         var pitcherHome = (g.teams&&g.teams.home&&g.teams.home.probablePitcher) ? g.teams.home.probablePitcher.fullName : "TBD";
+        var pitcherAwayId = (g.teams&&g.teams.away&&g.teams.away.probablePitcher) ? g.teams.away.probablePitcher.id : null;
+        var pitcherHomeId = (g.teams&&g.teams.home&&g.teams.home.probablePitcher) ? g.teams.home.probablePitcher.id : null;
         var s = STADIUM_INDEX.get(stadiumNorm(venue));
-        if(!s){ html+=tarjeta(away,home,venue,null,i,null,pitcherAway,pitcherHome); continue; }
+        if(!s){ html+=tarjeta(away,home,venue,null,i,null,pitcherAway,pitcherHome,pitcherAwayId,pitcherHomeId); continue; }
         var w = await climaFetchWeather(s, hoy, hoy);
         var hit = w.get(climaKeyTZ(g.gameDate, s.timezone));
-        if(!hit){ html+=tarjeta(away,home,venue,null,i,null,pitcherAway,pitcherHome); continue; }
+        if(!hit){ html+=tarjeta(away,home,venue,null,i,null,pitcherAway,pitcherHome,pitcherAwayId,pitcherHomeId); continue; }
         var condHoy = await jalarCondition(g.gamePk);
         var today = {
           temperature_f: hit.temperature_f, windspeed_mph: hit.windspeed_mph,
@@ -101,7 +103,7 @@
         };
         log("condition " + venue + ": " + condHoy);
         var r = calcularCoincidencia(today);
-        html += tarjeta(away,home,venue,r,i,today,pitcherAway,pitcherHome);
+        html += tarjeta(away,home,venue,r,i,today,pitcherAway,pitcherHome,pitcherAwayId,pitcherHomeId);
       }
       listaEl.innerHTML = html;
       log("LISTO.");
@@ -112,7 +114,7 @@
     }
   });
 
-  function tarjeta(away,home,venue,r,idx,today,pitcherAway,pitcherHome){
+  function tarjeta(away,home,venue,r,idx,today,pitcherAway,pitcherHome,pitcherAwayId,pitcherHomeId){
     var sc = r && r.top ? r.top.score : null;
     var cls = r ? r.cls : "bad";
     var txt = (sc===null) ? "SIN COINCIDENCIA" : (sc+"%");
@@ -129,7 +131,13 @@
         ' · hum '+(today.humidity_pct!==undefined?today.humidity_pct+"%":"?")+'</div>';
     }
 
-    var pitchers = '<div class="estadio">⚾ '+(pitcherAway||"TBD")+' vs '+(pitcherHome||"TBD")+'</div>';
+    function xeraTxt(pid){
+      if(pid===null || pid===undefined) return "";
+      var p = (typeof PITCHERS_MASTER_2026 !== "undefined") ? PITCHERS_MASTER_2026[pid] : null;
+      if(!p || p.xera===undefined || p.xera===null) return " (xERA NO CONFIRMADO)";
+      return " (xERA "+p.xera+" general)";
+    }
+    var pitchers = '<div class="estadio">⚾ '+(pitcherAway||"TBD")+xeraTxt(pitcherAwayId)+' vs '+(pitcherHome||"TBD")+xeraTxt(pitcherHomeId)+'</div>';
 
     var det = "";
     var sumScore=0, nScore=0, sumRuns=0, nRuns=0;
