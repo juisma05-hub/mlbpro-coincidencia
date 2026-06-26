@@ -29,13 +29,13 @@
 </main>
 
 <script>
-  // WORKER_BASE real (mismo valor que mlb-routes.js). Se define aqui para que
-  // el test no dependa del orden de carga. NO sustituye a mlb-routes.js en la app.
   if (typeof MLB_ROUTES === "undefined") {
     window.MLB_ROUTES = { WORKER_BASE: "https://mlb-score-proxy.jip0512.workers.dev/?url=" };
   }
 </script>
 <script src="jalar-roster.js"></script>
+<script src="pitchers-master.js"></script>
+<script src="traducir-pitcher.js"></script>
 
 <script>
   var consoleEl = document.getElementById("console");
@@ -61,7 +61,6 @@
       log("Juegos hoy: "+games.length);
       if(games.length===0){ log("No hay juegos hoy."); return; }
 
-      // prueba con los primeros 3 juegos para no tardar
       var n = Math.min(3, games.length);
       var html = "";
       for(var i=0;i<n;i++){
@@ -74,10 +73,12 @@
         log(JSON.stringify(r));
 
         function okbad(v){ return (v==="NO_CONFIRMADO" || v===null) ? '<span class="bad">'+v+'</span>' : '<span class="ok">'+v+'</span>'; }
+        var pa = traducirPitcher(r.pitcher_away_id);
+        var ph = traducirPitcher(r.pitcher_home_id);
         html += '<div class="juego">'+
           '<div class="matchup">'+away+' @ '+home+' · gamePk '+gamePk+'</div>'+
-          '<div class="row">pitcher_away_id: '+okbad(r.pitcher_away_id)+'</div>'+
-          '<div class="row">pitcher_home_id: '+okbad(r.pitcher_home_id)+'</div>'+
+          '<div class="row">PITCHER away: '+okbad(pa.nombre)+' (xERA '+pa.xera+')</div>'+
+          '<div class="row">PITCHER home: '+okbad(ph.nombre)+' (xERA '+ph.xera+')</div>'+
           '<div class="row">catcher_away_id: '+okbad(r.catcher_away_id)+'</div>'+
           '<div class="row">catcher_home_id: '+okbad(r.catcher_home_id)+'</div>'+
           '<div class="row">umpire_home: '+okbad(r.umpire_home)+'</div>'+
