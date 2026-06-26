@@ -13,6 +13,7 @@
   main { padding:16px; max-width:900px; margin:0 auto; }
   .go { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#fff; background:#238636; cursor:pointer; }
   .go:disabled { background:#30363d; color:#8b949e; }
+  .go-venideros { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#fff; background:#1f6feb; cursor:pointer; margin-top:12px; }
   .juego { background:#161b22; border:1px solid #30363d; border-radius:10px; padding:12px; margin-top:12px; cursor:pointer; }
   .matchup { font-size:16px; font-weight:800; }
   .estadio { font-size:13px; color:#bbb; margin:2px 0; }
@@ -33,6 +34,7 @@
 <header><h1>MLBPro · Coincidencia</h1></header>
 <main>
   <button id="go" class="go">COINCIDENCIA MLBPRO</button>
+  <button id="goVenideros" class="go-venideros">SERIES VENIDERAS (7 días)</button>
   <div id="lista"></div>
   <div id="console">Pulsa el botón.</div>
 </main>
@@ -56,6 +58,10 @@
     var d=new Date();
     return d.getFullYear()+"-"+("0"+(d.getMonth()+1)).slice(-2)+"-"+("0"+d.getDate()).slice(-2);
   }
+
+  document.getElementById("goVenideros").addEventListener("click", function(){
+    location.href = "venideros-test.html";
+  });
 
   document.getElementById("go").addEventListener("click", async function(){
     var btn=this; btn.disabled=true; btn.textContent="TRABAJANDO…";
