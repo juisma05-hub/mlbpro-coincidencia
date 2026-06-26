@@ -156,6 +156,28 @@
     return candidatos[0];
   }
 
+  // --- agrupa una lista de juegos en series del equipo de la casa ---
+  // serie = mismo home_team en dias consecutivos (hueco <= 2 dias, igual que armarBloques)
+  function agruparEnSeries(lista){
+    var arr = lista.slice().filter(function(x){ return x && x.date; });
+    arr.sort(function(a,b){ return a.date < b.date ? -1 : (a.date > b.date ? 1 : 0); });
+    function diffDias(d1,d2){
+      var a=new Date(d1+"T00:00:00"), b=new Date(d2+"T00:00:00");
+      return Math.round((b-a)/86400000);
+    }
+    var series=[], actual=null;
+    for(var i=0;i<arr.length;i++){
+      var g=arr[i];
+      if(actual && g.home_team===actual.home_team && diffDias(actual.ultima, g.date) <= 2){
+        actual.juegos.push(g); actual.ultima=g.date;
+      } else {
+        actual={ home_team:g.home_team, away_team:g.away_team, primera:g.date, ultima:g.date, juegos:[g] };
+        series.push(actual);
+      }
+    }
+    return series;
+  }
+
   // --- html del bloque serie, mismo patron que serie-pasada-test.html ---
   function serieParqueHtml(venue, bloquesSerie){
     var b = serieDelParque(venue, bloquesSerie);
@@ -251,26 +273,42 @@
     var det = "";
     var sumScore=0, nScore=0, sumRuns=0, nRuns=0;
     if(r && r.ranked && r.ranked.length){
-      for(var j=0;j<r.ranked.length;j++){
-        var h=r.ranked[j];
-        var ar = (h.away_runs!==undefined && h.away_runs!==null) ? h.away_runs : null;
-        var hr = (h.home_runs!==undefined && h.home_runs!==null) ? h.home_runs : null;
-        var carreras;
-        if(ar!==null && hr!==null){
-          var tot = ar + hr;
-          carreras = ar+"-"+hr+" ("+tot+" carreras)";
-          sumRuns += tot; nRuns++;
-        } else {
-          carreras = "— sin marcador";
+      // promedios sobre los 5 parecidos (no depende del orden)
+      for(var k=0;k<r.ranked.length;k++){
+        var hk=r.ranked[k];
+        var ark = (hk.away_runs!==undefined && hk.away_runs!==null) ? hk.away_runs : null;
+        var hrk = (hk.home_runs!==undefined && hk.home_runs!==null) ? hk.home_runs : null;
+        if(ark!==null && hrk!==null){ sumRuns += (ark+hrk); nRuns++; }
+        if(typeof hk.score === "number"){ sumScore += hk.score; nScore++; }
+      }
+      // agrupa por serie del equipo de la casa y ordena series de nueva a vieja
+      var series = agruparEnSeries(r.ranked);
+      series.sort(function(a,b){ return a.ultima < b.ultima ? 1 : (a.ultima > b.ultima ? -1 : 0); });
+      for(var s=0;s<series.length;s++){
+        var serie = series[s];
+        det += '<div style="font-size:12px;color:#8b949e;font-weight:700;letter-spacing:0.5px;margin:8px 0 4px;">'+
+               'SERIE · '+(serie.home_team||"?")+' · '+serie.primera+' a '+serie.ultima+' · '+serie.juegos.length+' juego(s)</div>';
+        // juegos de la serie, mas nuevo arriba (copia, no muta)
+        var js = serie.juegos.slice().sort(function(a,b){ return a.date < b.date ? 1 : (a.date > b.date ? -1 : 0); });
+        for(var j=0;j<js.length;j++){
+          var h=js[j];
+          var ar = (h.away_runs!==undefined && h.away_runs!==null) ? h.away_runs : null;
+          var hr = (h.home_runs!==undefined && h.home_runs!==null) ? h.home_runs : null;
+          var carreras;
+          if(ar!==null && hr!==null){
+            var tot = ar + hr;
+            carreras = ar+"-"+hr+" ("+tot+" carreras)";
+          } else {
+            carreras = "— sin marcador";
+          }
+          det += '<div class="hrow">'+
+            (h.date||"?")+' · '+(h.away_team||"?")+' / '+(h.home_team||"?")+
+            ' · '+(h.temperature_f!==undefined?h.temperature_f+"°":"?")+
+            ' · viento '+(h.windspeed_mph!==undefined?h.windspeed_mph:"?")+
+            ' · hum '+(h.humidity_pct!==undefined?h.humidity_pct+"%":"?")+
+            ' · score '+h.score+'%'+
+            ' · '+carreras+'</div>';
         }
-        if(typeof h.score === "number"){ sumScore += h.score; nScore++; }
-        det += '<div class="hrow">'+
-          (h.date||"?")+' · '+(h.away_team||"?")+' / '+(h.home_team||"?")+
-          ' · '+(h.temperature_f!==undefined?h.temperature_f+"°":"?")+
-          ' · viento '+(h.windspeed_mph!==undefined?h.windspeed_mph:"?")+
-          ' · hum '+(h.humidity_pct!==undefined?h.humidity_pct+"%":"?")+
-          ' · score '+h.score+'%'+
-          ' · '+carreras+'</div>';
       }
     } else {
       det = '<div class="hrow">Sin históricos para mostrar.</div>';
