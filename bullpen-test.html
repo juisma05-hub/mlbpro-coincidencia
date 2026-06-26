@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>MLBPro · Bullpen TEST</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; font-family:-apple-system,system-ui,sans-serif; background:#0d1117; color:#e6edf3; }
+  header { padding:14px 16px; border-bottom:1px solid #30363d; }
+  h1 { font-size:17px; margin:0; }
+  main { padding:16px; max-width:900px; margin:0 auto; }
+  .go { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#fff; background:#238636; cursor:pointer; }
+  .go:disabled { background:#30363d; color:#8b949e; }
+  #console { margin-top:16px; background:#010409; border:1px solid #30363d; border-radius:8px; padding:12px; min-height:60px; max-height:70vh; overflow:auto; font-family:ui-monospace,monospace; font-size:12px; white-space:pre-wrap; }
+</style>
+</head>
+<body>
+<header><h1>MLBPro · Bullpen TEST (1 juego Final)</h1></header>
+<main>
+  <button id="go" class="go">PROBAR BOXSCORE</button>
+  <div id="console">Pulsa el boton.</div>
+</main>
+
+<script src="mlb-routes.js"></script>
+<script>
+  var consoleEl = document.getElementById("console");
+  function log(t){ var d=document.createElement("div"); d.textContent=t; consoleEl.appendChild(d); consoleEl.scrollTop=consoleEl.scrollHeight; }
+
+  function ayerISO(){
+    var d=new Date(Date.now() - 24*60*60*1000);
+    return d.getFullYear()+"-"+("0"+(d.getMonth()+1)).slice(-2)+"-"+("0"+d.getDate()).slice(-2);
+  }
+
+  async function jala(url){
+    var full = MLB_ROUTES.WORKER_BASE + encodeURIComponent(url);
+    var resp = await fetch(full);
+    if(!resp.ok) throw new Error("HTTP "+resp.status+" -> "+url);
+    return await resp.json();
+  }
+
+  document.getElementById("go").addEventListener("click", async function(){
+    var btn=this; btn.disabled=true; btn.textContent="TRABAJANDO…";
+    consoleEl.textContent="";
+    try {
+      var ayer = ayerISO();
+      log("Fecha probada (ayer): "+ayer);
+
+      var sched = await jala("https://statsapi.mlb.com/api/v1/schedule?sportId=1&date="+ayer);
+      var games = (sched.dates && sched.dates[0]) ? sched.dates[0].games : [];
+      log("Juegos ese dia: "+games.length);
+
+      var fin = null;
+      for(var i=0;i<games.length;i++){
+        var st = games[i].status ? games[i].status.abstractGameState : "";
+        if(st === "Final"){ fin = games[i]; break; }
+      }
+      if(!fin){ log("No hay juego Final ese dia. Reintenta otro dia."); return; }
+
+      var gamePk = fin.gamePk;
+      var away = (fin.teams&&fin.teams.away&&fin.teams.away.team)?fin.teams.away.team.name:"?";
+      var home = (fin.teams&&fin.teams.home&&fin.teams.home.team)?fin.teams.home.team.name:"?";
+      log("Juego Final: "+away+" @ "+home+" (gamePk "+gamePk+")");
+
+      var box = await jala("https://statsapi.mlb.com/api/v1/game/"+gamePk+"/boxscore");
+      if(!box.teams){ log("boxscore SIN .teams. Keys: "+Object.keys(box).join(", ")); return; }
+
+      var lados = [["AWAY",box.teams.away],["HOME",box.teams.home]];
+      var camposMostrados = false;
+
+      for(var L=0;L<lados.length;L++){
+        var lado = lados[L][0];
+        var t = lados[L][1];
+        if(!t){ log(lado+": vacio"); continue; }
+        log("──────────");
+        log(lado+" ("+(t.team?t.team.name:"?")+")");
+
+        var arr = t.pitchers;
+        if(!arr || !arr.length){
+          log("  SIN .pitchers . Keys: "+Object.keys(t).join(", "));
+          continue;
+        }
+
+        for(var p=0;p<arr.length;p++){
+          var pid = arr[p];
+          var pl = t.players ? t.players["ID"+pid] : null;
+          if(!pl){ log("  pid "+pid+": no esta en .players"); continue; }
+          var nombre = pl.person ? pl.person.fullName : "?";
+          var pit = (pl.stats && pl.stats.pitching) ? pl.stats.pitching : null;
+          if(!pit){ log("  "+nombre+": sin stats.pitching"); continue; }
+
+          if(!camposMostrados){
+            log("CAMPOS pitching reales: "+Object.keys(pit).join(", "));
+            camposMostrados = true;
+          }
+          var rol = (p===0) ? "ABRIDOR" : "RELEVO "+p;
+          log("  "+rol+" · "+nombre+" (pid "+pid+")");
+          log("    "+JSON.stringify(pit));
+        }
+      }
+      log("──────────");
+      log("LISTO.");
+    } catch(e) {
+      log("ERROR REAL: " + (e && e.message ? e.message : e));
+    } finally {
+      btn.disabled=false; btn.textContent="PROBAR BOXSCORE";
+    }
+  });
+</script>
+</body>
+</html>
