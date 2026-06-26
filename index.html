@@ -112,6 +112,33 @@
         log("AVISO serie: " + (eb && eb.message ? eb.message : eb));
       }
 
+      // --- PRECARGA de rosters (pitcher/catcher/umpire) para las series que se van a mostrar ---
+      // Se hace UNA vez, ANTES del loop de tarjetas, porque jalarRoster es ASYNC.
+      var rosterMap = {};
+      try {
+        var idsAPrecargar = [];
+        for (var iv=0; iv<games.length; iv++){
+          var gv = games[iv];
+          var venueV = gv.venue ? gv.venue.name : "";
+          var bloqueV = serieDelParque(venueV, bloquesSerie);
+          if(bloqueV && bloqueV.juegos){
+            for(var jv=0; jv<bloqueV.juegos.length; jv++){
+              var gj = bloqueV.juegos[jv];
+              if(gj.game_id && idsAPrecargar.indexOf(gj.game_id) === -1){
+                idsAPrecargar.push(gj.game_id);
+              }
+            }
+          }
+        }
+        log("Precargando roster de "+idsAPrecargar.length+" juego(s) de series...");
+        var rosters = await Promise.all(idsAPrecargar.map(function(id){ return jalarRoster(id); }));
+        for(var ir=0; ir<rosters.length; ir++){
+          rosterMap[rosters[ir].game_id] = rosters[ir];
+        }
+      } catch(er) {
+        log("AVISO roster series: " + (er && er.message ? er.message : er));
+      }
+
       var html="";
       for(var i=0;i<games.length;i++){
         var g=games[i];
@@ -123,10 +150,10 @@
         var pitcherAwayId = (g.teams&&g.teams.away&&g.teams.away.probablePitcher) ? g.teams.away.probablePitcher.id : null;
         var pitcherHomeId = (g.teams&&g.teams.home&&g.teams.home.probablePitcher) ? g.teams.home.probablePitcher.id : null;
         var s = STADIUM_INDEX.get(stadiumNorm(venue));
-        if(!s){ html+=tarjeta(away,home,venue,null,i,null,pitcherAway,pitcherHome,pitcherAwayId,pitcherHomeId,bloquesSerie); continue; }
+        if(!s){ html+=tarjeta(away,home,venue,null,i,null,pitcherAway,pitcherHome,pitcherAwayId,pitcherHomeId,bloquesSerie,rosterMap); continue; }
         var w = await climaFetchWeather(s, hoy, hoy);
         var hit = w.get(climaKeyTZ(g.gameDate, s.timezone));
-        if(!hit){ html+=tarjeta(away,home,venue,null,i,null,pitcherAway,pitcherHome,pitcherAwayId,pitcherHomeId,bloquesSerie); continue; }
+        if(!hit){ html+=tarjeta(away,home,venue,null,i,null,pitcherAway,pitcherHome,pitcherAwayId,pitcherHomeId,bloquesSerie,rosterMap); continue; }
         var condHoy = await jalarCondition(g.gamePk);
         var today = {
           temperature_f: hit.temperature_f, windspeed_mph: hit.windspeed_mph,
@@ -136,7 +163,7 @@
         };
         log("condition " + venue + ": " + condHoy);
         var r = calcularCoincidencia(today);
-        html += tarjeta(away,home,venue,r,i,today,pitcherAway,pitcherHome,pitcherAwayId,pitcherHomeId,bloquesSerie);
+        html += tarjeta(away,home,venue,r,i,today,pitcherAway,pitcherHome,pitcherAwayId,pitcherHomeId,bloquesSerie,rosterMap);
       }
       listaEl.innerHTML = html;
       log("LISTO.");
@@ -182,7 +209,7 @@
   }
 
   // --- html del bloque serie, mismo patron que serie-pasada-test.html ---
-  function serieParqueHtml(venue, bloquesSerie){
+  function serieParqueHtml(venue, bloquesSerie, rosterMap){
     var b = serieDelParque(venue, bloquesSerie);
     if(!b){
       return '<div class="serieparque"><div class="sphdr">SERIE EN ESTE PARQUE</div>'+
@@ -219,12 +246,25 @@
         carreras = "— sin marcador";
       }
       var temp = (g.temperature_f!==undefined && g.temperature_f!==null && g.temperature_f!=="") ? g.temperature_f+"°" : "PENDIENTE";
+
+      // --- pitcher de esta fila (precargado en rosterMap antes del render) ---
+      var pitcherFila = "";
+      var ros = (rosterMap && g.game_id !== undefined) ? rosterMap[g.game_id] : null;
+      if(ros){
+        var pa = traducirPitcher(ros.pitcher_away_id);
+        var ph = traducirPitcher(ros.pitcher_home_id);
+        pitcherFila = ' · ⚾ '+pa.nombre+' vs '+ph.nombre;
+      } else {
+        pitcherFila = ' · ⚾ NO_CONFIRMADO';
+      }
+
       filas += '<div class="sprow">'+
         g.date+' · '+(g.away_team||"?")+' @ '+(g.home_team||"?")+
         ' · '+temp+
         ' · viento '+(g.windspeed_mph!==undefined?g.windspeed_mph:"?")+
         ' · hum '+(g.humidity_pct!==undefined?g.humidity_pct+"%":"?")+
-        ' · '+carreras+'</div>';
+        ' · '+carreras+
+        pitcherFila+'</div>';
     }
 
     var prom = "";
@@ -248,7 +288,7 @@
     '</div>';
   }
 
-  function tarjeta(away,home,venue,r,idx,today,pitcherAway,pitcherHome,pitcherAwayId,pitcherHomeId,bloquesSerie){
+  function tarjeta(away,home,venue,r,idx,today,pitcherAway,pitcherHome,pitcherAwayId,pitcherHomeId,bloquesSerie,rosterMap){
     var sc = r && r.top ? r.top.score : null;
     var cls = r ? r.cls : "bad";
     var txt = (sc===null) ? "SIN COINCIDENCIA" : (sc+"%");
@@ -330,7 +370,7 @@
         '</div>';
     }
 
-    var serieHtml = serieParqueHtml(venue, bloquesSerie);
+    var serieHtml = serieParqueHtml(venue, bloquesSerie, rosterMap);
 
     return '<div class="juego" onclick="toggleDet('+idx+')">'+
       '<div class="matchup">'+away+' @ '+home+'</div>'+
