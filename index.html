@@ -65,6 +65,7 @@
 <script src="jalar-roster.js"></script>
 <script src="traducir-pitcher.js"></script>
 <script src="catchers-master.js"></script>
+<script src="traducir-catcher.js"></script>
 
 <script src="bloques-serie.js"></script>
 <script src="bloques-trayectoria.js"></script>
@@ -150,11 +151,19 @@
         var pitcherHome = (g.teams&&g.teams.home&&g.teams.home.probablePitcher) ? g.teams.home.probablePitcher.fullName : "TBD";
         var pitcherAwayId = (g.teams&&g.teams.away&&g.teams.away.probablePitcher) ? g.teams.away.probablePitcher.id : null;
         var pitcherHomeId = (g.teams&&g.teams.home&&g.teams.home.probablePitcher) ? g.teams.home.probablePitcher.id : null;
+
+        // --- roster de HOY (catcher_away_id, catcher_home_id, umpire_home) ---
+        // jalarRoster ya devuelve umpire_home como NOMBRE real (no necesita master).
+        var rosterHoy = await jalarRoster(g.gamePk);
+        var catcherAwayId = rosterHoy ? rosterHoy.catcher_away_id : "NO_CONFIRMADO";
+        var catcherHomeId = rosterHoy ? rosterHoy.catcher_home_id : "NO_CONFIRMADO";
+        var umpireHomeHoy = rosterHoy ? rosterHoy.umpire_home : "NO_CONFIRMADO";
+
         var s = STADIUM_INDEX.get(stadiumNorm(venue));
-        if(!s){ html+=tarjeta(away,home,venue,null,i,null,pitcherAway,pitcherHome,pitcherAwayId,pitcherHomeId,bloquesSerie,rosterMap); continue; }
+        if(!s){ html+=tarjeta(away,home,venue,null,i,null,pitcherAway,pitcherHome,pitcherAwayId,pitcherHomeId,bloquesSerie,rosterMap,catcherAwayId,catcherHomeId,umpireHomeHoy); continue; }
         var w = await climaFetchWeather(s, hoy, hoy);
         var hit = w.get(climaKeyTZ(g.gameDate, s.timezone));
-        if(!hit){ html+=tarjeta(away,home,venue,null,i,null,pitcherAway,pitcherHome,pitcherAwayId,pitcherHomeId,bloquesSerie,rosterMap); continue; }
+        if(!hit){ html+=tarjeta(away,home,venue,null,i,null,pitcherAway,pitcherHome,pitcherAwayId,pitcherHomeId,bloquesSerie,rosterMap,catcherAwayId,catcherHomeId,umpireHomeHoy); continue; }
         var condHoy = await jalarCondition(g.gamePk);
         var today = {
           temperature_f: hit.temperature_f, windspeed_mph: hit.windspeed_mph,
@@ -164,7 +173,7 @@
         };
         log("condition " + venue + ": " + condHoy);
         var r = calcularCoincidencia(today);
-        html += tarjeta(away,home,venue,r,i,today,pitcherAway,pitcherHome,pitcherAwayId,pitcherHomeId,bloquesSerie,rosterMap);
+        html += tarjeta(away,home,venue,r,i,today,pitcherAway,pitcherHome,pitcherAwayId,pitcherHomeId,bloquesSerie,rosterMap,catcherAwayId,catcherHomeId,umpireHomeHoy);
       }
       listaEl.innerHTML = html;
       log("LISTO.");
@@ -248,15 +257,25 @@
       }
       var temp = (g.temperature_f!==undefined && g.temperature_f!==null && g.temperature_f!=="") ? g.temperature_f+"°" : "PENDIENTE";
 
-      // --- pitcher de esta fila (precargado en rosterMap antes del render) ---
+      // --- pitcher / catcher / umpire de esta fila (precargado en rosterMap antes del render) ---
       var pitcherFila = "";
+      var catcherFila = "";
+      var umpireFila = "";
       var ros = (rosterMap && g.game_id !== undefined) ? rosterMap[g.game_id] : null;
       if(ros){
         var pa = traducirPitcher(ros.pitcher_away_id);
         var ph = traducirPitcher(ros.pitcher_home_id);
         pitcherFila = ' · ⚾ '+pa.nombre+' vs '+ph.nombre;
+
+        var ca = traducirCatcher(ros.catcher_away_id);
+        var ch = traducirCatcher(ros.catcher_home_id);
+        catcherFila = ' · 🧤 '+ca.nombre+' vs '+ch.nombre;
+
+        umpireFila = ' · 🧑‍⚖️ '+(ros.umpire_home || "NO_CONFIRMADO");
       } else {
         pitcherFila = ' · ⚾ NO_CONFIRMADO';
+        catcherFila = ' · 🧤 NO_CONFIRMADO';
+        umpireFila = ' · 🧑‍⚖️ NO_CONFIRMADO';
       }
 
       filas += '<div class="sprow">'+
@@ -265,7 +284,7 @@
         ' · viento '+(g.windspeed_mph!==undefined?g.windspeed_mph:"?")+
         ' · hum '+(g.humidity_pct!==undefined?g.humidity_pct+"%":"?")+
         ' · '+carreras+
-        pitcherFila+'</div>';
+        pitcherFila+catcherFila+umpireFila+'</div>';
     }
 
     var prom = "";
@@ -289,7 +308,7 @@
     '</div>';
   }
 
-  function tarjeta(away,home,venue,r,idx,today,pitcherAway,pitcherHome,pitcherAwayId,pitcherHomeId,bloquesSerie,rosterMap){
+  function tarjeta(away,home,venue,r,idx,today,pitcherAway,pitcherHome,pitcherAwayId,pitcherHomeId,bloquesSerie,rosterMap,catcherAwayId,catcherHomeId,umpireHomeHoy){
     var sc = r && r.top ? r.top.score : null;
     var cls = r ? r.cls : "bad";
     var txt = (sc===null) ? "SIN COINCIDENCIA" : (sc+"%");
@@ -313,6 +332,18 @@
       return " (xERA "+p.xera+" general)";
     }
     var pitchers = '<div class="estadio">⚾ '+(pitcherAway||"TBD")+xeraTxt(pitcherAwayId)+' vs '+(pitcherHome||"TBD")+xeraTxt(pitcherHomeId)+'</div>';
+
+    // --- catcher de HOY (titular, via jalarRoster -> traducirCatcher) ---
+    var ca = traducirCatcher(catcherAwayId);
+    var ch = traducirCatcher(catcherHomeId);
+    function rvTxt(rv){
+      if(rv===undefined || rv===null || rv==="NO_CONFIRMADO") return " (rv_tot NO_CONFIRMADO)";
+      return " (rv_tot "+rv+")";
+    }
+    var catchersHtml = '<div class="estadio">🧤 '+ca.nombre+rvTxt(ca.rv_tot)+' vs '+ch.nombre+rvTxt(ch.rv_tot)+'</div>';
+
+    // --- umpire de plato de HOY (nombre real, sin master, viene directo del feed) ---
+    var umpireHtml = '<div class="estadio">🧑‍⚖️ Umpire de plato: '+(umpireHomeHoy || "NO_CONFIRMADO")+'</div>';
 
     var det = "";
     var sumScore=0, nScore=0, sumRuns=0, nRuns=0;
@@ -380,6 +411,8 @@
               brisaHtml +
 
       pitchers +
+      catchersHtml +
+      umpireHtml +
       '<div class="score '+cls+'">Coincidencia: '+txt+'</div>'+
       serieHtml +
       '<div class="ver">Toca para ver los 5 parecidos ▼</div>'+
