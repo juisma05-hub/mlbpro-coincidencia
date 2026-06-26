@@ -179,8 +179,10 @@
 
     var filas = "";
     var sumRuns=0, nRuns=0;
-    for(var j=0;j<b.juegos.length;j++){
-      var g=b.juegos[j];
+    // ordena por fecha descendente (mas reciente arriba). Copia para no mutar el bloque.
+    var juegosOrden = b.juegos.slice().sort(function(a,b){ return a.date < b.date ? 1 : (a.date > b.date ? -1 : 0); });
+    for(var j=0;j<juegosOrden.length;j++){
+      var g=juegosOrden[j];
       var ar = (g.away_runs!==undefined && g.away_runs!==null) ? g.away_runs : null;
       var hr = (g.home_runs!==undefined && g.home_runs!==null) ? g.home_runs : null;
       var carreras;
