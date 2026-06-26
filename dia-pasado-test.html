@@ -94,6 +94,21 @@
         var climaOk = (typeof g.temperature_f === "number");
         var r = climaOk ? calcularCoincidencia(clima) : null;
 
+        // FIX: el juego NO puede aparecer entre sus propios parecidos.
+        // quita del ranked cualquier fila que sea el mismo juego (mismo game_id,
+        // o misma fecha+venue+equipos si no hay game_id).
+        if(r && r.ranked && r.ranked.length){
+          r.ranked = r.ranked.filter(function(h){
+            var mismoGameId = (g.game_id !== undefined && g.game_id !== null && h.game_id !== undefined && h.game_id !== null)
+              ? (h.game_id === g.game_id) : false;
+            var mismoFechaVenue = (h.date === g.date && h.venue === g.venue && h.home_team === g.home_team && h.away_team === g.away_team);
+            return !(mismoGameId || mismoFechaVenue);
+          });
+          // recalcula el top tras quitar el propio juego
+          r.top = r.ranked.length ? r.ranked[0] : null;
+          r.cls = r.top && r.top.score >= 80 ? "ok" : (r.top && r.top.score >= 60 ? "mid" : "bad");
+        }
+
         html += tarjeta(g, r, i, climaOk);
       }
       listaEl.innerHTML = html;
