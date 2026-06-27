@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>MLBPro · Cazador de Domos</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; font-family:-apple-system,system-ui,sans-serif; background:#0d1117; color:#e6edf3; }
+  header { padding:14px 16px; border-bottom:1px solid #30363d; }
+  h1 { font-size:15px; margin:0; }
+  main { padding:12px; }
+  .go { width:100%; border:0; border-radius:10px; padding:16px; font-size:16px; font-weight:800; color:#fff; background:#8957e5; cursor:pointer; margin-bottom:6px; }
+  .nota { font-size:11px; color:#8b949e; text-align:center; margin-bottom:12px; }
+
+  .domo { background:#161b22; border:1px solid #30363d; border-radius:12px; padding:14px; margin-bottom:14px; }
+  .domo .dn { font-size:16px; font-weight:800; color:#d2a8ff; }
+  .domo .ds { font-size:11px; color:#8b949e; margin-bottom:10px; }
+  .seccion { font-size:12px; font-weight:700; color:#79c0ff; margin:10px 0 4px; border-top:1px solid #30363d; padding-top:8px; }
+  .grad { font-size:12px; padding:4px 0; border-top:1px solid #21262d; display:flex; justify-content:space-between; gap:6px; }
+  .grad .rango { color:#c9d1d9; font-weight:700; }
+  .grad .car { font-weight:800; }
+  .grad .n { color:#8b949e; font-size:11px; }
+  .car.alto { color:#ff7b72; } .car.bajo { color:#3fb950; } .car.medio { color:#d29922; }
+  .estrella { color:#ffd60a; }
+  .vacio { color:#8b949e; font-size:11px; padding:4px 0; }
+
+  #console { margin-top:12px; background:#010409; border:1px solid #30363d; border-radius:8px; padding:10px; min-height:40px; max-height:20vh; overflow:auto; font-family:ui-monospace,monospace; font-size:11px; white-space:pre-wrap; }
+</style>
+</head>
+<body>
+<header><h1>MLBPro · CAZADOR DE DOMOS (Miami + Tampa)</h1></header>
+<main>
+  <button id="go" class="go">CAZAR PATRÓN EN LOS DOMOS</button>
+  <div class="nota">Adentro del domo el clima no varía. Si sale patrón, es CONSTANTE y real. ⭐=más juegos · 🔴over 🟢under 🟡limbo</div>
+  <div id="salida"></div>
+  <div id="console">Pulsa el botón. Mide dirección Y velocidad del viento de afuera vs carreras.</div>
+</main>
+
+<script src="mlb-routes.js"></script>
+<script src="estadios.js"></script>
+<script src="clima-cache.js"></script>
+
+<script>
+  var consoleEl = document.getElementById("console");
+  function log(t){ var d=document.createElement("div"); d.textContent=t; consoleEl.appendChild(d); consoleEl.scrollTop=consoleEl.scrollHeight; }
+
+  var DOMOS = [
+    { equipo:"Miami Marlins (loanDepot)", m:"loandepot" },
+    { equipo:"Tampa Bay Rays (Tropicana)", m:"tropicana" }
+  ];
+
+  function carrerasDe(g){
+    var ar=g.away_runs, hr=g.home_runs;
+    if(ar!==null&&ar!==undefined&&hr!==null&&hr!==undefined) return Number(ar)+Number(hr);
+    return null;
+  }
+  function prom(arr){ if(!arr.length) return null; var s=0; for(var i=0;i<arr.length;i++) s+=arr[i]; return s/arr.length; }
+  function clase(pc){ if(pc===null) return "medio"; if(pc>=9) return "alto"; if(pc<=7) return "bajo"; return "medio"; }
+
+  function juegosDe(cache, m){
+    return cache.filter(function(g){
+      return g && g.venue && g.venue.toLowerCase().indexOf(m) !== -1;
+    });
+  }
+
+  // agrupa por DIRECCION (grados de 30 en 30)
+  function porDireccion(juegos){
+    var grupos={};
+    for(var i=0;i<juegos.length;i++){
+      var g=juegos[i];
+      if(g.wind_dir===undefined||g.wind_dir===null||g.wind_dir==="") continue;
+      var dir=Number(g.wind_dir); if(isNaN(dir)) continue;
+      var lo=Math.floor(dir/30)*30;
+      if(!grupos[lo]) grupos[lo]={lo:lo,hi:lo+30,carreras:[],n:0};
+      var c=carrerasDe(g); grupos[lo].n++; if(c!==null) grupos[lo].carreras.push(c);
+    }
+    var arr=[]; for(var k in grupos){ if(grupos.hasOwnProperty(k)) arr.push(grupos[k]); }
+    arr.sort(function(a,b){return a.lo-b.lo;});
+    return arr;
+  }
+
+  // agrupa por VELOCIDAD (de 3 en 3 mph)
+  function porVelocidad(juegos){
+    var grupos={};
+    for(var i=0;i<juegos.length;i++){
+      var g=juegos[i];
+      if(typeof g.windspeed_mph!=="number") continue;
+      var v=g.windspeed_mph;
+      var lo=Math.floor(v/3)*3;
+      if(!grupos[lo]) grupos[lo]={lo:lo,hi:lo+3,carreras:[],n:0};
+      var c=carrerasDe(g); grupos[lo].n++; if(c!==null) grupos[lo].carreras.push(c);
+    }
+    var arr=[]; for(var k in grupos){ if(grupos.hasOwnProperty(k)) arr.push(grupos[k]); }
+    arr.sort(function(a,b){return a.lo-b.lo;});
+    return arr;
+  }
+
+  function filasDe(arr, sufijo){
+    var maxN=0; for(var i=0;i<arr.length;i++){ if(arr[i].n>maxN) maxN=arr[i].n; }
+    var h="";
+    for(var i=0;i<arr.length;i++){
+      var gr=arr[i]; var pc=prom(gr.carreras);
+      var star=(gr.n===maxN&&maxN>=5)?'<span class="estrella">⭐</span> ':'';
+      h+='<div class="grad">'+
+        '<span class="rango">'+star+gr.lo+'-'+gr.hi+sufijo+'</span>'+
+        '<span class="car '+clase(pc)+'">'+(pc!==null?pc.toFixed(1):"—")+'c</span>'+
+        '<span class="n">'+gr.n+'j</span></div>';
+    }
+    return h || '<div class="vacio">Sin datos.</div>';
+  }
+
+  document.getElementById("go").addEventListener("click", function(){
+    consoleEl.textContent=""; document.getElementById("salida").innerHTML="";
+    try {
+      var cache=climaLeerCache();
+      if(!cache.length){ log("CACHE VACIO. Chrome normal (no incógnito), abre index, COINCIDENCIA, vuelve."); return; }
+      log("Filas en cache: "+cache.length);
+      var html="";
+      for(var d=0;d<DOMOS.length;d++){
+        var juegos=juegosDe(cache, DOMOS[d].m);
+        html += '<div class="domo">'+
+          '<div class="dn">'+DOMOS[d].equipo+'</div>'+
+          '<div class="ds">'+juegos.length+' juegos en cache</div>'+
+          '<div class="seccion">POR DIRECCIÓN del viento de afuera</div>'+
+          filasDe(porDireccion(juegos), "°")+
+          '<div class="seccion">POR VELOCIDAD del viento de afuera</div>'+
+          filasDe(porVelocidad(juegos), " mph")+
+        '</div>';
+      }
+      document.getElementById("salida").innerHTML=html;
+      log("LISTO. Si en el domo hay patrón, es constante (adentro no varía el clima).");
+    } catch(e){ log("ERROR: "+e.message); }
+  });
+</script>
+</body>
+</html>
