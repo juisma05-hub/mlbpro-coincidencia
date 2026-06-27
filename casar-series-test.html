@@ -123,7 +123,7 @@
           if(c!==null){ sumC+=c; nC++; carrerasArr.push(c); }
           if(typeof g.windspeed_mph==="number"){ sumV+=g.windspeed_mph; nV++; }
           if(typeof g.temperature_f==="number"){ sumT+=g.temperature_f; nT++; }
-          var dirTxt = (g.winddir_deg!==undefined&&g.winddir_deg!==null) ? ("dir "+Math.round(g.winddir_deg)) : "dir —";
+          var dirTxt = (g.wind_dir!==undefined&&g.wind_dir!==null&&g.wind_dir!=="") ? ("dir "+g.wind_dir) : "dir —";
           filas += '<div class="jrow"><span class="f">'+g.date+'</span>'+
                    '<span>'+(typeof g.temperature_f==="number"?Math.round(g.temperature_f)+"°":"—")+
                    ' · v'+(typeof g.windspeed_mph==="number"?g.windspeed_mph.toFixed(0):"—")+
