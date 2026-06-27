@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>TEST · bloques por mes</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:-apple-system,system-ui,sans-serif; background:#0d1117; color:#e6edf3; padding:16px; }
+  h1 { font-size:16px; }
+  .go { width:100%; border:0; border-radius:10px; padding:16px; font-size:16px; font-weight:800; color:#fff; background:#238636; margin-bottom:14px; }
+  .parque { background:#161b22; border:1px solid #30363d; border-radius:12px; padding:14px; margin-bottom:12px; }
+  .pn { font-size:15px; font-weight:800; margin-bottom:8px; }
+  .bloque { background:#0d1117; border:1px solid #21262d; border-radius:8px; padding:10px; margin:8px 0; }
+  .bm { font-size:14px; font-weight:700; color:#79c0ff; margin-bottom:4px; }
+  .chips { display:flex; flex-wrap:wrap; gap:5px; }
+  .chip { font-size:12px; background:#161b22; border:1px solid #30363d; border-radius:6px; padding:3px 8px; }
+  .chip b { color:#fff; }
+  .chip.run { border-color:#3fb950; } .chip.run b { color:#3fb950; }
+  #out { margin-top:8px; }
+  .aviso { font-size:12px; color:#8b949e; }
+</style>
+</head>
+<body>
+<h1>TEST · bloques por mes (lee tu caché real)</h1>
+<button id="go" class="go">ARMAR BLOQUES POR MES</button>
+<div id="out"></div>
+
+<!-- mismas piezas que usa la app, en el mismo orden -->
+<script src="clima-cache.js"></script>
+<script src="bloques-temporada.js"></script>
+
+<script>
+  var out = document.getElementById("out");
+
+  document.getElementById("go").addEventListener("click", function(){
+    out.innerHTML = "";
+    var cache = climaLeerCache();
+    if(!cache.length){
+      out.innerHTML = '<div class="aviso">Caché vacío. Abre primero la app principal (index) para que llene MLBPRO_CLIMA_CACHE_2026, y vuelve aquí.</div>';
+      return;
+    }
+
+    // saca lista de parques unicos del cache
+    var setV = {};
+    for(var i=0;i<cache.length;i++){
+      var v = cache[i] && cache[i].venue;
+      if(v) setV[v] = true;
+    }
+    var parques = Object.keys(setV).sort();
+
+    out.innerHTML = '<div class="aviso">Juegos en caché: '+cache.length+' · Parques: '+parques.length+'</div>';
+
+    for(var p=0;p<parques.length;p++){
+      var venue = parques[p];
+      var bloques = bloquesPorMes(cache, venue);
+
+      var html = '<div class="parque"><div class="pn">'+venue+'</div>';
+      if(!bloques.length){
+        html += '<div class="aviso">Sin bloques (¿juegos sin fecha?).</div>';
+      } else {
+        for(var b=0;b<bloques.length;b++){
+          var bl = bloques[b];
+          html += '<div class="bloque">'+
+            '<div class="bm">'+bl.etiqueta+' '+bl.clave_mes.slice(0,4)+' · '+bl.n_juegos+' juegos</div>'+
+            '<div class="chips">'+
+              '<span class="chip">🌡️ prom <b>'+(bl.temp_prom!==null?bl.temp_prom+"°":"N/C")+'</b></span>'+
+              '<span class="chip">rango <b>'+(bl.temp_min!==null?bl.temp_min+"°":"?")+' a '+(bl.temp_max!==null?bl.temp_max+"°":"?")+'</b></span>'+
+              '<span class="chip">🌬️ <b>'+(bl.viento_prom!==null?bl.viento_prom:"N/C")+'</b></span>'+
+              '<span class="chip">💧 <b>'+(bl.humedad_prom!==null?bl.humedad_prom+"%":"N/C")+'</b></span>'+
+              '<span class="chip run">⚾ prom <b>'+(bl.carreras_prom!==null?bl.carreras_prom:"N/C")+'</b> ('+bl.n_con_marcador+' j)</span>'+
+            '</div>'+
+          '</div>';
+        }
+      }
+      html += '</div>';
+      out.innerHTML += html;
+    }
+  });
+</script>
+</body>
+</html>
