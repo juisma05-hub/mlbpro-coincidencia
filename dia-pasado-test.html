@@ -210,10 +210,15 @@
       var dif = (estimRuns - realRuns);
       difTxt = (dif>0?"+":"")+dif.toFixed(1)+" vs real";
     }
+    // SCORE FINAL: el marcador como pasó (ej "5-3")
+    var scoreFinalTxt = "—";
+    if(g.away_runs!==null && g.away_runs!==undefined && g.home_runs!==null && g.home_runs!==undefined){
+      scoreFinalTxt = g.away_runs+'-'+g.home_runs;
+    }
     var carr =
       '<div class="carr">'+
-        '<div class="cbox real"><div class="lbl">CARRERAJE REAL</div><div class="val">'+(realRuns!==null?realRuns:"—")+'</div><div class="dif">lo que pasó</div></div>'+
-        '<div class="cbox estim"><div class="lbl">CARRERAJE ESTIMADO</div><div class="val">'+(estimRuns!==null?estimRuns.toFixed(1):"—")+'</div><div class="dif">'+difTxt+'</div></div>'+
+        '<div class="cbox estim"><div class="lbl">PROYECCIÓN APP</div><div class="val">'+(estimRuns!==null?estimRuns.toFixed(1):"—")+'</div><div class="dif">'+difTxt+'</div></div>'+
+        '<div class="cbox real"><div class="lbl">SCORE FINAL</div><div class="val">'+scoreFinalTxt+'</div><div class="dif">'+(realRuns!==null?'('+realRuns+' carreras)':'lo que pasó')+'</div></div>'+
       '</div>';
 
     // 5 parecidos VISIBLES adelante (igual que el index)
