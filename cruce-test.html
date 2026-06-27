@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>MLBPro · Cruce TEST</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; font-family:-apple-system,system-ui,sans-serif; background:#0d1117; color:#e6edf3; }
+  header { padding:14px 16px; border-bottom:1px solid #30363d; }
+  h1 { font-size:17px; margin:0; }
+  main { padding:16px; max-width:900px; margin:0 auto; }
+  .go { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#fff; background:#8957e5; cursor:pointer; }
+  .go:disabled { background:#30363d; color:#8b949e; }
+
+  .juego { background:#161b22; border:1px solid #30363d; border-radius:14px; padding:16px; margin-top:14px; }
+  .matchup { font-size:18px; font-weight:800; }
+  .estadio { font-size:13px; color:#8b949e; margin:3px 0; }
+
+  /* bloque de cruce de un pitcher */
+  .cruce { background:#0d1117; border:1px solid #30363d; border-radius:10px; padding:12px; margin-top:10px; }
+  .cruce .pname { font-size:14px; font-weight:800; color:#d2a8ff; }
+  .cruce .woba { font-size:24px; font-weight:800; margin:4px 0; }
+  .cruce .lectura { font-size:13px; color:#c9d1d9; margin-bottom:6px; }
+  .cruce .estado-pend { color:#ffd60a; font-size:13px; }
+  .cruce .estado-nc { color:#ff453a; font-size:13px; }
+  .pitchrow { font-size:12px; color:#c9d1d9; padding:3px 0; border-top:1px solid #21262d; }
+  .pitchrow b { color:#fff; }
+
+  #console { margin-top:16px; background:#010409; border:1px solid #30363d; border-radius:8px; padding:12px; min-height:60px; max-height:30vh; overflow:auto; font-family:ui-monospace,monospace; font-size:12px; white-space:pre-wrap; }
+</style>
+</head>
+<body>
+<header><h1>MLBPro · Cruce TEST (arsenal vs bateo)</h1></header>
+<main>
+  <button id="go" class="go">PROBAR CRUCE DE HOY</button>
+  <div id="lista"></div>
+  <div id="console">Pulsa el botón para probar el cruce con los juegos de hoy.</div>
+</main>
+
+<script src="mlb-routes.js"></script>
+<script src="arsenal-master.js"></script>
+<script src="batters-vspitch.js"></script>
+<script src="cruce-arsenal.js"></script>
+
+<script>
+  var consoleEl = document.getElementById("console");
+  var listaEl = document.getElementById("lista");
+  function log(t){ var d=document.createElement("div"); d.textContent=t; consoleEl.appendChild(d); consoleEl.scrollTop=consoleEl.scrollHeight; }
+
+  function hoyISO(){
+    var d=new Date(Date.now() - 6*60*60*1000);
+    return d.getFullYear()+"-"+("0"+(d.getMonth()+1)).slice(-2)+"-"+("0"+d.getDate()).slice(-2);
+  }
+
+  document.getElementById("go").addEventListener("click", async function(){
+    var btn=this; btn.disabled=true; btn.textContent="TRABAJANDO…";
+    consoleEl.textContent=""; listaEl.innerHTML="";
+    try {
+      // chequeo: los archivos cargaron?
+      if(typeof ARSENAL_MASTER_2026 === "undefined"){ log("ERROR: no cargó arsenal-master.js"); return; }
+      if(typeof BATTERS_VSPITCH_2026 === "undefined"){ log("ERROR: no cargó batters-vspitch.js"); return; }
+      if(typeof cruzarArsenal !== "function"){ log("ERROR: no cargó cruce-arsenal.js"); return; }
+      log("Archivos OK. Arsenal: "+Object.keys(ARSENAL_MASTER_2026).length+" pitchers, Batters: "+Object.keys(BATTERS_VSPITCH_2026).length);
+
+      var hoy = hoyISO();
+      log("Trayendo juegos de hoy ("+hoy+")...");
+      var mlbUrl = "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date="+hoy+"&hydrate=probablePitcher";
+      var resp = await fetch(MLB_ROUTES.WORKER_BASE + encodeURIComponent(mlbUrl));
+      if(!resp.ok) throw new Error("Schedule HTTP "+resp.status);
+      var data = await resp.json();
+      var games = (data.dates && data.dates[0]) ? data.dates[0].games : [];
+      log("Juegos hoy: "+games.length);
+      if(games.length===0){ log("No hay juegos hoy."); return; }
+
+      var html="";
+      for(var i=0;i<games.length;i++){
+        var g=games[i];
+        var venue = g.venue ? g.venue.name : "";
+        var away = (g.teams&&g.teams.away&&g.teams.away.team)? g.teams.away.team.name : "?";
+        var home = (g.teams&&g.teams.home&&g.teams.home.team)? g.teams.home.team.name : "?";
+
+        var pAwayId = (g.teams&&g.teams.away&&g.teams.away.probablePitcher) ? g.teams.away.probablePitcher.id : null;
+        var pHomeId = (g.teams&&g.teams.home&&g.teams.home.probablePitcher) ? g.teams.home.probablePitcher.id : null;
+        var pAwayName = (g.teams&&g.teams.away&&g.teams.away.probablePitcher) ? g.teams.away.probablePitcher.fullName : "TBD";
+        var pHomeName = (g.teams&&g.teams.home&&g.teams.home.probablePitcher) ? g.teams.home.probablePitcher.fullName : "TBD";
+
+        // lineup de cada equipo (del boxscore via feed/live)
+        var lineAway = [], lineHome = [];
+        try {
+          var feedUrl = "https://statsapi.mlb.com/api/v1.1/game/"+g.gamePk+"/feed/live";
+          var fres = await fetch(MLB_ROUTES.WORKER_BASE + encodeURIComponent(feedUrl));
+          if(fres.ok){
+            var fdata = await fres.json();
+            var box = fdata && fdata.liveData && fdata.liveData.boxscore;
+            if(box && box.teams){
+              lineAway = lineupTitular(box.teams.away);
+              lineHome = lineupTitular(box.teams.home);
+            }
+          }
+        } catch(ef){ log("aviso lineup "+venue+": "+ef.message); }
+
+        log(venue+": lineup away "+lineAway.length+", home "+lineHome.length);
+
+        // CRUCE: pitcher AWAY confronta al lineup HOME (rival), y viceversa
+        var cruceAway = cruzarArsenal(pAwayId, lineHome);  // pitcher visitante vs bateo local
+        var cruceHome = cruzarArsenal(pHomeId, lineAway);  // pitcher local vs bateo visitante
+
+        html += '<div class="juego">'+
+          '<div class="matchup">'+away+' @ '+home+'</div>'+
+          '<div class="estadio">'+(venue||"SIN PARQUE")+'</div>'+
+          bloqueCruce(pAwayName+" (vs bateo "+home+")", cruceAway)+
+          bloqueCruce(pHomeName+" (vs bateo "+away+")", cruceHome)+
+          '</div>';
+      }
+      listaEl.innerHTML = html;
+      log("LISTO.");
+    } catch(e) {
+      log("ERROR: " + (e && e.message ? e.message : e));
+    } finally {
+      btn.disabled=false; btn.textContent="PROBAR CRUCE DE HOY";
+    }
+  });
+
+  function bloqueCruce(titulo, res){
+    var cuerpo = "";
+    if(!res || res.estado === "NO_CONFIRMADO"){
+      cuerpo = '<div class="estado-nc">NO_CONFIRMADO'+(res&&res.nota?" — "+res.nota:"")+'</div>';
+    } else if(res.estado === "PENDIENTE"){
+      cuerpo = '<div class="estado-pend">PENDIENTE — '+(res.nota||"lineup no puesto")+'</div>';
+    } else {
+      var det = "";
+      for(var i=0;i<res.detalle.length;i++){
+        var d=res.detalle[i];
+        det += '<div class="pitchrow">'+d.pt+': usa <b>'+d.usage+'%</b> · el lineup le batea woba <b>'+d.woba_lineup+'</b> ('+d.n_bateadores+' bat.)</div>';
+      }
+      cuerpo =
+        '<div class="woba">wOBA '+res.woba_esperado.toFixed(3)+'</div>'+
+        '<div class="lectura">'+lecturaCruce(res)+'</div>'+
+        det;
+    }
+    return '<div class="cruce"><div class="pname">'+titulo+'</div>'+cuerpo+'</div>';
+  }
+</script>
+</body>
+</html>
