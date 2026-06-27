@@ -71,6 +71,7 @@
 <script src="clima-cache.js"></script>
 <script src="score-match.js"></script>
 <script src="calcular-coincidencia.js"></script>
+<script src="resumen-juego.js"></script>
 
 <script>
   var consoleEl = document.getElementById("console");
@@ -199,8 +200,11 @@
     } else {
       det5 = '<div class="sub">CLIMA NO NUMERICO ('+g.temperature_f+'): no se calcula.</div>';
     }
-    var promScore = nScore>0 ? Math.round(sumScore/nScore) : null;
-    var estimRuns = nRuns>0  ? (sumRuns/nRuns) : null;
+    // FUNCIÓN MADRE: carreras y coincidencia salen de resumenJuego (un solo sitio).
+    // Así esta vista usa el MISMO cálculo que las demás (regla: 3 vistas iguales).
+    var resumen = (typeof resumenJuego === "function" && r) ? resumenJuego(r) : null;
+    var promScore = resumen ? resumen.coinc_prom : (nScore>0 ? Math.round(sumScore/nScore) : null);
+    var estimRuns = resumen ? resumen.carreras_estim : (nRuns>0 ? (sumRuns/nRuns) : null);
 
     // panel: coincidencia de hoy + coincidencia promedio
     var panel =
@@ -212,8 +216,10 @@
     // CARRERAJE: REAL vs ESTIMADO (lo nuevo, para ver cual acierta)
     var difTxt = "";
     if(realRuns!==null && estimRuns!==null){
-      var dif = (estimRuns - realRuns);
-      difTxt = (dif>0?"+":"")+dif.toFixed(1)+" vs real";
+      var dif = (realRuns - estimRuns);   // cuánto se PASÓ la realidad sobre la proyección
+      if(dif > 0)      difTxt = "+"+dif.toFixed(1)+" más de lo proyectado";
+      else if(dif < 0) difTxt = dif.toFixed(1)+" menos de lo proyectado";
+      else             difTxt = "exacto";
     }
     // SCORE FINAL: el marcador como pasó (ej "5-3")
     var scoreFinalTxt = "—";
