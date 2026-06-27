@@ -15,19 +15,43 @@
   input[type="date"] { flex:1; background:#161b22; color:#e6edf3; border:1px solid #30363d; border-radius:10px; padding:14px; font-size:16px; }
   .go { border:0; border-radius:10px; padding:14px 18px; font-size:16px; font-weight:800; color:#fff; background:#238636; cursor:pointer; }
   .go:disabled { background:#30363d; color:#8b949e; }
-  .juego { background:#161b22; border:1px solid #30363d; border-radius:10px; padding:12px; margin-top:12px; cursor:pointer; }
-  .matchup { font-size:16px; font-weight:800; }
-  .estadio { font-size:13px; color:#bbb; margin:2px 0; }
-  .score { font-size:22px; font-weight:800; margin-top:6px; }
-  .ok{color:#32d74b;} .mid{color:#ffd60a;} .bad{color:#ff453a;}
-  .ver { font-size:12px; color:#79c0ff; margin-top:6px; }
-  .detalle { display:none; margin-top:10px; border-top:1px solid #30363d; padding-top:10px; }
-  .detalle.abierto { display:block; }
-  .hrow { font-size:12px; color:#ccc; padding:4px 0; border-bottom:1px solid #21262d; }
-  .concl { text-align:center; border-top:1px solid #30363d; margin-top:10px; padding-top:10px; }
-  .concl .lbl { font-size:12px; color:#8b949e; }
-  .concl .val { font-size:20px; font-weight:800; color:#79c0ff; }
-  .concl .sep { margin-top:8px; }
+
+  /* ===== CAJITA DEL JUEGO (igual que el index) ===== */
+  .juego { background:#161b22; border:1px solid #30363d; border-radius:14px; padding:16px; margin-top:14px; }
+  .matchup { font-size:18px; font-weight:800; }
+  .estadio { font-size:13px; color:#8b949e; margin:3px 0; }
+
+  /* chips */
+  .hoychips { display:flex; flex-wrap:wrap; gap:6px; margin:10px 0; }
+  .chip { font-size:12px; background:#0d1117; border:1px solid #30363d; border-radius:6px; padding:4px 9px; color:#c9d1d9; }
+  .chip b { color:#fff; }
+
+  /* panel de numeros (la conclusion, arriba) */
+  .panel { display:flex; gap:8px; margin:12px 0 4px; }
+  .pbox { flex:1; background:#0d1117; border:1px solid #30363d; border-radius:10px; padding:10px; text-align:center; }
+  .pbox .lbl { font-size:10px; color:#8b949e; letter-spacing:0.3px; }
+  .pbox .val { font-size:23px; font-weight:800; margin-top:2px; }
+  .v-coin { color:#3fb950; }
+  .v-coin.mid{color:#ffd60a;} .v-coin.bad{color:#ff453a;}
+  .v-run  { color:#79c0ff; }
+
+  /* fila CARRERAJE: REAL vs ESTIMADO (lo nuevo, para comprobar cual acierta) */
+  .carr { display:flex; gap:8px; margin:8px 0 2px; }
+  .cbox { flex:1; background:#0d1117; border:1px solid #30363d; border-radius:10px; padding:10px; text-align:center; }
+  .cbox .lbl { font-size:10px; color:#8b949e; letter-spacing:0.3px; }
+  .cbox .val { font-size:20px; font-weight:800; margin-top:2px; }
+  .cbox.real .val { color:#3fb950; }       /* lo que de verdad paso */
+  .cbox.estim .val { color:#79c0ff; }      /* lo que dijeron los 5 parecidos */
+  .cbox .dif { font-size:10px; color:#8b949e; margin-top:2px; }
+
+  /* 5 parecidos visibles (igual que el index) */
+  .serieparque { margin-top:12px; border-top:1px solid #30363d; padding-top:10px; }
+  .serieparque .sphdr { font-size:12px; color:#8b949e; font-weight:700; letter-spacing:0.5px; }
+  .sub { background:#0d1117; border:1px solid #21262d; border-radius:8px; padding:10px; margin:8px 0; }
+  .sub .top { font-size:13px; font-weight:700; margin-bottom:6px; }
+  .sub .fecha { color:#79c0ff; }
+  .sub .nums { display:flex; flex-wrap:wrap; gap:5px; }
+
   #console { margin-top:16px; background:#010409; border:1px solid #30363d; border-radius:8px; padding:12px; min-height:50px; max-height:25vh; overflow:auto; font-family:ui-monospace,monospace; font-size:12px; white-space:pre-wrap; }
 </style>
 </head>
@@ -53,11 +77,19 @@
   var listaEl = document.getElementById("lista");
   function log(t){ var d=document.createElement("div"); d.textContent=t; consoleEl.appendChild(d); consoleEl.scrollTop=consoleEl.scrollHeight; }
 
+  var MESES_CORTOS = {"01":"Ene","02":"Feb","03":"Mar","04":"Abr","05":"May","06":"Jun","07":"Jul","08":"Ago","09":"Sep","10":"Oct","11":"Nov","12":"Dic"};
+  function fechaBonita(date){
+    if(!date || typeof date!=="string" || date.length<10) return date||"?";
+    var yy=date.slice(0,4), mm=date.slice(5,7), dd=date.slice(8,10);
+    var mes=MESES_CORTOS[mm]||mm;
+    return dd+" "+mes+" "+yy.slice(2);
+  }
+
   document.getElementById("go").addEventListener("click", function(){
     var btn=this; btn.disabled=true;
     consoleEl.textContent=""; listaEl.innerHTML="";
     try {
-      var fecha = document.getElementById("fecha").value; // YYYY-MM-DD
+      var fecha = document.getElementById("fecha").value;
       if(!fecha){ log("No elegiste fecha."); return; }
       log("Fecha pedida: " + fecha);
 
@@ -68,35 +100,25 @@
         return;
       }
 
-      // filtra los juegos de esa fecha (campo date confirmado: YYYY-MM-DD)
       var delDia = cache.filter(function(r){ return r.date === fecha; });
       log("Juegos en cache ese dia: " + delDia.length);
       if(delDia.length === 0){
-        log("No hay juegos guardados para " + fecha + ". (Solo aparecen dias ya jalados al cache.)");
+        log("No hay juegos guardados para " + fecha + ".");
         return;
       }
 
       var html = "";
       for(var i=0;i<delDia.length;i++){
         var g = delDia[i];
-
-        // arma el objeto clima de ESE juego desde el cache (no en vivo)
         var clima = {
-          temperature_f: g.temperature_f,
-          windspeed_mph: g.windspeed_mph,
-          humidity_pct: g.humidity_pct,
-          precipitation_mm: g.precipitation_mm,
-          wind_dir: g.wind_dir,
-          venueName: g.venue
+          temperature_f: g.temperature_f, windspeed_mph: g.windspeed_mph,
+          humidity_pct: g.humidity_pct, precipitation_mm: g.precipitation_mm,
+          wind_dir: g.wind_dir, venueName: g.venue
         };
-
-        // solo calcula coincidencia si el clima de esa fila es numerico (no ERR:...)
         var climaOk = (typeof g.temperature_f === "number");
         var r = climaOk ? calcularCoincidencia(clima) : null;
 
-        // FIX: el juego NO puede aparecer entre sus propios parecidos.
-        // quita del ranked cualquier fila que sea el mismo juego (mismo game_id,
-        // o misma fecha+venue+equipos si no hay game_id).
+        // el juego NO puede aparecer entre sus propios parecidos
         if(r && r.ranked && r.ranked.length){
           r.ranked = r.ranked.filter(function(h){
             var mismoGameId = (g.game_id !== undefined && g.game_id !== null && h.game_id !== undefined && h.game_id !== null)
@@ -104,11 +126,9 @@
             var mismoFechaVenue = (h.date === g.date && h.venue === g.venue && h.home_team === g.home_team && h.away_team === g.away_team);
             return !(mismoGameId || mismoFechaVenue);
           });
-          // recalcula el top tras quitar el propio juego
           r.top = r.ranked.length ? r.ranked[0] : null;
           r.cls = r.top && r.top.score >= 80 ? "ok" : (r.top && r.top.score >= 60 ? "mid" : "bad");
         }
-
         html += tarjeta(g, r, i, climaOk);
       }
       listaEl.innerHTML = html;
@@ -127,80 +147,89 @@
 
     var sc = r && r.top ? r.top.score : null;
     var cls = r ? r.cls : "bad";
-    var txt = (!climaOk) ? "CLIMA NO NUMERICO (" + g.temperature_f + ")"
-            : (sc===null ? "SIN COINCIDENCIA" : sc+"%");
+    var coinTxt = (!climaOk) ? "—" : (sc===null ? "—" : sc+"%");
 
-    // marcador real de ESE juego (ya guardado en cache)
-    var marcador = "";
+    // CARRERAJE REAL de ESE juego (lo que de verdad paso)
+    var realRuns = null;
     if(g.away_runs!==null && g.away_runs!==undefined && g.home_runs!==null && g.home_runs!==undefined){
-      marcador = '<div class="estadio">Marcador: '+g.away_runs+'-'+g.home_runs+' ('+g.total_runs+' carreras) · '+(g.status||"")+'</div>';
-    } else {
-      marcador = '<div class="estadio">Marcador: — sin datos · '+(g.status||"")+'</div>';
+      realRuns = g.away_runs + g.home_runs;
     }
+    var marcadorTxt = (realRuns!==null)
+      ? g.away_runs+'-'+g.home_runs+' ('+realRuns+') · '+(g.status||"")
+      : '— sin datos · '+(g.status||"");
 
-    var climaHoy = '<div class="estadio">CLIMA: '+
-      (g.temperature_f!==undefined?g.temperature_f+"°":"?")+
-      ' · viento '+(g.windspeed_mph!==undefined?g.windspeed_mph:"?")+
-      ' · dir '+(g.wind_dir!==undefined && g.wind_dir!==null && g.wind_dir!==""?g.wind_dir:"NO CONFIRMADO")+
-      ' · hum '+(g.humidity_pct!==undefined?g.humidity_pct+"%":"?")+'</div>';
+    // chips de clima de ESE juego
+    var hoychips = '<div class="hoychips">'+
+      '<span class="chip">🌡️ <b>'+(g.temperature_f!==undefined?g.temperature_f+"°":"?")+'</b></span>'+
+      '<span class="chip">🌬️ <b>'+(g.windspeed_mph!==undefined?g.windspeed_mph:"?")+'</b></span>'+
+      '<span class="chip">🧭 dir <b>'+(g.wind_dir!==undefined && g.wind_dir!==null && g.wind_dir!==""?g.wind_dir:"N/C")+'</b></span>'+
+      '<span class="chip">💧 <b>'+(g.humidity_pct!==undefined?g.humidity_pct+"%":"?")+'</b></span>'+
+    '</div>';
 
-    var det = "";
+    // promedios de los 5 parecidos
     var sumScore=0, nScore=0, sumRuns=0, nRuns=0;
+    var det5 = "";
     if(r && r.ranked && r.ranked.length){
       for(var j=0;j<r.ranked.length;j++){
         var h=r.ranked[j];
         var ar = (h.away_runs!==undefined && h.away_runs!==null) ? h.away_runs : null;
         var hr = (h.home_runs!==undefined && h.home_runs!==null) ? h.home_runs : null;
-        var carreras;
-        if(ar!==null && hr!==null){
-          var tot = ar + hr;
-          carreras = ar+"-"+hr+" ("+tot+" carreras)";
-          sumRuns += tot; nRuns++;
-        } else {
-          carreras = "— sin marcador";
-        }
+        var carrChip;
+        if(ar!==null && hr!==null){ var tot=ar+hr; carrChip='<span class="chip">⚾ <b>'+ar+'-'+hr+'</b> ('+tot+')</span>'; sumRuns+=tot; nRuns++; }
+        else { carrChip='<span class="chip">⚾ sin marcador</span>'; }
         if(typeof h.score === "number"){ sumScore += h.score; nScore++; }
-        det += '<div class="hrow">'+
-          (h.date||"?")+' · '+(h.away_team||"?")+' / '+(h.home_team||"?")+
-          ' · '+(h.temperature_f!==undefined?h.temperature_f+"°":"?")+
-          ' · viento '+(h.windspeed_mph!==undefined?h.windspeed_mph:"?")+
-          ' · hum '+(h.humidity_pct!==undefined?h.humidity_pct+"%":"?")+
-          ' · score '+h.score+'%'+
-          ' · '+carreras+'</div>';
+        det5 += '<div class="sub">'+
+          '<div class="top"><span class="fecha">'+fechaBonita(h.date)+'</span> · '+(h.away_team||"?")+' / '+(h.home_team||"?")+'</div>'+
+          '<div class="nums">'+
+            '<span class="chip">🌡️ <b>'+(h.temperature_f!==undefined?h.temperature_f+"°":"?")+'</b></span>'+
+            '<span class="chip">🌬️ <b>'+(h.windspeed_mph!==undefined?h.windspeed_mph:"?")+'</b></span>'+
+            '<span class="chip">💧 <b>'+(h.humidity_pct!==undefined?h.humidity_pct+"%":"?")+'</b></span>'+
+            '<span class="chip">score <b>'+h.score+'%</b></span>'+
+            carrChip+
+          '</div>'+
+        '</div>';
       }
     } else if(climaOk){
-      det = '<div class="hrow">Sin históricos para mostrar.</div>';
+      det5 = '<div class="sub">Sin históricos para mostrar.</div>';
     } else {
-      det = '<div class="hrow">No se calcula coincidencia: el clima guardado de este juego no es numérico.</div>';
+      det5 = '<div class="sub">CLIMA NO NUMERICO ('+g.temperature_f+'): no se calcula.</div>';
     }
+    var promScore = nScore>0 ? Math.round(sumScore/nScore) : null;
+    var estimRuns = nRuns>0  ? (sumRuns/nRuns) : null;
 
-    var conclusion = "";
-    if(nScore>0 || nRuns>0){
-      var promScore = nScore>0 ? Math.round(sumScore/nScore) : null;
-      var promRuns  = nRuns>0  ? (sumRuns/nRuns).toFixed(1) : null;
-      conclusion =
-        '<div class="concl">'+
-          '<div class="lbl">COINCIDENCIA PROMEDIO</div>'+
-          '<div class="val">'+(promScore!==null?promScore+"%":"—")+'</div>'+
-          '<div class="lbl sep">PROMEDIO DE CARRERAS (de los 5 parecidos)</div>'+
-          '<div class="val">'+(promRuns!==null?promRuns:"—")+'</div>'+
-        '</div>';
+    // panel: coincidencia de hoy + coincidencia promedio
+    var panel =
+      '<div class="panel">'+
+        '<div class="pbox"><div class="lbl">COINCIDENCIA</div><div class="val v-coin '+cls+'">'+coinTxt+'</div></div>'+
+        '<div class="pbox"><div class="lbl">COINC. PROMEDIO</div><div class="val v-run">'+(promScore!==null?promScore+"%":"—")+'</div></div>'+
+      '</div>';
+
+    // CARRERAJE: REAL vs ESTIMADO (lo nuevo, para ver cual acierta)
+    var difTxt = "";
+    if(realRuns!==null && estimRuns!==null){
+      var dif = (estimRuns - realRuns);
+      difTxt = (dif>0?"+":"")+dif.toFixed(1)+" vs real";
     }
+    var carr =
+      '<div class="carr">'+
+        '<div class="cbox real"><div class="lbl">CARRERAJE REAL</div><div class="val">'+(realRuns!==null?realRuns:"—")+'</div><div class="dif">lo que pasó</div></div>'+
+        '<div class="cbox estim"><div class="lbl">CARRERAJE ESTIMADO</div><div class="val">'+(estimRuns!==null?estimRuns.toFixed(1):"—")+'</div><div class="dif">'+difTxt+'</div></div>'+
+      '</div>';
 
-    return '<div class="juego" onclick="toggleDet('+idx+')">'+
+    // 5 parecidos VISIBLES adelante (igual que el index)
+    var bloque5 = '<div class="serieparque">'+
+      '<div class="sphdr">5 PARECIDOS · CLIMA EN ESTE PARQUE</div>'+
+      det5+'</div>';
+
+    return '<div class="juego">'+
       '<div class="matchup">'+away+' @ '+home+'</div>'+
       '<div class="estadio">'+venue+'</div>'+
-      marcador +
-      climaHoy +
-      '<div class="score '+cls+'">Coincidencia: '+txt+'</div>'+
-      '<div class="ver">Toca para ver los 5 parecidos ▼</div>'+
-      '<div class="detalle" id="det'+idx+'">'+det+conclusion+'</div>'+
+      '<div class="estadio">Marcador: '+marcadorTxt+'</div>'+
+      hoychips +
+      panel +
+      carr +
+      bloque5 +
       '</div>';
-  }
-
-  function toggleDet(idx){
-    var d=document.getElementById("det"+idx);
-    if(d){ d.classList.toggle("abierto"); }
   }
 </script>
 </body>
