@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>MLBPro · Casar Series TEST</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; font-family:-apple-system,system-ui,sans-serif; background:#0d1117; color:#e6edf3; }
+  header { padding:14px 16px; border-bottom:1px solid #30363d; }
+  h1 { font-size:17px; margin:0; }
+  main { padding:16px; max-width:900px; margin:0 auto; }
+  label { font-size:13px; color:#8b949e; display:block; margin-bottom:6px; }
+  select { width:100%; padding:14px; font-size:16px; background:#161b22; color:#e6edf3; border:1px solid #30363d; border-radius:10px; margin-bottom:12px; }
+  .go { width:100%; border:0; border-radius:10px; padding:16px; font-size:16px; font-weight:800; color:#fff; background:#238636; cursor:pointer; }
+
+  .serie { background:#161b22; border:1px solid #30363d; border-radius:14px; padding:14px; margin-top:14px; }
+  .serie .cab { font-size:15px; font-weight:800; }
+  .serie .sub { font-size:12px; color:#8b949e; margin:3px 0 8px; }
+  .serie .prom { font-size:13px; color:#c9d1d9; margin-bottom:8px; }
+  .serie .prom b { color:#fff; }
+  .jrow { font-size:12px; color:#c9d1d9; padding:5px 0; border-top:1px solid #21262d; display:flex; justify-content:space-between; gap:8px; }
+  .jrow .f { color:#79c0ff; }
+  .jrow .r { color:#3fb950; font-weight:700; }
+  .tag-sube { color:#3fb950; } .tag-baja { color:#ff7b72; } .tag-est { color:#d29922; }
+
+  #console { margin-top:16px; background:#010409; border:1px solid #30363d; border-radius:8px; padding:12px; min-height:50px; max-height:25vh; overflow:auto; font-family:ui-monospace,monospace; font-size:12px; white-space:pre-wrap; }
+</style>
+</head>
+<body>
+<header><h1>MLBPro · Casar SERIES por temporada (TEST)</h1></header>
+<main>
+  <label>Parque (de lo que hay en cache):</label>
+  <select id="parque"></select>
+  <button id="go" class="go">CASAR SERIES DE ESTE PARQUE</button>
+  <div id="lista"></div>
+  <div id="console">Elige un parque y pulsa el botón. Solo agrupa lo que ya está en cache.</div>
+</main>
+
+<script src="mlb-routes.js"></script>
+<script src="estadios.js"></script>
+<script src="clima-cache.js"></script>
+
+<script>
+  var consoleEl = document.getElementById("console");
+  var listaEl = document.getElementById("lista");
+  var selParque = document.getElementById("parque");
+  function log(t){ var d=document.createElement("div"); d.textContent=t; consoleEl.appendChild(d); consoleEl.scrollTop=consoleEl.scrollHeight; }
+
+  // llenar el dropdown con los parques que existen en el cache
+  (function llenarParques(){
+    try {
+      var cache = (typeof climaLeerCache === "function") ? climaLeerCache() : [];
+      if(!cache.length){ log("CACHE VACIO. Abre el index y pulsa COINCIDENCIA para llenar el cache."); return; }
+      var set = {};
+      for(var i=0;i<cache.length;i++){ if(cache[i] && cache[i].venue) set[cache[i].venue]=true; }
+      var parques = Object.keys(set).sort();
+      for(var j=0;j<parques.length;j++){
+        var o=document.createElement("option"); o.value=parques[j]; o.textContent=parques[j]; selParque.appendChild(o);
+      }
+      log("Parques en cache: "+parques.length+". Filas totales: "+cache.length);
+    } catch(e){ log("ERROR llenando parques: "+e.message); }
+  })();
+
+  // agrupa los juegos de un parque en SERIES: mismo visitante seguido, fechas con hueco <= 4 días
+  function casarSeries(cache, venue){
+    var juegos = cache.filter(function(g){ return g && g.venue===venue && g.date; });
+    // ordenar por fecha ascendente
+    juegos.sort(function(a,b){ return a.date < b.date ? -1 : (a.date > b.date ? 1 : 0); });
+
+    var series = [];
+    var actual = null;
+    for(var i=0;i<juegos.length;i++){
+      var g = juegos[i];
+      var visit = g.away_team || g.away || "?";
+      var fecha = g.date;
+      if(actual && actual.visit===visit && diffDias(actual.ultFecha, fecha) <= 4){
+        actual.juegos.push(g); actual.ultFecha = fecha;
+      } else {
+        if(actual) series.push(actual);
+        actual = { visit:visit, home:(g.home_team||g.home||venue), iniFecha:fecha, ultFecha:fecha, juegos:[g] };
+      }
+    }
+    if(actual) series.push(actual);
+    // más nueva primero
+    series.sort(function(a,b){ return a.iniFecha < b.iniFecha ? 1 : -1; });
+    return series;
+  }
+
+  function diffDias(d1, d2){
+    var a=new Date(d1+"T00:00:00"), b=new Date(d2+"T00:00:00");
+    return Math.abs((b-a)/(1000*60*60*24));
+  }
+
+  function carrerasDe(g){
+    var ar=g.away_runs, hr=g.home_runs;
+    if(ar!==null&&ar!==undefined&&hr!==null&&hr!==undefined) return Number(ar)+Number(hr);
+    return null;
+  }
+
+  document.getElementById("go").addEventListener("click", function(){
+    consoleEl.textContent=""; listaEl.innerHTML="";
+    var venue = selParque.value;
+    if(!venue){ log("Elige un parque."); return; }
+    try {
+      var cache = climaLeerCache();
+      var series = casarSeries(cache, venue);
+      log(venue+": "+series.length+" series encontradas.");
+      if(!series.length){ log("Sin series para este parque."); return; }
+
+      var html="";
+      for(var s=0;s<series.length;s++){
+        var se = series[s];
+        // promedios de la serie
+        var sumC=0,nC=0,sumV=0,nV=0,sumT=0,nT=0;
+        var filas="";
+        var carrerasArr=[];
+        for(var k=0;k<se.juegos.length;k++){
+          var g=se.juegos[k];
+          var c=carrerasDe(g);
+          var marc = (g.away_runs!==undefined&&g.away_runs!==null&&g.home_runs!==undefined&&g.home_runs!==null) ? (g.away_runs+"-"+g.home_runs) : "—";
+          if(c!==null){ sumC+=c; nC++; carrerasArr.push(c); }
+          if(typeof g.windspeed_mph==="number"){ sumV+=g.windspeed_mph; nV++; }
+          if(typeof g.temperature_f==="number"){ sumT+=g.temperature_f; nT++; }
+          var dirTxt = (g.winddir_deg!==undefined&&g.winddir_deg!==null) ? ("dir "+Math.round(g.winddir_deg)) : "dir —";
+          filas += '<div class="jrow"><span class="f">'+g.date+'</span>'+
+                   '<span>'+(typeof g.temperature_f==="number"?Math.round(g.temperature_f)+"°":"—")+
+                   ' · v'+(typeof g.windspeed_mph==="number"?g.windspeed_mph.toFixed(0):"—")+
+                   ' · '+dirTxt+'</span>'+
+                   '<span class="r">'+marc+(c!==null?' ('+c+')':'')+'</span></div>';
+        }
+        var promC = nC>0 ? (sumC/nC).toFixed(1) : "—";
+        // tendencia: sube/baja/estable comparando primer vs último juego con carreras
+        var tend="", tendCls="tag-est";
+        if(carrerasArr.length>=2){
+          var d = carrerasArr[carrerasArr.length-1] - carrerasArr[0];
+          if(d>=2){ tend="SUBE"; tendCls="tag-sube"; }
+          else if(d<=-2){ tend="BAJA"; tendCls="tag-baja"; }
+          else { tend="ESTABLE"; tendCls="tag-est"; }
+        }
+
+        html += '<div class="serie">'+
+          '<div class="cab">'+se.visit+' @ '+se.home+'</div>'+
+          '<div class="sub">'+se.iniFecha+' → '+se.ultFecha+' · '+se.juegos.length+' juego(s)'+
+            (tend?' · <span class="'+tendCls+'">'+tend+'</span>':'')+'</div>'+
+          '<div class="prom">Carreras promedio serie: <b>'+promC+'</b>'+
+            ' · temp '+(nT>0?(sumT/nT).toFixed(0)+'°':'—')+
+            ' · viento '+(nV>0?(sumV/nV).toFixed(1):'—')+'</div>'+
+          filas+
+          '</div>';
+      }
+      listaEl.innerHTML = html;
+      log("LISTO.");
+    } catch(e){ log("ERROR: "+e.message); }
+  });
+</script>
+</body>
+</html>
