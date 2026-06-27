@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>MLBPro · Viento Nativo (todos)</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; font-family:-apple-system,system-ui,sans-serif; background:#0d1117; color:#e6edf3; }
+  header { padding:14px 16px; border-bottom:1px solid #30363d; }
+  h1 { font-size:15px; margin:0; }
+  main { padding:12px; }
+  .go { width:100%; border:0; border-radius:10px; padding:16px; font-size:16px; font-weight:800; color:#fff; background:#1f6feb; cursor:pointer; margin-bottom:6px; }
+  .leyenda { font-size:11px; color:#8b949e; text-align:center; margin-bottom:12px; }
+
+  .cols { display:flex; gap:10px; }
+  .col { flex:1; min-width:0; }
+  .coltit { font-size:13px; font-weight:800; text-align:center; padding:8px; border-radius:8px; margin-bottom:8px; position:sticky; top:0; }
+  .costa { background:#0d2818; color:#3fb950; border:1px solid #238636; }
+  .adentro { background:#2d1e0d; color:#ffa657; border:1px solid #9e6a03; }
+
+  .parque { background:#161b22; border:1px solid #30363d; border-radius:10px; padding:10px; margin-bottom:10px; }
+  .parque .pn { font-size:13px; font-weight:800; margin-bottom:2px; }
+  .parque .sub { font-size:10px; color:#8b949e; margin-bottom:6px; }
+  .nativo { font-size:11px; color:#d2a8ff; font-weight:700; margin-bottom:6px; }
+  .grad { font-size:11px; padding:4px 0; border-top:1px solid #21262d; display:flex; justify-content:space-between; gap:4px; align-items:center; }
+  .grad .rango { color:#79c0ff; font-weight:700; }
+  .grad .car { font-weight:800; }
+  .grad .n { color:#8b949e; font-size:10px; }
+  .car.alto { color:#ff7b72; }
+  .car.bajo { color:#3fb950; }
+  .car.medio { color:#d29922; }
+  .vacio { color:#8b949e; font-size:11px; padding:4px 0; }
+  .estrella { color:#ffd60a; }
+
+  #console { margin-top:12px; background:#010409; border:1px solid #30363d; border-radius:8px; padding:10px; min-height:40px; max-height:18vh; overflow:auto; font-family:ui-monospace,monospace; font-size:11px; white-space:pre-wrap; }
+</style>
+</head>
+<body>
+<header><h1>MLBPro · VIENTO NATIVO (todos · mín 10 juegos)</h1></header>
+<main>
+  <button id="go" class="go">VER VIENTO NATIVO DE TODOS</button>
+  <div class="leyenda">🔴 over (9+) · 🟢 under (7-) · 🟡 limbo · ⭐ = viento nativo (más juegos)</div>
+  <div class="cols">
+    <div class="col"><div class="coltit costa">🌊 COSTA (mar)</div><div id="colCosta"></div></div>
+    <div class="col"><div class="coltit adentro">🏙️ ADENTRO</div><div id="colAdentro"></div></div>
+  </div>
+  <div id="console">Pulsa el botón. Solo muestra rangos con 10+ juegos = viento nativo limpio.</div>
+</main>
+
+<script src="mlb-routes.js"></script>
+<script src="estadios.js"></script>
+<script src="clima-cache.js"></script>
+
+<script>
+  var consoleEl = document.getElementById("console");
+  function log(t){ var d=document.createElement("div"); d.textContent=t; consoleEl.appendChild(d); consoleEl.scrollTop=consoleEl.scrollHeight; }
+
+  var MIN_JUEGOS = 10;
+
+  // COSTA de mar de verdad (5)
+  var COSTA = [
+    { equipo:"San Francisco Giants", m:"oracle" },
+    { equipo:"Seattle Mariners",     m:"t-mobile" },
+    { equipo:"San Diego Padres",     m:"petco" },
+    { equipo:"New York Mets",        m:"citi field" },
+    { equipo:"Miami Marlins",        m:"loandepot" }
+  ];
+  // ADENTRO (el resto, incl. ríos como Pittsburgh y Washington)
+  var ADENTRO = [
+    { equipo:"Detroit Tigers",        m:"comerica" },
+    { equipo:"St. Louis Cardinals",   m:"busch" },
+    { equipo:"Texas Rangers",         m:"globe life" },
+    { equipo:"Houston Astros",        m:"daikin" },
+    { equipo:"Chicago Cubs",          m:"wrigley" },
+    { equipo:"Chicago White Sox",     m:"rate field" },
+    { equipo:"Milwaukee Brewers",     m:"american family" },
+    { equipo:"Minnesota Twins",       m:"target field" },
+    { equipo:"Kansas City Royals",    m:"kauffman" },
+    { equipo:"Cleveland Guardians",   m:"progressive" },
+    { equipo:"Cincinnati Reds",       m:"great american" },
+    { equipo:"Pittsburgh Pirates",    m:"pnc" },
+    { equipo:"Atlanta Braves",        m:"truist" },
+    { equipo:"Colorado Rockies",      m:"coors" },
+    { equipo:"Arizona Diamondbacks",  m:"chase field" },
+    { equipo:"Washington Nationals",  m:"nationals park" },
+    { equipo:"Philadelphia Phillies", m:"citizens bank" },
+    { equipo:"New York Yankees",      m:"yankee" },
+    { equipo:"Boston Red Sox",        m:"fenway" },
+    { equipo:"Baltimore Orioles",     m:"camden" },
+    { equipo:"Toronto Blue Jays",     m:"rogers" },
+    { equipo:"Tampa Bay Rays",        m:"tropicana" },
+    { equipo:"Los Angeles Dodgers",   m:"dodger" },
+    { equipo:"Los Angeles Angels",    m:"angel" },
+    { equipo:"Athletics",             m:"sutter" }
+  ];
+
+  function carrerasDe(g){
+    var ar=g.away_runs, hr=g.home_runs;
+    if(ar!==null&&ar!==undefined&&hr!==null&&hr!==undefined) return Number(ar)+Number(hr);
+    return null;
+  }
+  function prom(arr){ if(!arr.length) return null; var s=0; for(var i=0;i<arr.length;i++) s+=arr[i]; return s/arr.length; }
+
+  function agruparPorGrado(cache, m){
+    var juegos = cache.filter(function(g){
+      return g && g.venue && g.venue.toLowerCase().indexOf(m) !== -1
+             && g.wind_dir!==undefined && g.wind_dir!==null && g.wind_dir!=="";
+    });
+    var grupos = {};
+    for(var i=0;i<juegos.length;i++){
+      var dir = Number(juegos[i].wind_dir);
+      if(isNaN(dir)) continue;
+      var lo = Math.floor(dir/30)*30;
+      if(!grupos[lo]) grupos[lo] = { lo:lo, hi:lo+30, carreras:[], n:0 };
+      var c = carrerasDe(juegos[i]);
+      grupos[lo].n++;
+      if(c!==null) grupos[lo].carreras.push(c);
+    }
+    var arr=[];
+    for(var k in grupos){ if(grupos.hasOwnProperty(k)) arr.push(grupos[k]); }
+    arr.sort(function(a,b){ return a.lo-b.lo; });
+    return { total: juegos.length, grupos: arr };
+  }
+
+  function parqueCard(item, cache){
+    var res = agruparPorGrado(cache, item.m);
+    // filtra solo rangos con MIN_JUEGOS o más
+    var fuertes = res.grupos.filter(function(g){ return g.n >= MIN_JUEGOS; });
+    // el viento nativo = el rango con más juegos
+    var maxN = 0;
+    for(var i=0;i<fuertes.length;i++){ if(fuertes[i].n>maxN) maxN=fuertes[i].n; }
+
+    var filas="";
+    if(res.total === 0){
+      filas = '<div class="vacio">Sin juegos con dir.</div>';
+    } else if(fuertes.length === 0){
+      filas = '<div class="vacio">Ningún rango llega a '+MIN_JUEGOS+' juegos.</div>';
+    } else {
+      for(var j=0;j<fuertes.length;j++){
+        var gr=fuertes[j];
+        var pc=prom(gr.carreras);
+        var cls="medio";
+        if(pc!==null){ if(pc>=9) cls="alto"; else if(pc<=7) cls="bajo"; }
+        var esNativo = (gr.n === maxN);
+        filas += '<div class="grad">'+
+          '<span class="rango">'+(esNativo?'<span class="estrella">⭐</span> ':'')+gr.lo+'-'+gr.hi+'°</span>'+
+          '<span class="car '+cls+'">'+(pc!==null?pc.toFixed(1):"—")+'c</span>'+
+          '<span class="n">'+gr.n+'j</span>'+
+        '</div>';
+      }
+    }
+    return '<div class="parque">'+
+      '<div class="pn">'+item.equipo+'</div>'+
+      '<div class="sub">'+res.total+' juegos con dir</div>'+
+      filas+
+    '</div>';
+  }
+
+  document.getElementById("go").addEventListener("click", function(){
+    consoleEl.textContent="";
+    document.getElementById("colCosta").innerHTML="";
+    document.getElementById("colAdentro").innerHTML="";
+    try {
+      var cache = climaLeerCache();
+      if(!cache.length){ log("CACHE VACIO. Abre el index (Chrome normal, NO incógnito), pulsa COINCIDENCIA, vuelve."); return; }
+      log("Filas en cache: "+cache.length);
+      var hc="", ha="";
+      for(var i=0;i<COSTA.length;i++)   hc += parqueCard(COSTA[i], cache);
+      for(var j=0;j<ADENTRO.length;j++) ha += parqueCard(ADENTRO[j], cache);
+      document.getElementById("colCosta").innerHTML = hc;
+      document.getElementById("colAdentro").innerHTML = ha;
+      log("LISTO. ⭐ = viento nativo de cada parque (rango con más juegos).");
+    } catch(e){ log("ERROR: "+e.message); }
+  });
+</script>
+</body>
+</html>
