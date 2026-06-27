@@ -170,8 +170,13 @@
     var sumScore=0, nScore=0, sumRuns=0, nRuns=0;
     var det5 = "";
     if(r && r.ranked && r.ranked.length){
-      for(var j=0;j<r.ranked.length;j++){
-        var h=r.ranked[j];
+      // ordenar los parecidos por FECHA (más reciente arriba) para leer la coincidencia seguida.
+      // El score sigue siendo el del cálculo; solo cambia el orden de presentación.
+      var parecidosOrden = r.ranked.slice().sort(function(a,b){
+        return (a.date < b.date) ? 1 : ((a.date > b.date) ? -1 : 0);
+      });
+      for(var j=0;j<parecidosOrden.length;j++){
+        var h=parecidosOrden[j];
         var ar = (h.away_runs!==undefined && h.away_runs!==null) ? h.away_runs : null;
         var hr = (h.home_runs!==undefined && h.home_runs!==null) ? h.home_runs : null;
         var carrChip;
