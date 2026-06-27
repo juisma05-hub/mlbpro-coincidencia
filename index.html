@@ -416,9 +416,12 @@
     } else {
       det5 = '<div class="sub">Sin históricos para mostrar.</div>';
     }
-    var fold5 = '<details class="fold"><summary>Ver los 5 parecidos (score)</summary>'+det5+'</details>';
+    var fold5 = '<div class="serieparque">'+
+      '<div class="sphdr">5 PARECIDOS · CLIMA EN ESTE PARQUE</div>'+
+      det5+'</div>';
 
-    var serieHtml = serieParqueHtml(venue, bloquesSerie, rosterMap);
+    var serieHtml = '<details class="fold"><summary>Serie en este parque (por si ya jugaron en escena parecida)</summary>'+
+      serieParqueHtml(venue, bloquesSerie, rosterMap)+'</details>';
 
     return '<div class="juego">'+
       '<div class="matchup">'+away+' @ '+home+'</div>'+
@@ -426,9 +429,9 @@
       hoychips +
       panel +
       lineas +
-      serieHtml +
-      foldHoy +
       fold5 +
+      foldHoy +
+      serieHtml +
       '</div>';
   }
 </script>
