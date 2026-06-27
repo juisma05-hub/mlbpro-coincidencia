@@ -15,27 +15,28 @@
   .go:disabled { background:#30363d; color:#8b949e; }
   .go-venideros { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#fff; background:#1f6feb; cursor:pointer; margin-top:12px; }
   .go-pasados { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#fff; background:#d2691e; cursor:pointer; margin-top:12px; }
-  .juego { background:#161b22; border:1px solid #30363d; border-radius:10px; padding:12px; margin-top:12px; cursor:pointer; }
+  .juego { background:#161b22; border:1px solid #30363d; border-radius:10px; padding:12px; margin-top:12px; }
   .matchup { font-size:16px; font-weight:800; }
   .estadio { font-size:13px; color:#bbb; margin:2px 0; }
   .score { font-size:22px; font-weight:800; margin-top:6px; }
   .ok{color:#32d74b;} .mid{color:#ffd60a;} .bad{color:#ff453a;}
-  .ver { font-size:12px; color:#79c0ff; margin-top:6px; }
-  .detalle { display:none; margin-top:10px; border-top:1px solid #30363d; padding-top:10px; }
-  .detalle.abierto { display:block; }
-  .hrow { font-size:12px; color:#ccc; padding:4px 0; border-bottom:1px solid #21262d; }
   .concl { text-align:center; border-top:1px solid #30363d; margin-top:10px; padding-top:10px; }
   .concl .lbl { font-size:12px; color:#8b949e; }
   .concl .val { font-size:20px; font-weight:800; color:#79c0ff; }
   .concl .sep { margin-top:8px; }
-  /* --- bloque SERIE EN ESTE PARQUE (agregado) --- */
+  details.fold { margin-top:10px; border-top:1px solid #30363d; padding-top:8px; }
+  details.fold > summary { font-size:13px; color:#79c0ff; font-weight:700; cursor:pointer; list-style:none; padding:4px 0; }
+  details.fold > summary::-webkit-details-marker { display:none; }
+  details.fold > summary::before { content:"\25B6  "; font-size:11px; }
+  details.fold[open] > summary::before { content:"\25BC  "; }
+  .hrow { font-size:12px; color:#ccc; padding:4px 0; border-bottom:1px solid #21262d; }
   .serieparque { margin-top:10px; border-top:1px solid #30363d; padding-top:10px; }
   .serieparque .sphdr { font-size:12px; color:#8b949e; font-weight:700; letter-spacing:0.5px; }
   .serieparque .spsub { font-size:13px; color:#bbb; margin:3px 0; }
   .serieparque .sptray { font-size:13px; font-weight:700; margin:3px 0; }
   .sp-up{color:#ff9f0a;} .sp-down{color:#64d2ff;} .sp-flat{color:#8b949e;}
   .serieparque .spsalto { font-size:12px; color:#ffd60a; margin:2px 0; }
-  .serieparque .sprow { font-size:12px; color:#ccc; padding:4px 0; border-bottom:1px solid #21262d; }
+  .serieparque .sprow { font-size:12px; color:#ccc; padding:6px 0; border-bottom:1px solid #21262d; }
   .serieparque .spprom { text-align:center; margin-top:8px; padding-top:8px; }
   .serieparque .spprom .lbl { font-size:12px; color:#8b949e; }
   .serieparque .spprom .val { font-size:20px; font-weight:800; color:#79c0ff; }
@@ -68,7 +69,6 @@
 <script src="traducir-catcher.js"></script>
 <script src="umpires-master.js"></script>
 <script src="traducir-umpire.js"></script>
-
 <script src="bloques-serie.js"></script>
 <script src="bloques-trayectoria.js"></script>
 
@@ -78,7 +78,6 @@
   function log(t){ var d=document.createElement("div"); d.textContent=t; consoleEl.appendChild(d); consoleEl.scrollTop=consoleEl.scrollHeight; }
 
   function hoyISO(){
-    // Corte 6 AM: antes de las 6 AM se sigue mostrando el dia anterior.
     var d=new Date(Date.now() - 6*60*60*1000);
     return d.getFullYear()+"-"+("0"+(d.getMonth()+1)).slice(-2)+"-"+("0"+d.getDate()).slice(-2);
   }
@@ -86,7 +85,6 @@
   document.getElementById("goVenideros").addEventListener("click", function(){
     location.href = "venideros-test.html";
   });
-
   document.getElementById("goPasados").addEventListener("click", function(){
     location.href = "dia-pasado-test.html";
   });
@@ -106,7 +104,6 @@
       log("Juegos hoy: "+games.length);
       if(games.length===0){ log("No hay juegos hoy ("+hoy+")."); return; }
 
-      // arma los bloques de serie UNA vez desde el cache (mismo patron que serie-pasada-test)
       var bloquesSerie = [];
       try {
         var cacheSerie = climaLeerCache();
@@ -116,8 +113,7 @@
         log("AVISO serie: " + (eb && eb.message ? eb.message : eb));
       }
 
-      // --- PRECARGA de rosters (pitcher/catcher/umpire) para las series que se van a mostrar ---
-      // Se hace UNA vez, ANTES del loop de tarjetas, porque jalarRoster es ASYNC.
+      // PRECARGA de rosters de series (jalarRoster es ASYNC)
       var rosterMap = {};
       try {
         var idsAPrecargar = [];
@@ -154,8 +150,6 @@
         var pitcherAwayId = (g.teams&&g.teams.away&&g.teams.away.probablePitcher) ? g.teams.away.probablePitcher.id : null;
         var pitcherHomeId = (g.teams&&g.teams.home&&g.teams.home.probablePitcher) ? g.teams.home.probablePitcher.id : null;
 
-        // --- roster de HOY (catcher_away_id, catcher_home_id, umpire_home) ---
-        // jalarRoster ya devuelve umpire_home como NOMBRE real (no necesita master).
         var rosterHoy = await jalarRoster(g.gamePk);
         var catcherAwayId = rosterHoy ? rosterHoy.catcher_away_id : "NO_CONFIRMADO";
         var catcherHomeId = rosterHoy ? rosterHoy.catcher_home_id : "NO_CONFIRMADO";
@@ -186,20 +180,15 @@
     }
   });
 
-  // --- serie del parque: toma el bloque mas reciente del venue de hoy ---
   function serieDelParque(venue, bloquesSerie){
     if(!venue || !bloquesSerie || !bloquesSerie.length) return null;
     var v = stadiumNorm(venue);
-    var candidatos = bloquesSerie.filter(function(b){
-      return stadiumNorm(b.venue) === v;
-    });
+    var candidatos = bloquesSerie.filter(function(b){ return stadiumNorm(b.venue) === v; });
     if(!candidatos.length) return null;
     candidatos.sort(function(a,b){ return a.fecha_inicio < b.fecha_inicio ? 1 : -1; });
     return candidatos[0];
   }
 
-  // --- agrupa una lista de juegos en series del equipo de la casa ---
-  // serie = mismo home_team en dias consecutivos (hueco <= 2 dias, igual que armarBloques)
   function agruparEnSeries(lista){
     var arr = lista.slice().filter(function(x){ return x && x.date; });
     arr.sort(function(a,b){ return a.date < b.date ? -1 : (a.date > b.date ? 1 : 0); });
@@ -220,26 +209,20 @@
     return series;
   }
 
-  // --- texto corto de stats de umpire (recibe el objeto de traducirUmpire) ---
   function umpireTxt(u){
     if(!u || u.zone_type === "NO_CONFIRMADO"){
       return (u && u.nombre ? u.nombre : "NO_CONFIRMADO") + " (stats NO_CONFIRMADO)";
     }
-    return u.nombre +
-      " (zona "+u.zone_type+
-      " · K/j "+u.k_per_game+
-      " · BB/j "+u.bb_per_game+
-      " · "+u.k_tier+")";
+    return u.nombre + " (zona "+u.zone_type+" · K/j "+u.k_per_game+" · BB/j "+u.bb_per_game+" · "+u.k_tier+")";
   }
 
-  // --- html del bloque serie, mismo patron que serie-pasada-test.html ---
+  // SERIE EN ESTE PARQUE (visible). Detalle de roster de cada fila PLEGADO.
   function serieParqueHtml(venue, bloquesSerie, rosterMap){
     var b = serieDelParque(venue, bloquesSerie);
     if(!b){
       return '<div class="serieparque"><div class="sphdr">SERIE EN ESTE PARQUE</div>'+
              '<div class="spsub">Sin serie en cache para este parque todavía.</div></div>';
     }
-
     var tr = (typeof analizarTrayectoria === "function") ? analizarTrayectoria(b) : {tendencia:"ESTABLE",min:null,max:null,saltos:[]};
     var clsTend = tr.tendencia==="SUBE" ? "sp-up" : (tr.tendencia==="BAJA" ? "sp-down" : "sp-flat");
     var rango = (tr.min!==null && tr.max!==null) ? (" ("+tr.min+"° a "+tr.max+"°)") : "";
@@ -255,42 +238,30 @@
 
     var filas = "";
     var sumRuns=0, nRuns=0;
-    // ordena por fecha descendente (mas reciente arriba). Copia para no mutar el bloque.
     var juegosOrden = b.juegos.slice().sort(function(a,b){ return a.date < b.date ? 1 : (a.date > b.date ? -1 : 0); });
     for(var j=0;j<juegosOrden.length;j++){
       var g=juegosOrden[j];
       var ar = (g.away_runs!==undefined && g.away_runs!==null) ? g.away_runs : null;
       var hr = (g.home_runs!==undefined && g.home_runs!==null) ? g.home_runs : null;
       var carreras;
-      if(ar!==null && hr!==null){
-        var tot = ar+hr;
-        carreras = ar+"-"+hr+" ("+tot+" carreras)";
-        sumRuns += tot; nRuns++;
-      } else {
-        carreras = "— sin marcador";
-      }
+      if(ar!==null && hr!==null){ var tot=ar+hr; carreras=ar+"-"+hr+" ("+tot+" carreras)"; sumRuns+=tot; nRuns++; }
+      else { carreras="— sin marcador"; }
       var temp = (g.temperature_f!==undefined && g.temperature_f!==null && g.temperature_f!=="") ? g.temperature_f+"°" : "PENDIENTE";
 
-      // --- pitcher / catcher / umpire de esta fila (precargado en rosterMap antes del render) ---
-      var pitcherFila = "";
-      var catcherFila = "";
-      var umpireFila = "";
+      var detFila = "";
       var ros = (rosterMap && g.game_id !== undefined) ? rosterMap[g.game_id] : null;
       if(ros){
         var pa = traducirPitcher(ros.pitcher_away_id);
         var ph = traducirPitcher(ros.pitcher_home_id);
-        pitcherFila = ' · ⚾ '+pa.nombre+' vs '+ph.nombre;
-
         var ca = traducirCatcher(ros.catcher_away_id);
         var ch = traducirCatcher(ros.catcher_home_id);
-        catcherFila = ' · 🧤 '+ca.nombre+' vs '+ch.nombre;
-
         var uf = traducirUmpire(ros.umpire_home);
-        umpireFila = ' · 🧑‍⚖️ '+umpireTxt(uf);
+        detFila =
+          '<div class="hrow">⚾ '+pa.nombre+' vs '+ph.nombre+'</div>'+
+          '<div class="hrow">🧤 '+ca.nombre+' vs '+ch.nombre+'</div>'+
+          '<div class="hrow">🧑‍⚖️ '+umpireTxt(uf)+'</div>';
       } else {
-        pitcherFila = ' · ⚾ NO_CONFIRMADO';
-        catcherFila = ' · 🧤 NO_CONFIRMADO';
-        umpireFila = ' · 🧑‍⚖️ NO_CONFIRMADO';
+        detFila = '<div class="hrow">Roster NO_CONFIRMADO</div>';
       }
 
       filas += '<div class="sprow">'+
@@ -299,16 +270,15 @@
         ' · viento '+(g.windspeed_mph!==undefined?g.windspeed_mph:"?")+
         ' · hum '+(g.humidity_pct!==undefined?g.humidity_pct+"%":"?")+
         ' · '+carreras+
-        pitcherFila+catcherFila+umpireFila+'</div>';
+        '<details class="fold"><summary>pitcher / catcher / umpire</summary>'+detFila+'</details>'+
+        '</div>';
     }
 
     var prom = "";
     if(nRuns>0){
       var promRuns = (sumRuns/nRuns).toFixed(1);
-      prom = '<div class="spprom">'+
-        '<div class="lbl">PROMEDIO DE CARRERAS DE LA SERIE ('+nRuns+' juegos con marcador)</div>'+
-        '<div class="val">'+promRuns+'</div>'+
-      '</div>';
+      prom = '<div class="spprom"><div class="lbl">PROMEDIO DE CARRERAS DE LA SERIE ('+nRuns+' juegos con marcador)</div>'+
+        '<div class="val">'+promRuns+'</div></div>';
     } else {
       prom = '<div class="spprom"><div class="lbl">Sin marcadores en esta serie.</div></div>';
     }
@@ -316,10 +286,7 @@
     return '<div class="serieparque">'+
       '<div class="sphdr">SERIE EN ESTE PARQUE</div>'+
       '<div class="spsub">'+(b.home_team||"?")+' · '+b.fecha_inicio+' a '+b.fecha_fin+' · '+b.n_juegos+' juegos</div>'+
-      trayHtml +
-      saltosHtml +
-      filas +
-      prom +
+      trayHtml + saltosHtml + filas + prom +
     '</div>';
   }
 
@@ -327,9 +294,8 @@
     var sc = r && r.top ? r.top.score : null;
     var cls = r ? r.cls : "bad";
     var txt = (sc===null) ? "SIN COINCIDENCIA" : (sc+"%");
-      var brisaInfo = (typeof BRISA_GEO_PARQUES_MLB_2026 !== "undefined" && BRISA_GEO_PARQUES_MLB_2026[venue]) ? BRISA_GEO_PARQUES_MLB_2026[venue] : null;
-      var brisaHtml = brisaInfo ? '<div class="estadio">🌬️ '+brisaInfo.variante+'</div>' : "";
-      
+    var brisaInfo = (typeof BRISA_GEO_PARQUES_MLB_2026 !== "undefined" && BRISA_GEO_PARQUES_MLB_2026[venue]) ? BRISA_GEO_PARQUES_MLB_2026[venue] : null;
+    var brisaHtml = brisaInfo ? '<div class="estadio">🌬️ '+brisaInfo.variante+'</div>' : "";
 
     var climaHoy = "";
     if(today){
@@ -340,31 +306,9 @@
         ' · hum '+(today.humidity_pct!==undefined?today.humidity_pct+"%":"?")+'</div>';
     }
 
-    function xeraTxt(pid){
-      if(pid===null || pid===undefined) return "";
-      var p = (typeof PITCHERS_MASTER_2026 !== "undefined") ? PITCHERS_MASTER_2026[pid] : null;
-      if(!p || p.xera===undefined || p.xera===null) return " (xERA NO CONFIRMADO)";
-      return " (xERA "+p.xera+" general)";
-    }
-    var pitchers = '<div class="estadio">⚾ '+(pitcherAway||"TBD")+xeraTxt(pitcherAwayId)+' vs '+(pitcherHome||"TBD")+xeraTxt(pitcherHomeId)+'</div>';
-
-    // --- catcher de HOY (titular, via jalarRoster -> traducirCatcher) ---
-    var ca = traducirCatcher(catcherAwayId);
-    var ch = traducirCatcher(catcherHomeId);
-    function rvTxt(rv){
-      if(rv===undefined || rv===null || rv==="NO_CONFIRMADO") return " (rv_tot NO_CONFIRMADO)";
-      return " (rv_tot "+rv+")";
-    }
-    var catchersHtml = '<div class="estadio">🧤 '+ca.nombre+rvTxt(ca.rv_tot)+' vs '+ch.nombre+rvTxt(ch.rv_tot)+'</div>';
-
-    // --- umpire de plato de HOY (nombre real del feed + stats via traducirUmpire) ---
-    var uHoy = traducirUmpire(umpireHomeHoy);
-    var umpireHtml = '<div class="estadio">🧑‍⚖️ Umpire de plato: '+umpireTxt(uHoy)+'</div>';
-
-    var det = "";
+    // CONCLUSION (visible)
     var sumScore=0, nScore=0, sumRuns=0, nRuns=0;
     if(r && r.ranked && r.ranked.length){
-      // promedios sobre los 5 parecidos (no depende del orden)
       for(var k=0;k<r.ranked.length;k++){
         var hk=r.ranked[k];
         var ark = (hk.away_runs!==undefined && hk.away_runs!==null) ? hk.away_runs : null;
@@ -372,39 +316,7 @@
         if(ark!==null && hrk!==null){ sumRuns += (ark+hrk); nRuns++; }
         if(typeof hk.score === "number"){ sumScore += hk.score; nScore++; }
       }
-      // agrupa por serie del equipo de la casa y ordena series de nueva a vieja
-      var series = agruparEnSeries(r.ranked);
-      series.sort(function(a,b){ return a.ultima < b.ultima ? 1 : (a.ultima > b.ultima ? -1 : 0); });
-      for(var s=0;s<series.length;s++){
-        var serie = series[s];
-        det += '<div style="font-size:12px;color:#8b949e;font-weight:700;letter-spacing:0.5px;margin:8px 0 4px;">'+
-               'SERIE · '+(serie.home_team||"?")+' · '+serie.primera+' a '+serie.ultima+' · '+serie.juegos.length+' juego(s)</div>';
-        // juegos de la serie, mas nuevo arriba (copia, no muta)
-        var js = serie.juegos.slice().sort(function(a,b){ return a.date < b.date ? 1 : (a.date > b.date ? -1 : 0); });
-        for(var j=0;j<js.length;j++){
-          var h=js[j];
-          var ar = (h.away_runs!==undefined && h.away_runs!==null) ? h.away_runs : null;
-          var hr = (h.home_runs!==undefined && h.home_runs!==null) ? h.home_runs : null;
-          var carreras;
-          if(ar!==null && hr!==null){
-            var tot = ar + hr;
-            carreras = ar+"-"+hr+" ("+tot+" carreras)";
-          } else {
-            carreras = "— sin marcador";
-          }
-          det += '<div class="hrow">'+
-            (h.date||"?")+' · '+(h.away_team||"?")+' / '+(h.home_team||"?")+
-            ' · '+(h.temperature_f!==undefined?h.temperature_f+"°":"?")+
-            ' · viento '+(h.windspeed_mph!==undefined?h.windspeed_mph:"?")+
-            ' · hum '+(h.humidity_pct!==undefined?h.humidity_pct+"%":"?")+
-            ' · score '+h.score+'%'+
-            ' · '+carreras+'</div>';
-        }
-      }
-    } else {
-      det = '<div class="hrow">Sin históricos para mostrar.</div>';
     }
-
     var conclusion = "";
     if(nScore>0 || nRuns>0){
       var promScore = nScore>0 ? Math.round(sumScore/nScore) : null;
@@ -418,27 +330,75 @@
         '</div>';
     }
 
+    // DETALLE PLEGADO: roster de hoy (datos reales crudos)
+    function xeraTxt(pid){
+      if(pid===null || pid===undefined) return "";
+      var p = (typeof PITCHERS_MASTER_2026 !== "undefined") ? PITCHERS_MASTER_2026[pid] : null;
+      if(!p || p.xera===undefined || p.xera===null) return " (xERA NO CONFIRMADO)";
+      return " (xERA "+p.xera+" general)";
+    }
+    var pitchersHoy = '⚾ '+(pitcherAway||"TBD")+xeraTxt(pitcherAwayId)+' vs '+(pitcherHome||"TBD")+xeraTxt(pitcherHomeId);
+    var ca = traducirCatcher(catcherAwayId);
+    var ch = traducirCatcher(catcherHomeId);
+    function rvTxt(rv){
+      if(rv===undefined || rv===null || rv==="NO_CONFIRMADO") return " (rv_tot NO_CONFIRMADO)";
+      return " (rv_tot "+rv+")";
+    }
+    var catchersHoy = '🧤 '+ca.nombre+rvTxt(ca.rv_tot)+' vs '+ch.nombre+rvTxt(ch.rv_tot);
+    var uHoy = traducirUmpire(umpireHomeHoy);
+    var umpireHoy = '🧑‍⚖️ Umpire de plato: '+umpireTxt(uHoy);
+
+    var foldHoy =
+      '<details class="fold"><summary>Pitcher / Catcher / Umpire de hoy (datos)</summary>'+
+        '<div class="hrow">'+pitchersHoy+'</div>'+
+        '<div class="hrow">'+catchersHoy+'</div>'+
+        '<div class="hrow">'+umpireHoy+'</div>'+
+      '</details>';
+
+    // DETALLE PLEGADO: los 5 parecidos (score real)
+    var det5 = "";
+    if(r && r.ranked && r.ranked.length){
+      var series = agruparEnSeries(r.ranked);
+      series.sort(function(a,b){ return a.ultima < b.ultima ? 1 : (a.ultima > b.ultima ? -1 : 0); });
+      for(var sx=0;sx<series.length;sx++){
+        var serie = series[sx];
+        det5 += '<div style="font-size:12px;color:#8b949e;font-weight:700;letter-spacing:0.5px;margin:8px 0 4px;">'+
+               'SERIE · '+(serie.home_team||"?")+' · '+serie.primera+' a '+serie.ultima+' · '+serie.juegos.length+' juego(s)</div>';
+        var js = serie.juegos.slice().sort(function(a,b){ return a.date < b.date ? 1 : (a.date > b.date ? -1 : 0); });
+        for(var jj=0;jj<js.length;jj++){
+          var h=js[jj];
+          var arr2 = (h.away_runs!==undefined && h.away_runs!==null) ? h.away_runs : null;
+          var hrr2 = (h.home_runs!==undefined && h.home_runs!==null) ? h.home_runs : null;
+          var carr2;
+          if(arr2!==null && hrr2!==null){ var t2=arr2+hrr2; carr2=arr2+"-"+hrr2+" ("+t2+" carreras)"; }
+          else { carr2="— sin marcador"; }
+          det5 += '<div class="hrow">'+
+            (h.date||"?")+' · '+(h.away_team||"?")+' / '+(h.home_team||"?")+
+            ' · '+(h.temperature_f!==undefined?h.temperature_f+"°":"?")+
+            ' · viento '+(h.windspeed_mph!==undefined?h.windspeed_mph:"?")+
+            ' · hum '+(h.humidity_pct!==undefined?h.humidity_pct+"%":"?")+
+            ' · score '+h.score+'%'+
+            ' · '+carr2+'</div>';
+        }
+      }
+    } else {
+      det5 = '<div class="hrow">Sin históricos para mostrar.</div>';
+    }
+    var fold5 = '<details class="fold"><summary>Ver los 5 parecidos (score)</summary>'+det5+'</details>';
+
     var serieHtml = serieParqueHtml(venue, bloquesSerie, rosterMap);
 
-    return '<div class="juego" onclick="toggleDet('+idx+')">'+
+    return '<div class="juego">'+
       '<div class="matchup">'+away+' @ '+home+'</div>'+
       '<div class="estadio">'+(venue||"SIN PARQUE")+'</div>'+
       climaHoy +
-              brisaHtml +
-
-      pitchers +
-      catchersHtml +
-      umpireHtml +
+      brisaHtml +
       '<div class="score '+cls+'">Coincidencia: '+txt+'</div>'+
+      conclusion +
       serieHtml +
-      '<div class="ver">Toca para ver los 5 parecidos ▼</div>'+
-      '<div class="detalle" id="det'+idx+'">'+det+conclusion+'</div>'+
+      foldHoy +
+      fold5 +
       '</div>';
-  }
-
-  function toggleDet(idx){
-    var d=document.getElementById("det"+idx);
-    if(d){ d.classList.toggle("abierto"); }
   }
 </script>
 </body>
