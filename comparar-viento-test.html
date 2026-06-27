@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>MLBPro · Viento Costa vs Adentro</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; font-family:-apple-system,system-ui,sans-serif; background:#0d1117; color:#e6edf3; }
+  header { padding:14px 16px; border-bottom:1px solid #30363d; }
+  h1 { font-size:16px; margin:0; }
+  main { padding:12px; }
+  .go { width:100%; border:0; border-radius:10px; padding:16px; font-size:16px; font-weight:800; color:#fff; background:#1f6feb; cursor:pointer; margin-bottom:12px; }
+
+  .cols { display:flex; gap:10px; }
+  .col { flex:1; min-width:0; }
+  .coltit { font-size:13px; font-weight:800; text-align:center; padding:8px; border-radius:8px; margin-bottom:8px; }
+  .costa { background:#0d2818; color:#3fb950; border:1px solid #238636; }
+  .adentro { background:#2d1e0d; color:#ffa657; border:1px solid #9e6a03; }
+
+  .parque { background:#161b22; border:1px solid #30363d; border-radius:10px; padding:10px; margin-bottom:10px; }
+  .parque .pn { font-size:13px; font-weight:800; margin-bottom:6px; }
+  .parque .pn small { color:#8b949e; font-weight:400; display:block; font-size:10px; }
+  .grad { font-size:11px; padding:4px 0; border-top:1px solid #21262d; display:flex; justify-content:space-between; gap:4px; }
+  .grad .rango { color:#79c0ff; font-weight:700; }
+  .grad .car { font-weight:800; }
+  .grad .n { color:#8b949e; }
+  .car.alto { color:#ff7b72; }   /* mas carreras = over */
+  .car.bajo { color:#3fb950; }   /* menos carreras = under */
+  .car.medio { color:#d29922; }  /* limbo */
+  .vacio { color:#8b949e; font-size:11px; padding:4px 0; }
+
+  #console { margin-top:12px; background:#010409; border:1px solid #30363d; border-radius:8px; padding:10px; min-height:40px; max-height:20vh; overflow:auto; font-family:ui-monospace,monospace; font-size:11px; white-space:pre-wrap; }
+</style>
+</head>
+<body>
+<header><h1>MLBPro · Viento: Costa vs Adentro (por grado)</h1></header>
+<main>
+  <button id="go" class="go">COMPARAR LOS 6 PARQUES</button>
+  <div class="cols">
+    <div class="col">
+      <div class="coltit costa">🌊 COSTA</div>
+      <div id="colCosta"></div>
+    </div>
+    <div class="col">
+      <div class="coltit adentro">🏙️ ADENTRO</div>
+      <div id="colAdentro"></div>
+    </div>
+  </div>
+  <div id="console">Pulsa el botón. Agrupa por grados de viento (de 30 en 30), solo del cache.</div>
+</main>
+
+<script src="mlb-routes.js"></script>
+<script src="estadios.js"></script>
+<script src="clima-cache.js"></script>
+
+<script>
+  var consoleEl = document.getElementById("console");
+  function log(t){ var d=document.createElement("div"); d.textContent=t; consoleEl.appendChild(d); consoleEl.scrollTop=consoleEl.scrollHeight; }
+
+  // 6 parques: 3 costa, 3 adentro. equipo = lo que el usuario reconoce; venueMatch = texto a buscar en el cache.
+  var COSTA = [
+    { equipo:"Miami Marlins",        venueMatch:"loandepot" },
+    { equipo:"San Francisco Giants", venueMatch:"oracle" },
+    { equipo:"San Diego Padres",     venueMatch:"petco" }
+  ];
+  var ADENTRO = [
+    { equipo:"Detroit Tigers",    venueMatch:"comerica" },
+    { equipo:"St. Louis Cardinals", venueMatch:"busch" },
+    { equipo:"Texas Rangers",     venueMatch:"globe life" }
+  ];
+
+  function carrerasDe(g){
+    var ar=g.away_runs, hr=g.home_runs;
+    if(ar!==null&&ar!==undefined&&hr!==null&&hr!==undefined) return Number(ar)+Number(hr);
+    return null;
+  }
+
+  // agrupa los juegos de un parque por rango de grados (de 30 en 30)
+  function agruparPorGrado(cache, venueMatch){
+    var juegos = cache.filter(function(g){
+      return g && g.venue && g.venue.toLowerCase().indexOf(venueMatch) !== -1
+             && g.wind_dir!==undefined && g.wind_dir!==null && g.wind_dir!=="";
+    });
+    // rangos de 30 en 30: 0-30, 30-60, ... 330-360
+    var grupos = {};
+    for(var i=0;i<juegos.length;i++){
+      var g=juegos[i];
+      var dir = Number(g.wind_dir);
+      if(isNaN(dir)) continue;
+      var lo = Math.floor(dir/30)*30;
+      var key = lo;
+      if(!grupos[key]) grupos[key] = { lo:lo, hi:lo+30, carreras:[], n:0 };
+      var c = carrerasDe(g);
+      grupos[key].n++;
+      if(c!==null) grupos[key].carreras.push(c);
+    }
+    // a array ordenado por grado
+    var arr = [];
+    for(var k in grupos){ if(grupos.hasOwnProperty(k)) arr.push(grupos[k]); }
+    arr.sort(function(a,b){ return a.lo - b.lo; });
+    return { total: juegos.length, grupos: arr };
+  }
+
+  function prom(arr){ if(!arr.length) return null; var s=0; for(var i=0;i<arr.length;i++) s+=arr[i]; return s/arr.length; }
+
+  function parqueCard(item, cache){
+    var res = agruparPorGrado(cache, item.venueMatch);
+    var filas = "";
+    if(res.total === 0){
+      filas = '<div class="vacio">Sin juegos con dir en cache.</div>';
+    } else {
+      for(var i=0;i<res.grupos.length;i++){
+        var gr = res.grupos[i];
+        var pc = prom(gr.carreras);
+        var cls = "medio";
+        if(pc!==null){ if(pc >= 9) cls="alto"; else if(pc <= 7) cls="bajo"; else cls="medio"; }
+        filas += '<div class="grad">'+
+          '<span class="rango">'+gr.lo+'-'+gr.hi+'°</span>'+
+          '<span class="car '+cls+'">'+(pc!==null?pc.toFixed(1):"—")+' c</span>'+
+          '<span class="n">'+gr.n+'j</span>'+
+        '</div>';
+      }
+    }
+    return '<div class="parque">'+
+      '<div class="pn">'+item.equipo+'<small>'+res.total+' juegos con dir</small></div>'+
+      filas+
+    '</div>';
+  }
+
+  document.getElementById("go").addEventListener("click", function(){
+    consoleEl.textContent="";
+    document.getElementById("colCosta").innerHTML="";
+    document.getElementById("colAdentro").innerHTML="";
+    try {
+      var cache = climaLeerCache();
+      if(!cache.length){ log("CACHE VACIO. Abre el index, pulsa COINCIDENCIA, vuelve."); return; }
+      log("Filas en cache: "+cache.length);
+
+      var hc="", ha="";
+      for(var i=0;i<COSTA.length;i++)   hc += parqueCard(COSTA[i], cache);
+      for(var j=0;j<ADENTRO.length;j++) ha += parqueCard(ADENTRO[j], cache);
+      document.getElementById("colCosta").innerHTML = hc;
+      document.getElementById("colAdentro").innerHTML = ha;
+      log("LISTO. Rojo=más carreras(9+), Verde=menos(7-), Amarillo=limbo(7-9).");
+    } catch(e){ log("ERROR: "+e.message); }
+  });
+</script>
+</body>
+</html>
