@@ -16,18 +16,15 @@
   .go-venideros { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#fff; background:#1f6feb; cursor:pointer; margin-top:12px; }
   .go-pasados { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#fff; background:#d2691e; cursor:pointer; margin-top:12px; }
 
-  /* ===== CAJITA DEL JUEGO ===== */
   .juego { background:#161b22; border:1px solid #30363d; border-radius:14px; padding:16px; margin-top:14px; }
   .matchup { font-size:18px; font-weight:800; }
   .estadio { font-size:13px; color:#8b949e; margin:3px 0; }
 
-  /* chips de clima de hoy */
   .hoychips { display:flex; flex-wrap:wrap; gap:6px; margin:10px 0; }
   .chip { font-size:12px; background:#0d1117; border:1px solid #30363d; border-radius:6px; padding:4px 9px; color:#c9d1d9; }
   .chip b { color:#fff; }
   .brisachip { border-color:#3a4250; }
 
-  /* ===== PANEL DE NUMEROS (la conclusion, arriba) ===== */
   .panel { display:flex; gap:8px; margin:12px 0 4px; }
   .pbox { flex:1; background:#0d1117; border:1px solid #30363d; border-radius:10px; padding:10px; text-align:center; }
   .pbox .lbl { font-size:10px; color:#8b949e; letter-spacing:0.3px; }
@@ -36,29 +33,26 @@
   .v-run  { color:#79c0ff; }
   .v-coin.mid{color:#ffd60a;} .v-coin.bad{color:#ff453a;}
 
-  /* fila linea propia vs mercado */
   .lineas { display:flex; gap:8px; margin:8px 0 2px; }
   .lbox { flex:1; background:#0d1117; border:1px solid #30363d; border-radius:10px; padding:10px; text-align:center; }
   .lbox .lbl { font-size:10px; color:#8b949e; letter-spacing:0.3px; }
   .lbox .val { font-size:20px; font-weight:800; margin-top:2px; color:#79c0ff; }
   .lbox.mercado { border-style:dashed; }
-  .lbox.mercado .val { font-size:13px; color:#8b949e; font-weight:700; }
+  .lbox.mercado .val { font-size:20px; color:#ffd60a; font-weight:800; }
+  .lbox.mercado .val.pendiente { font-size:13px; color:#8b949e; font-weight:700; }
 
-  /* ===== FLECHITAS PLEGABLES ===== */
   details.fold { margin-top:10px; border-top:1px solid #30363d; padding-top:8px; }
   details.fold > summary { font-size:13px; color:#79c0ff; font-weight:700; cursor:pointer; list-style:none; padding:6px 0; }
   details.fold > summary::-webkit-details-marker { display:none; }
   details.fold > summary::before { content:"\25B6  "; font-size:11px; }
   details.fold[open] > summary::before { content:"\25BC  "; }
 
-  /* cada juego historico en su SUBCAJITA separada */
   .sub { background:#0d1117; border:1px solid #21262d; border-radius:8px; padding:10px; margin:8px 0; }
   .sub .top { font-size:13px; font-weight:700; margin-bottom:6px; }
   .sub .fecha { color:#79c0ff; }
   .sub .nums { display:flex; flex-wrap:wrap; gap:5px; }
   .serie-hdr { font-size:11px; color:#8b949e; font-weight:700; letter-spacing:0.5px; margin:10px 0 4px; }
 
-  /* serie en este parque */
   .serieparque { margin-top:12px; border-top:1px solid #30363d; padding-top:10px; }
   .serieparque .sphdr { font-size:12px; color:#8b949e; font-weight:700; letter-spacing:0.5px; }
   .serieparque .spsub { font-size:13px; color:#bbb; margin:3px 0; }
@@ -100,6 +94,7 @@
 <script src="traducir-umpire.js"></script>
 <script src="bloques-serie.js"></script>
 <script src="bloques-trayectoria.js"></script>
+<script src="jalar-linea.js"></script>
 
 <script>
   var consoleEl = document.getElementById("console");
@@ -111,13 +106,12 @@
     return d.getFullYear()+"-"+("0"+(d.getMonth()+1)).slice(-2)+"-"+("0"+d.getDate()).slice(-2);
   }
 
-  // muestra "26 Jun 26" desde "2026-06-26" (dia · mes letra · año). Por dentro la fecha NO cambia.
   var MESES_CORTOS = {"01":"Ene","02":"Feb","03":"Mar","04":"Abr","05":"May","06":"Jun","07":"Jul","08":"Ago","09":"Sep","10":"Oct","11":"Nov","12":"Dic"};
   function fechaBonita(date){
     if(!date || typeof date!=="string" || date.length<10) return date||"?";
     var yy=date.slice(0,4), mm=date.slice(5,7), dd=date.slice(8,10);
     var mes=MESES_CORTOS[mm]||mm;
-    return dd+" "+mes+" "+yy.slice(2); // "26 Jun 26"
+    return dd+" "+mes+" "+yy.slice(2);
   }
 
   document.getElementById("goVenideros").addEventListener("click", function(){
@@ -127,11 +121,23 @@
     location.href = "dia-pasado-test.html";
   });
 
+  // cache de lineas para esta sesion
+  var lineasCache = null;
+
   document.getElementById("go").addEventListener("click", async function(){
     var btn=this; btn.disabled=true; btn.textContent="TRABAJANDO…";
     consoleEl.textContent=""; listaEl.innerHTML="";
     try {
       await jalarClima(log);
+
+      // Jalar líneas de mercado
+      try {
+        lineasCache = await jalarLineas(log);
+      } catch(el) {
+        log("AVISO líneas: " + (el && el.message ? el.message : el));
+        lineasCache = null;
+      }
+
       log("Trayendo juegos de hoy...");
       var hoy = hoyISO();
       var mlbUrl = "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date="+hoy+"&hydrate=probablePitcher";
@@ -151,7 +157,6 @@
         log("AVISO serie: " + (eb && eb.message ? eb.message : eb));
       }
 
-      // PRECARGA de rosters de series (jalarRoster es ASYNC)
       var rosterMap = {};
       try {
         var idsAPrecargar = [];
@@ -193,11 +198,14 @@
         var catcherHomeId = rosterHoy ? rosterHoy.catcher_home_id : "NO_CONFIRMADO";
         var umpireHomeHoy = rosterHoy ? rosterHoy.umpire_home : "NO_CONFIRMADO";
 
+        // buscar línea de mercado para este juego
+        var lineaMercado = lineasCache ? lineasBuscarJuego(home, away) : null;
+
         var s = STADIUM_INDEX.get(stadiumNorm(venue));
-        if(!s){ html+=tarjeta(away,home,venue,null,i,null,pitcherAway,pitcherHome,pitcherAwayId,pitcherHomeId,bloquesSerie,rosterMap,catcherAwayId,catcherHomeId,umpireHomeHoy); continue; }
+        if(!s){ html+=tarjeta(away,home,venue,null,i,null,pitcherAway,pitcherHome,pitcherAwayId,pitcherHomeId,bloquesSerie,rosterMap,catcherAwayId,catcherHomeId,umpireHomeHoy,lineaMercado); continue; }
         var w = await climaFetchWeather(s, hoy, hoy);
         var hit = w.get(climaKeyTZ(g.gameDate, s.timezone));
-        if(!hit){ html+=tarjeta(away,home,venue,null,i,null,pitcherAway,pitcherHome,pitcherAwayId,pitcherHomeId,bloquesSerie,rosterMap,catcherAwayId,catcherHomeId,umpireHomeHoy); continue; }
+        if(!hit){ html+=tarjeta(away,home,venue,null,i,null,pitcherAway,pitcherHome,pitcherAwayId,pitcherHomeId,bloquesSerie,rosterMap,catcherAwayId,catcherHomeId,umpireHomeHoy,lineaMercado); continue; }
         var condHoy = await jalarCondition(g.gamePk);
         var today = {
           temperature_f: hit.temperature_f, windspeed_mph: hit.windspeed_mph,
@@ -207,7 +215,7 @@
         };
         log("condition " + venue + ": " + condHoy);
         var r = calcularCoincidencia(today);
-        html += tarjeta(away,home,venue,r,i,today,pitcherAway,pitcherHome,pitcherAwayId,pitcherHomeId,bloquesSerie,rosterMap,catcherAwayId,catcherHomeId,umpireHomeHoy);
+        html += tarjeta(away,home,venue,r,i,today,pitcherAway,pitcherHome,pitcherAwayId,pitcherHomeId,bloquesSerie,rosterMap,catcherAwayId,catcherHomeId,umpireHomeHoy,lineaMercado);
       }
       listaEl.innerHTML = html;
       log("LISTO.");
@@ -254,7 +262,6 @@
     return u.nombre + " (zona "+u.zone_type+" · K/j "+u.k_per_game+" · BB/j "+u.bb_per_game+" · "+u.k_tier+")";
   }
 
-  // SERIE EN ESTE PARQUE — cada juego en su subcajita separada
   function serieParqueHtml(venue, bloquesSerie, rosterMap){
     var b = serieDelParque(venue, bloquesSerie);
     if(!b){
@@ -265,7 +272,6 @@
     var clsTend = tr.tendencia==="SUBE" ? "sp-up" : (tr.tendencia==="BAJA" ? "sp-down" : "sp-flat");
     var rango = (tr.min!==null && tr.max!==null) ? (" ("+tr.min+"° a "+tr.max+"°)") : "";
     var trayHtml = '<div class="sptray '+clsTend+'">Clima de la serie: '+tr.tendencia+rango+'</div>';
-
     var saltosHtml = "";
     if(tr.saltos && tr.saltos.length){
       for(var s=0;s<tr.saltos.length;s++){
@@ -273,7 +279,6 @@
         saltosHtml += '<div class="spsalto">⚠️ Salto '+sa.date+': '+sa.de+'° → '+sa.a+'° ('+(sa.dif>0?"+":"")+sa.dif+'°)</div>';
       }
     }
-
     var filas = "";
     var sumRuns=0, nRuns=0;
     var juegosOrden = b.juegos.slice().sort(function(a,b){ return a.date < b.date ? 1 : (a.date > b.date ? -1 : 0); });
@@ -281,19 +286,17 @@
       var g=juegosOrden[j];
       var ar = (g.away_runs!==undefined && g.away_runs!==null) ? g.away_runs : null;
       var hr = (g.home_runs!==undefined && g.home_runs!==null) ? g.home_runs : null;
-      var carrTxt, carrChip;
+      var carrChip;
       if(ar!==null && hr!==null){ var tot=ar+hr; carrChip='<span class="chip">⚾ <b>'+ar+'-'+hr+'</b> ('+tot+')</span>'; sumRuns+=tot; nRuns++; }
       else { carrChip='<span class="chip">⚾ sin marcador</span>'; }
       var tempChip = (g.temperature_f!==undefined && g.temperature_f!==null && g.temperature_f!=="") ? '<span class="chip">🌡️ <b>'+g.temperature_f+'°</b></span>' : '<span class="chip">🌡️ PEND</span>';
       var vientoChip = '<span class="chip">🌬️ <b>'+(g.windspeed_mph!==undefined?g.windspeed_mph:"?")+'</b></span>';
       var humChip = '<span class="chip">💧 <b>'+(g.humidity_pct!==undefined?g.humidity_pct+"%":"?")+'</b></span>';
-
       filas += '<div class="sub">'+
         '<div class="top"><span class="fecha">'+fechaBonita(g.date)+'</span> · '+(g.away_team||"?")+' @ '+(g.home_team||"?")+'</div>'+
         '<div class="nums">'+tempChip+vientoChip+humChip+carrChip+'</div>'+
         '</div>';
     }
-
     var prom = "";
     if(nRuns>0){
       var promRuns = (sumRuns/nRuns).toFixed(1);
@@ -302,7 +305,6 @@
     } else {
       prom = '<div class="spprom"><div class="lbl">Sin marcadores en esta serie.</div></div>';
     }
-
     return '<div class="serieparque">'+
       '<div class="sphdr">SERIE EN ESTE PARQUE</div>'+
       '<div class="spsub">'+(b.home_team||"?")+' · '+fechaBonita(b.fecha_inicio)+' a '+fechaBonita(b.fecha_fin)+' · '+b.n_juegos+' juegos</div>'+
@@ -310,12 +312,11 @@
     '</div>';
   }
 
-  function tarjeta(away,home,venue,r,idx,today,pitcherAway,pitcherHome,pitcherAwayId,pitcherHomeId,bloquesSerie,rosterMap,catcherAwayId,catcherHomeId,umpireHomeHoy){
+  function tarjeta(away,home,venue,r,idx,today,pitcherAway,pitcherHome,pitcherAwayId,pitcherHomeId,bloquesSerie,rosterMap,catcherAwayId,catcherHomeId,umpireHomeHoy,lineaMercado){
     var sc = r && r.top ? r.top.score : null;
     var cls = r ? r.cls : "bad";
     var brisaInfo = (typeof BRISA_GEO_PARQUES_MLB_2026 !== "undefined" && BRISA_GEO_PARQUES_MLB_2026[venue]) ? BRISA_GEO_PARQUES_MLB_2026[venue] : null;
 
-    // chips de clima de hoy
     var hoychips = "";
     if(today){
       hoychips = '<div class="hoychips">'+
@@ -329,7 +330,6 @@
       hoychips = '<div class="hoychips"><span class="chip brisachip">🌬️ '+brisaInfo.variante+'</span></div>';
     }
 
-    // promedios (la conclusion)
     var sumScore=0, nScore=0, sumRuns=0, nRuns=0;
     if(r && r.ranked && r.ranked.length){
       for(var k=0;k<r.ranked.length;k++){
@@ -343,7 +343,6 @@
     var promScore = nScore>0 ? Math.round(sumScore/nScore) : null;
     var promRuns  = nRuns>0  ? (sumRuns/nRuns).toFixed(1) : null;
 
-    // panel arriba: coincidencia de hoy + promedio
     var coinTxt = (sc===null) ? "—" : (sc+"%");
     var panel =
       '<div class="panel">'+
@@ -351,14 +350,22 @@
         '<div class="pbox"><div class="lbl">COINC. PROMEDIO</div><div class="val v-run">'+(promScore!==null?promScore+"%":"—")+'</div></div>'+
       '</div>';
 
-    // lineas: DataPro (propia) + Mercado (pendiente)
+    // LÍNEA DE MERCADO — real si existe, PENDIENTE si no
+    var mercadoVal, mercadoClass;
+    if(lineaMercado && lineaMercado.total !== null){
+      mercadoVal = lineaMercado.total + (lineaMercado.bookie ? '<br><span style="font-size:9px;color:#555;">'+lineaMercado.bookie+'</span>' : '');
+      mercadoClass = 'val';
+    } else {
+      mercadoVal = 'N/C';
+      mercadoClass = 'val pendiente';
+    }
+
     var lineas =
       '<div class="lineas">'+
         '<div class="lbox"><div class="lbl">LÍNEA DATAPRO</div><div class="val">'+(promRuns!==null?promRuns:"—")+'</div></div>'+
-        '<div class="lbox mercado"><div class="lbl">LÍNEA DE MERCADO</div><div class="val">PENDIENTE</div></div>'+
+        '<div class="lbox mercado"><div class="lbl">LÍNEA DE MERCADO</div><div class="'+mercadoClass+'">'+mercadoVal+'</div></div>'+
       '</div>';
 
-    // detalle plegado: roster de hoy
     function xeraTxt(pid){
       if(pid===null || pid===undefined) return "";
       var p = (typeof PITCHERS_MASTER_2026 !== "undefined") ? PITCHERS_MASTER_2026[pid] : null;
@@ -385,7 +392,6 @@
         '</div>'+
       '</details>';
 
-    // detalle plegado: 5 parecidos
     var det5 = "";
     if(r && r.ranked && r.ranked.length){
       var series = agruparEnSeries(r.ranked);
