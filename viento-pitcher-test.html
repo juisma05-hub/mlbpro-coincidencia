@@ -70,8 +70,11 @@
   // velocidad (domo), y dice si el rango donde cae HOY tira a over/under/limbo.
   function lecturaViento(cache, venue, dirHoy, velHoy){
     var domo = esDomo(venue);
+    var venueLow2 = (venue||"").toLowerCase();
     var juegos = cache.filter(function(g){
-      return g && g.venue && g.venue===venue
+      var cv=(g.venue||"").toLowerCase();
+      return g && g.venue
+        && (cv===venueLow2 || cv.indexOf(venueLow2)!==-1 || venueLow2.indexOf(cv)!==-1)
         && g.away_runs!==undefined && g.away_runs!==null && g.home_runs!==undefined && g.home_runs!==null;
     });
     if(juegos.length < 5) return { estado:"NC", txt:"Sin muestra del parque", over:null };
@@ -170,7 +173,16 @@
 
         // buscar el clima de hoy de este juego en el cache
         var hoyRow = null;
-        for(var c=0;c<cache.length;c++){ if(cache[c].date===hoy && cache[c].venue===venue){ hoyRow=cache[c]; break; } }
+        var venueLow = venue.toLowerCase();
+        for(var c=0;c<cache.length;c++){
+          if(cache[c].date===hoy){
+            var cv=(cache[c].venue||"").toLowerCase();
+            // buscar coincidencia flexible: uno contiene al otro
+            if(cv===venueLow || cv.indexOf(venueLow)!==-1 || venueLow.indexOf(cv)!==-1){
+              hoyRow=cache[c]; break;
+            }
+          }
+        }
         var dirHoy = hoyRow ? hoyRow.wind_dir : null;
         var velHoy = hoyRow ? hoyRow.windspeed_mph : null;
 
