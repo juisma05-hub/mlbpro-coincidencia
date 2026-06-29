@@ -1,5 +1,7 @@
 // clima-cache.js
-// PIEZA 4b - jalador de clima con cache (WeatherAPI - corregido, pasa por el worker).
+// PIEZA 4b - jalador de clima con cache.
+// HOY/VENIDEROS = WeatherAPI (pasa por worker). PASADOS = Open-Meteo Archive (pasa por worker... 
+// ojo: el worker solo permite statsapi.mlb.com y api.weatherapi.com — Open-Meteo Archive es publico, sin llave, va directo).
 
 const CLIMA_CACHE_KEY = "MLBPRO_CLIMA_CACHE_2026";
 const CLIMA_START_FIJO = "2026-03-26";
@@ -54,8 +56,7 @@ function climaKeyTZ(utcISO, tz) {
   return g("year") + "-" + g("month") + "-" + g("day") + "T" + g("hour") + ":00";
 }
 
-// Convierte direccion de viento de texto a grados numericos
-// WeatherAPI devuelve "N", "NNE", "NE", etc. — el sistema necesita grados (0-360)
+// Convierte direccion de viento de texto a grados numericos (WeatherAPI da texto "N","NNE",etc.)
 function windDirToGrados(dir) {
   const tabla = {
     "N":0,"NNE":22,"NE":45,"ENE":67,"E":90,"ESE":112,"SE":135,"SSE":157,
@@ -65,14 +66,14 @@ function windDirToGrados(dir) {
   return tabla[d] !== undefined ? tabla[d] : null;
 }
 
-async function climaFetchWeather(s, start, end) {
+// ===== HOY / VENIDEROS — WeatherAPI (pasa por el worker, llave protegida) =====
+async function climaFetchWeatherAPI(s) {
   const lat = s.lat || s.latitude;
   const lon = s.lon || s.longitude;
   const q = lat + "," + lon;
 
-  // La llave NO va aqui. El worker la mete por detras (WEATHER_API_KEY).
   const weatherUrl = "https://api.weatherapi.com/v1/forecast.json?q=" + q +
-    "&days=2&aqi=no&alerts=no";
+    "&days=3&aqi=no&alerts=no";
 
   const url = MLB_ROUTES.WORKER_BASE + encodeURIComponent(weatherUrl);
 
@@ -88,8 +89,6 @@ async function climaFetchWeather(s, start, end) {
   fday.forEach(function(day) {
     if (!Array.isArray(day.hour)) return;
     day.hour.forEach(function(h) {
-      // WeatherAPI da "2026-06-29 14:00" — convertir a "2026-06-29T14:00"
-      // SIN agregar Z (no es UTC, es hora local del parque)
       const key = h.time.replace(" ", "T");
       const grados = windDirToGrados(h.wind_dir);
       m.set(key, {
@@ -97,12 +96,66 @@ async function climaFetchWeather(s, start, end) {
         humidity_pct: h.humidity,
         precipitation_mm: h.precip_mm,
         windspeed_mph: h.wind_mph,
-        wind_dir: grados !== null ? grados : h.wind_dir  // grados si hay, texto si no
+        wind_dir: grados !== null ? grados : h.wind_dir
       });
     });
   });
 
   return m;
+}
+
+// ===== PASADOS — Open-Meteo Archive (historial real, sin llave, publico) =====
+async function climaFetchArchive(s, start, end) {
+  const lat = s.lat || s.latitude;
+  const lon = s.lon || s.longitude;
+  const tz = s.timezone || "America/New_York";
+
+  const archiveUrl = "https://archive-api.open-meteo.com/v1/archive" +
+    "?latitude=" + lat + "&longitude=" + lon +
+    "&start_date=" + start + "&end_date=" + end +
+    "&hourly=temperature_2m,relativehumidity_2m,precipitation,windspeed_10m,winddirection_10m" +
+    "&temperature_unit=fahrenheit&windspeed_unit=mph&timezone=" + encodeURIComponent(tz);
+
+  const res = await fetch(archiveUrl);
+  if (!res.ok) throw new Error("OPENMETEO HTTP " + res.status);
+  const data = await res.json();
+  if (!data.hourly || !Array.isArray(data.hourly.time)) throw new Error("OPENMETEO sin hourly");
+
+  const m = new Map();
+  const H = data.hourly;
+  for (let i = 0; i < H.time.length; i++) {
+    const key = H.time[i]; // ya viene "2026-03-26T14:00" en timezone local
+    m.set(key, {
+      temperature_f: H.temperature_2m[i],
+      humidity_pct: H.relativehumidity_2m[i],
+      precipitation_mm: H.precipitation[i],
+      windspeed_mph: H.windspeed_10m[i],
+      wind_dir: H.winddirection_10m[i]
+    });
+  }
+  return m;
+}
+
+// ===== ENRUTADOR — decide cual usar segun la fecha pedida =====
+async function climaFetchWeather(s, start, end) {
+  const hoy = climaHoyISO();
+
+  if (end < hoy) {
+    // todo el rango es pasado -> archive
+    return await climaFetchArchive(s, start, end);
+  }
+  if (start >= hoy) {
+    // todo el rango es hoy/futuro -> weatherapi
+    return await climaFetchWeatherAPI(s);
+  }
+
+  // rango mixto: parte pasada (archive) + parte hoy/futuro (weatherapi)
+  const ayer = climaAyerISO();
+  const mPasado = await climaFetchArchive(s, start, ayer);
+  const mFuturo = await climaFetchWeatherAPI(s);
+  const merged = new Map(mPasado);
+  mFuturo.forEach(function(v, k) { merged.set(k, v); });
+  return merged;
 }
 
 function climaMerge(viejos, nuevos) {
