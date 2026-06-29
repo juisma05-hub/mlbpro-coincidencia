@@ -16,17 +16,14 @@
   .go { border:0; border-radius:10px; padding:14px 18px; font-size:16px; font-weight:800; color:#fff; background:#238636; cursor:pointer; }
   .go:disabled { background:#30363d; color:#8b949e; }
 
-  /* ===== CAJITA DEL JUEGO (igual que el index) ===== */
   .juego { background:#161b22; border:1px solid #30363d; border-radius:14px; padding:16px; margin-top:14px; }
   .matchup { font-size:18px; font-weight:800; }
   .estadio { font-size:13px; color:#8b949e; margin:3px 0; }
 
-  /* chips */
   .hoychips { display:flex; flex-wrap:wrap; gap:6px; margin:10px 0; }
   .chip { font-size:12px; background:#0d1117; border:1px solid #30363d; border-radius:6px; padding:4px 9px; color:#c9d1d9; }
   .chip b { color:#fff; }
 
-  /* panel de numeros (la conclusion, arriba) */
   .panel { display:flex; gap:8px; margin:12px 0 4px; }
   .pbox { flex:1; background:#0d1117; border:1px solid #30363d; border-radius:10px; padding:10px; text-align:center; }
   .pbox .lbl { font-size:10px; color:#8b949e; letter-spacing:0.3px; }
@@ -35,16 +32,14 @@
   .v-coin.mid{color:#ffd60a;} .v-coin.bad{color:#ff453a;}
   .v-run  { color:#79c0ff; }
 
-  /* fila CARRERAJE: REAL vs ESTIMADO (lo nuevo, para comprobar cual acierta) */
   .carr { display:flex; gap:8px; margin:8px 0 2px; }
   .cbox { flex:1; background:#0d1117; border:1px solid #30363d; border-radius:10px; padding:10px; text-align:center; }
   .cbox .lbl { font-size:10px; color:#8b949e; letter-spacing:0.3px; }
   .cbox .val { font-size:20px; font-weight:800; margin-top:2px; }
-  .cbox.real .val { color:#3fb950; }       /* lo que de verdad paso */
-  .cbox.estim .val { color:#79c0ff; }      /* lo que dijeron los 5 parecidos */
+  .cbox.real .val { color:#3fb950; }
+  .cbox.estim .val { color:#79c0ff; }
   .cbox .dif { font-size:10px; color:#8b949e; margin-top:2px; }
 
-  /* 5 parecidos visibles (igual que el index) */
   .serieparque { margin-top:12px; border-top:1px solid #30363d; padding-top:10px; }
   .serieparque .sphdr { font-size:12px; color:#8b949e; font-weight:700; letter-spacing:0.5px; }
   .sub { background:#0d1117; border:1px solid #21262d; border-radius:8px; padding:10px; margin:8px 0; }
@@ -119,7 +114,6 @@
         var climaOk = (typeof g.temperature_f === "number");
         var r = climaOk ? calcularCoincidencia(clima) : null;
 
-        // el juego NO puede aparecer entre sus propios parecidos
         if(r && r.ranked && r.ranked.length){
           r.ranked = r.ranked.filter(function(h){
             var mismoGameId = (g.game_id !== undefined && g.game_id !== null && h.game_id !== undefined && h.game_id !== null)
@@ -150,7 +144,6 @@
     var cls = r ? r.cls : "bad";
     var coinTxt = (!climaOk) ? "—" : (sc===null ? "—" : sc+"%");
 
-    // CARRERAJE REAL de ESE juego (lo que de verdad paso)
     var realRuns = null;
     if(g.away_runs!==null && g.away_runs!==undefined && g.home_runs!==null && g.home_runs!==undefined){
       realRuns = g.away_runs + g.home_runs;
@@ -159,7 +152,6 @@
       ? g.away_runs+'-'+g.home_runs+' ('+realRuns+') · '+(g.status||"")
       : '— sin datos · '+(g.status||"");
 
-    // chips de clima de ESE juego
     var hoychips = '<div class="hoychips">'+
       '<span class="chip">🌡️ <b>'+(g.temperature_f!==undefined?g.temperature_f+"°":"?")+'</b></span>'+
       '<span class="chip">🌬️ <b>'+(g.windspeed_mph!==undefined?g.windspeed_mph:"?")+'</b></span>'+
@@ -167,12 +159,9 @@
       '<span class="chip">💧 <b>'+(g.humidity_pct!==undefined?g.humidity_pct+"%":"?")+'</b></span>'+
     '</div>';
 
-    // promedios de los 5 parecidos
     var sumScore=0, nScore=0, sumRuns=0, nRuns=0;
     var det5 = "";
     if(r && r.ranked && r.ranked.length){
-      // ordenar los parecidos por FECHA (más reciente arriba) para leer la coincidencia seguida.
-      // El score sigue siendo el del cálculo; solo cambia el orden de presentación.
       var parecidosOrden = r.ranked.slice().sort(function(a,b){
         return (a.date < b.date) ? 1 : ((a.date > b.date) ? -1 : 0);
       });
@@ -189,6 +178,7 @@
           '<div class="nums">'+
             '<span class="chip">🌡️ <b>'+(h.temperature_f!==undefined?h.temperature_f+"°":"?")+'</b></span>'+
             '<span class="chip">🌬️ <b>'+(h.windspeed_mph!==undefined?h.windspeed_mph:"?")+'</b></span>'+
+            '<span class="chip">🧭 dir <b>'+(h.wind_dir!==undefined && h.wind_dir!==null && h.wind_dir!==""?h.wind_dir:"N/C")+'</b></span>'+
             '<span class="chip">💧 <b>'+(h.humidity_pct!==undefined?h.humidity_pct+"%":"?")+'</b></span>'+
             '<span class="chip">score <b>'+h.score+'%</b></span>'+
             carrChip+
@@ -200,28 +190,24 @@
     } else {
       det5 = '<div class="sub">CLIMA NO NUMERICO ('+g.temperature_f+'): no se calcula.</div>';
     }
-    // FUNCIÓN MADRE: carreras y coincidencia salen de resumenJuego (un solo sitio).
-    // Así esta vista usa el MISMO cálculo que las demás (regla: 3 vistas iguales).
+
     var resumen = (typeof resumenJuego === "function" && r) ? resumenJuego(r) : null;
     var promScore = resumen ? resumen.coinc_prom : (nScore>0 ? Math.round(sumScore/nScore) : null);
     var estimRuns = resumen ? resumen.carreras_estim : (nRuns>0 ? (sumRuns/nRuns) : null);
 
-    // panel: coincidencia de hoy + coincidencia promedio
     var panel =
       '<div class="panel">'+
         '<div class="pbox"><div class="lbl">COINCIDENCIA</div><div class="val v-coin '+cls+'">'+coinTxt+'</div></div>'+
         '<div class="pbox"><div class="lbl">COINC. PROMEDIO</div><div class="val v-run">'+(promScore!==null?promScore+"%":"—")+'</div></div>'+
       '</div>';
 
-    // CARRERAJE: REAL vs ESTIMADO (lo nuevo, para ver cual acierta)
     var difTxt = "";
     if(realRuns!==null && estimRuns!==null){
-      var dif = (realRuns - estimRuns);   // cuánto se PASÓ la realidad sobre la proyección
+      var dif = (realRuns - estimRuns);
       if(dif > 0)      difTxt = "+"+dif.toFixed(1)+" más de lo proyectado";
       else if(dif < 0) difTxt = dif.toFixed(1)+" menos de lo proyectado";
       else             difTxt = "exacto";
     }
-    // SCORE FINAL: el marcador como pasó (ej "5-3")
     var scoreFinalTxt = "—";
     if(g.away_runs!==null && g.away_runs!==undefined && g.home_runs!==null && g.home_runs!==undefined){
       scoreFinalTxt = g.away_runs+'-'+g.home_runs;
@@ -232,7 +218,6 @@
         '<div class="cbox real"><div class="lbl">SCORE FINAL</div><div class="val">'+scoreFinalTxt+'</div><div class="dif">'+(realRuns!==null?'('+realRuns+' carreras)':'lo que pasó')+'</div></div>'+
       '</div>';
 
-    // 5 parecidos VISIBLES adelante (igual que el index)
     var bloque5 = '<div class="serieparque">'+
       '<div class="sphdr">5 PARECIDOS · CLIMA EN ESTE PARQUE</div>'+
       det5+'</div>';
