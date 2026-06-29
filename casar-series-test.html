@@ -32,6 +32,11 @@
   .rango .sub { font-size:12px; color:#8b949e; margin:3px 0 8px; }
   .rango .prom { font-size:13px; color:#c9d1d9; margin-bottom:8px; }
   .rango .prom b { color:#fff; }
+  .sub { background:#0d1117; border:1px solid #21262d; border-radius:8px; padding:10px; margin:6px 0; }
+  .sub .top { font-size:13px; font-weight:700; margin-bottom:4px; }
+  .sub .f { color:#79c0ff; }
+  .chip { font-size:12px; background:#0d1117; border:1px solid #30363d; border-radius:6px; padding:4px 9px; color:#c9d1d9; }
+  .chip b { color:#fff; }
 
   #console { margin-top:16px; background:#010409; border:1px solid #30363d; border-radius:8px; padding:12px; min-height:50px; max-height:25vh; overflow:auto; font-family:ui-monospace,monospace; font-size:12px; white-space:pre-wrap; }
 </style>
@@ -209,13 +214,14 @@
           var marc = (gk.away_runs!==undefined&&gk.away_runs!==null&&gk.home_runs!==undefined&&gk.home_runs!==null) ? (gk.away_runs+"-"+gk.home_runs) : "—";
           if(c!==null){ sumC+=c; nC++; }
           if(typeof gk.temperature_f==="number"){ sumT+=gk.temperature_f; nT++; }
-          filas += '<div class="jrow">'+
-            '<span class="f">'+gk.date+'</span>'+
-            '<span>'+(gk.away_team||"?")+' @ '+(gk.home_team||"?")+'</span>'+
-            '<span>'+(typeof gk.temperature_f==="number"?Math.round(gk.temperature_f)+"°":"—")+
-            ' · dir '+gk.wind_dir+'</span>'+
-            '<span class="r">'+marc+(c!==null?' ('+c+')':'')+'</span>'+
-            '</div>';
+          filas += '<div class="sub">'+
+            '<div class="top"><span class="f">'+gk.date+'</span> · '+(gk.away_team||"?")+' @ '+(gk.home_team||"?")+'</div>'+
+            '<div class="nums" style="display:flex;flex-wrap:wrap;gap:5px;margin-top:5px;">'+
+              '<span class="chip">🌡️ <b>'+(typeof gk.temperature_f==="number"?Math.round(gk.temperature_f)+"°":"—")+'</b></span>'+
+              '<span class="chip">🧭 dir <b>'+gk.wind_dir+'</b></span>'+
+              '<span class="chip r" style="color:#3fb950;font-weight:700;">⚾ '+marc+(c!==null?' ('+c+')':'')+'</span>'+
+            '</div>'+
+          '</div>';
         }
         var promC = nC>0 ? (sumC/nC).toFixed(1) : "—";
         html += '<div class="rango">'+
