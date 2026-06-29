@@ -199,7 +199,7 @@
         var umpireHomeHoy = rosterHoy ? rosterHoy.umpire_home : "NO_CONFIRMADO";
 
         // buscar línea de mercado para este juego
-        var lineaMercado = lineasCache ? lineasBuscarJuego(home, away) : null;
+        var lineaMercado = lineasCache ? lineasBuscarVenue(venue) : null;
 
         var s = STADIUM_INDEX.get(stadiumNorm(venue));
         if(!s){ html+=tarjeta(away,home,venue,null,i,null,pitcherAway,pitcherHome,pitcherAwayId,pitcherHomeId,bloquesSerie,rosterMap,catcherAwayId,catcherHomeId,umpireHomeHoy,lineaMercado); continue; }
