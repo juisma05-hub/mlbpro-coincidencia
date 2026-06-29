@@ -13,8 +13,8 @@
   main { padding:16px; max-width:900px; margin:0 auto; }
   .go { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#fff; background:#238636; cursor:pointer; }
   .go:disabled { background:#30363d; color:#8b949e; }
-  .go-venideros { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#fff; background:#1f6feb; cursor:pointer; margin-top:12px; }
-  .go-pasados { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#fff; background:#d2691e; cursor:pointer; margin-top:12px; }
+  .go-venideros { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#fff; background:#1f6feb; cursor:pointer; margin-top:12px; pointer-events:auto !important; opacity:1 !important; }
+  .go-pasados { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#fff; background:#d2691e; cursor:pointer; margin-top:12px; pointer-events:auto !important; opacity:1 !important; }
 
   .juego { background:#161b22; border:1px solid #30363d; border-radius:14px; padding:16px; margin-top:14px; }
   .matchup { font-size:18px; font-weight:800; }
@@ -412,6 +412,7 @@
             '<div class="nums">'+
               '<span class="chip">🌡️ <b>'+(h.temperature_f!==undefined?h.temperature_f+"°":"?")+'</b></span>'+
               '<span class="chip">🌬️ <b>'+(h.windspeed_mph!==undefined?h.windspeed_mph:"?")+'</b></span>'+
+              '<span class="chip">🧭 dir <b>'+(h.wind_dir!==undefined && h.wind_dir!==null && h.wind_dir!==""?h.wind_dir:"N/C")+'</b></span>'+
               '<span class="chip">💧 <b>'+(h.humidity_pct!==undefined?h.humidity_pct+"%":"?")+'</b></span>'+
               '<span class="chip">score <b>'+h.score+'%</b></span>'+
               carrChip2+
