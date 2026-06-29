@@ -155,6 +155,10 @@
       log("Filas en cache: "+cache.length+(cache.length?"":" — abre index y COINCIDENCIA primero"));
 
       var hoy = hoyISO();
+      // DIAGNOSTICO: ver qué venues hay en el cache para hoy
+      var hoyRows = cache.filter(function(g){ return g && g.date===hoy; });
+      log("Venues en cache para HOY ("+hoy+"): "+hoyRows.length+" juegos");
+      hoyRows.forEach(function(g){ log("  venue: '"+g.venue+"' wind_dir:"+g.wind_dir+" windspeed:"+g.windspeed_mph); });
       var mlbUrl = "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date="+hoy+"&hydrate=probablePitcher";
       var resp = await fetch(MLB_ROUTES.WORKER_BASE + encodeURIComponent(mlbUrl));
       if(!resp.ok) throw new Error("Schedule HTTP "+resp.status);
