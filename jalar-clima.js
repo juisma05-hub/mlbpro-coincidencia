@@ -1,20 +1,16 @@
 // jalar-clima.js
 // PIEZA 4c - jalado completo: schedule + clima + carreras + cache.
-// Primera vez jala todo; despues solo (ayer - 3 dias). Combina sin duplicar.
-// Usa: clima-cache.js, estadios.js, mlb-routes.js
-// Devuelve el array completo de records (viejos + nuevos), ya guardado en cache.
+// Migrado a WeatherAPI. Incluye hoy (climaHoyISO).
 
 async function jalarClima(logFn) {
   function log(t) { if (typeof logFn === "function") logFn(t); }
 
-  // 1. leer lo que ya tengo en cache
   const cacheViejo = climaLeerCache();
   const start = climaStartDesde(cacheViejo);
-  const end = climaHoyISO(); // CAMBIO: antes climaAyerISO(), ahora incluye hoy
+  const end = climaHoyISO(); // incluye hoy
 
   log("Cache: " + cacheViejo.length + " filas. Jalando " + start + " -> " + end);
 
-  // 2. schedule del rango (por el Worker)
   const mlbUrl = "https://statsapi.mlb.com/api/v1/schedule?sportId=1" +
     "&startDate=" + start + "&endDate=" + end;
   const urlSched = MLB_ROUTES.WORKER_BASE + encodeURIComponent(mlbUrl);
@@ -26,10 +22,9 @@ async function jalarClima(logFn) {
     throw new Error("El proxy no devolvio el calendario esperado.");
   }
 
-  // aplanar juegos del rango
   const games = [];
-  dataSched.dates.forEach(function (day) {
-    (day.games || []).forEach(function (g) {
+  dataSched.dates.forEach(function(day) {
+    (day.games || []).forEach(function(g) {
       games.push({
         date: day.date,
         gameDate: g.gameDate,
@@ -43,15 +38,13 @@ async function jalarClima(logFn) {
   });
   log("Juegos en rango: " + games.length);
 
-  // 3. estadios presentes en este rango
   const present = new Map();
-  games.forEach(function (g) {
+  games.forEach(function(g) {
     const k = stadiumNorm(g.venue);
     if (STADIUM_INDEX.has(k)) present.set(k, STADIUM_INDEX.get(k));
   });
   log("Estadios a consultar: " + present.size);
 
-  // 4. clima por estadio (errores reales, no se inventan)
   const weather = new Map();
   let n = 0;
   for (const e of present) {
@@ -65,7 +58,6 @@ async function jalarClima(logFn) {
     }
   }
 
-  // 4b. carreras por juego Final (mismo estilo, error real, no inventa)
   const runsMap = new Map();
   let m = 0;
   for (const g of games) {
@@ -88,9 +80,8 @@ async function jalarClima(logFn) {
     }
   }
 
-  // 5. armar cada fila
   const nuevos = [];
-  games.forEach(function (g) {
+  games.forEach(function(g) {
     const k = stadiumNorm(g.venue);
     const s = STADIUM_INDEX.get(k);
     let w = { temperature_f: "", windspeed_mph: "", wind_dir: "", precipitation_mm: "", humidity_pct: "" };
@@ -103,10 +94,12 @@ async function jalarClima(logFn) {
       roof = s.roof; tz = s.timezone;
       const c = weather.get(k);
       if (c && c.error) {
-        const e2 = "ERR:WEATHERAPI"; // CAMBIO: Ahora apunta conceptualmente a tu nuevo proveedor
+        const e2 = "ERR:WEATHERAPI";
         w = { temperature_f: e2, windspeed_mph: e2, wind_dir: e2, precipitation_mm: e2, humidity_pct: e2 };
       } else {
-        const hit = c.get(climaKeyTZ(g.gameDate, tz));
+        // WeatherAPI da hora local — usar directamente sin convertir timezone
+        const gameLocal = g.gameDate.replace("Z","").slice(0,16); // "2026-06-29T14:00"
+        const hit = c.get(gameLocal) || c.get(climaKeyTZ(g.gameDate, tz));
         if (!hit) {
           const e3 = "ERR:NO_HOUR_MATCH";
           w = { temperature_f: e3, windspeed_mph: e3, wind_dir: e3, precipitation_mm: e3, humidity_pct: e3 };
@@ -130,17 +123,9 @@ async function jalarClima(logFn) {
     });
   });
 
-  // 6. combinar sin duplicar y guardar
   const total = climaMerge(cacheViejo, nuevos);
   climaGuardarCache(total);
   log("LISTO. Total en cache: " + total.length + " filas (" + nuevos.length + " jaladas esta vez).");
 
   return total;
-}
-
-function climaHoyISO() {
-  const d = new Date();
-  return d.getFullYear() + "-" +
-    ("0" + (d.getMonth() + 1)).slice(-2) + "-" +
-    ("0" + d.getDate()).slice(-2);
 }
