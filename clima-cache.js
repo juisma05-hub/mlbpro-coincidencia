@@ -1,5 +1,5 @@
 // clima-cache.js
-// PIEZA 4b - jalador de clima con cache (WeatherAPI - corregido).
+// PIEZA 4b - jalador de clima con cache (WeatherAPI - corregido, pasa por el worker).
 
 const CLIMA_CACHE_KEY = "MLBPRO_CLIMA_CACHE_2026";
 const CLIMA_START_FIJO = "2026-03-26";
@@ -70,13 +70,11 @@ async function climaFetchWeather(s, start, end) {
   const lon = s.lon || s.longitude;
   const q = lat + "," + lon;
 
-  // La llave va aqui — reemplaza TU_LLAVE_WEATHERAPI con la tuya
-  // IMPORTANTE: cuando tengas el worker, mueve la llave ahi para protegerla
-  const apiKey = "TU_LLAVE_WEATHERAPI";
+  // La llave NO va aqui. El worker la mete por detras (WEATHER_API_KEY).
+  const weatherUrl = "https://api.weatherapi.com/v1/forecast.json?q=" + q +
+    "&days=2&aqi=no&alerts=no";
 
-  // URL correcta de WeatherAPI — forecast da datos de hoy + historico reciente
-  const url = "https://api.weatherapi.com/v1/forecast.json?key=" + apiKey +
-    "&q=" + q + "&days=2&aqi=no&alerts=no";
+  const url = MLB_ROUTES.WORKER_BASE + encodeURIComponent(weatherUrl);
 
   const res = await fetch(url);
   if (!res.ok) throw new Error("WEATHERAPI HTTP " + res.status);
