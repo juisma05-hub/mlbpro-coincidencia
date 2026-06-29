@@ -1,5 +1,5 @@
 // clima-cache.js
-// PIEZA 4b - jalador de clima con cache (Migrado a WeatherAPI).
+// PIEZA 4b - jalador de clima con cache (WeatherAPI - corregido).
 
 const CLIMA_CACHE_KEY = "MLBPRO_CLIMA_CACHE_2026";
 const CLIMA_START_FIJO = "2026-03-26";
@@ -28,6 +28,13 @@ function climaAyerISO() {
     ("0" + d.getDate()).slice(-2);
 }
 
+function climaHoyISO() {
+  const d = new Date();
+  return d.getFullYear() + "-" +
+    ("0" + (d.getMonth() + 1)).slice(-2) + "-" +
+    ("0" + d.getDate()).slice(-2);
+}
+
 function climaStartDesde(records) {
   if (!records || records.length === 0) return CLIMA_START_FIJO;
   const d = new Date();
@@ -47,43 +54,54 @@ function climaKeyTZ(utcISO, tz) {
   return g("year") + "-" + g("month") + "-" + g("day") + "T" + g("hour") + ":00";
 }
 
-async function climaFetchWeather(s, start, end) {
-  // WeatherAPI usa formato "lat,lon" para geolocalizar
-  const q = (s.latitude || s.lat) + "," + (s.longitude || s.lon);
-  
-  // Extrae de forma segura la API KEY desde las variables de entorno
-  const apiKey = process.env.WEATHER_API_KEY; 
-  if (!apiKey) throw new Error("Falta la variable de entorno WEATHER_API_KEY");
+// Convierte direccion de viento de texto a grados numericos
+// WeatherAPI devuelve "N", "NNE", "NE", etc. — el sistema necesita grados (0-360)
+function windDirToGrados(dir) {
+  const tabla = {
+    "N":0,"NNE":22,"NE":45,"ENE":67,"E":90,"ESE":112,"SE":135,"SSE":157,
+    "S":180,"SSW":202,"SW":225,"WSW":247,"W":270,"WNW":292,"NW":315,"NNW":337
+  };
+  const d = String(dir || "").trim().toUpperCase();
+  return tabla[d] !== undefined ? tabla[d] : null;
+}
 
-  // Consultamos el pronóstico de 2 días que incluye el tiempo real del día de hoy
-  const url = "https://weatherapi.com" + apiKey + "&q=" + q + "&days=2&aqi=no&alerts=no";
+async function climaFetchWeather(s, start, end) {
+  const lat = s.lat || s.latitude;
+  const lon = s.lon || s.longitude;
+  const q = lat + "," + lon;
+
+  // La llave va aqui — reemplaza TU_LLAVE_WEATHERAPI con la tuya
+  // IMPORTANTE: cuando tengas el worker, mueve la llave ahi para protegerla
+  const apiKey = "TU_LLAVE_WEATHERAPI";
+
+  // URL correcta de WeatherAPI — forecast da datos de hoy + historico reciente
+  const url = "https://api.weatherapi.com/v1/forecast.json?key=" + apiKey +
+    "&q=" + q + "&days=2&aqi=no&alerts=no";
 
   const res = await fetch(url);
   if (!res.ok) throw new Error("WEATHERAPI HTTP " + res.status);
   const data = await res.json();
   if (data.error) throw new Error("WEATHERAPI: " + (data.error.message || "?"));
 
-  const fday = data.forecast.forecastday;
-  if (!fday || !Array.isArray(fday)) throw new Error("WEATHERAPI sin datos de dias");
+  const fday = data.forecast && data.forecast.forecastday;
+  if (!fday || !Array.isArray(fday)) throw new Error("WEATHERAPI sin forecastday");
 
   const m = new Map();
-
-  fday.forEach(function (day) {
-    if (Array.isArray(day.hour)) {
-      day.hour.forEach(function (h) {
-        // Formateamos la hora para que coincida exactamente con lo que busca tu climaKeyTZ
-        // Pasa de "2026-06-29 14:00" a "2026-06-29T14:00"
-        const keyHora = h.time.replace(" ", "T");
-
-        m.set(keyHora, {
-          temperature_f: h.temp_f,
-          humidity_pct: h.humidity,
-          precipitation_mm: h.precip_mm,
-          windspeed_mph: h.wind_mph,
-          wind_dir: h.wind_dir
-        });
+  fday.forEach(function(day) {
+    if (!Array.isArray(day.hour)) return;
+    day.hour.forEach(function(h) {
+      // WeatherAPI da "2026-06-29 14:00" — convertir a "2026-06-29T14:00"
+      // SIN agregar Z (no es UTC, es hora local del parque)
+      const key = h.time.replace(" ", "T");
+      const grados = windDirToGrados(h.wind_dir);
+      m.set(key, {
+        temperature_f: h.temp_f,
+        humidity_pct: h.humidity,
+        precipitation_mm: h.precip_mm,
+        windspeed_mph: h.wind_mph,
+        wind_dir: grados !== null ? grados : h.wind_dir  // grados si hay, texto si no
       });
-    }
+    });
   });
 
   return m;
@@ -91,7 +109,7 @@ async function climaFetchWeather(s, start, end) {
 
 function climaMerge(viejos, nuevos) {
   const map = new Map();
-  viejos.forEach(function (r) { map.set(r.game_id, r); });
-  nuevos.forEach(function (r) { map.set(r.game_id, r); });
+  viejos.forEach(function(r) { map.set(r.game_id, r); });
+  nuevos.forEach(function(r) { map.set(r.game_id, r); });
   return Array.from(map.values());
 }
