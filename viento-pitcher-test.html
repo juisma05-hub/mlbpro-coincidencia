@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>MLBPro · Viento + Pitcher</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; font-family:-apple-system,system-ui,sans-serif; background:#0d1117; color:#e6edf3; }
+  header { padding:14px 16px; border-bottom:1px solid #30363d; }
+  h1 { font-size:16px; margin:0; }
+  main { padding:14px; max-width:900px; margin:0 auto; }
+  .go { width:100%; border:0; border-radius:10px; padding:16px; font-size:16px; font-weight:800; color:#fff; background:#cf222e; cursor:pointer; }
+  .go:disabled { background:#30363d; color:#8b949e; }
+
+  .juego { background:#161b22; border:1px solid #30363d; border-radius:14px; padding:16px; margin-top:14px; }
+  .matchup { font-size:17px; font-weight:800; }
+  .estadio { font-size:12px; color:#8b949e; margin:3px 0 10px; }
+
+  .veredicto { border-radius:10px; padding:12px; margin:10px 0; text-align:center; font-weight:800; font-size:15px; }
+  .v-premium { background:#0d2818; color:#3fb950; border:1px solid #238636; }
+  .v-choca { background:#2d1e0d; color:#ffa657; border:1px solid #9e6a03; }
+  .v-limbo { background:#2d0d0d; color:#ff7b72; border:1px solid #cf222e; }
+  .veredicto small { display:block; font-weight:400; font-size:11px; color:#c9d1d9; margin-top:4px; }
+
+  .linea { display:flex; gap:8px; margin:8px 0; }
+  .lbox { flex:1; background:#0d1117; border:1px solid #30363d; border-radius:8px; padding:10px; }
+  .lbox .et { font-size:10px; color:#8b949e; }
+  .lbox .vv { font-size:14px; font-weight:800; margin-top:3px; }
+  .over{color:#ff7b72;} .under{color:#3fb950;} .limbo{color:#d29922;} .nc{color:#8b949e;}
+
+  #console { margin-top:14px; background:#010409; border:1px solid #30363d; border-radius:8px; padding:12px; min-height:50px; max-height:25vh; overflow:auto; font-family:ui-monospace,monospace; font-size:12px; white-space:pre-wrap; }
+</style>
+</head>
+<body>
+<header><h1>MLBPro · VIENTO + PITCHER (combinación)</h1></header>
+<main>
+  <button id="go" class="go">CRUZAR VIENTO + PITCHER DE HOY</button>
+  <div id="lista"></div>
+  <div id="console">Pulsa el botón. Junta el viento del parque con el cruce del pitcher.</div>
+</main>
+
+<script src="mlb-routes.js"></script>
+<script src="estadios.js"></script>
+<script src="clima-cache.js"></script>
+<script src="arsenal-master.js"></script>
+<script src="batters-vspitch.js"></script>
+<script src="cruce-arsenal.js"></script>
+
+<script>
+  var consoleEl = document.getElementById("console");
+  var listaEl = document.getElementById("lista");
+  function log(t){ var d=document.createElement("div"); d.textContent=t; consoleEl.appendChild(d); consoleEl.scrollTop=consoleEl.scrollHeight; }
+
+  function hoyISO(){
+    var d=new Date(Date.now() - 6*60*60*1000);
+    return d.getFullYear()+"-"+("0"+(d.getMonth()+1)).slice(-2)+"-"+("0"+d.getDate()).slice(-2);
+  }
+
+  // ¿el parque es domo? (por nombre)
+  function esDomo(venue){
+    var v=(venue||"").toLowerCase();
+    return v.indexOf("tropicana")!==-1 || v.indexOf("loandepot")!==-1 || v.indexOf("daikin")!==-1
+        || v.indexOf("rogers")!==-1 || v.indexOf("chase")!==-1 || v.indexOf("american family")!==-1
+        || v.indexOf("globe life")!==-1 || v.indexOf("minute maid")!==-1;
+  }
+
+  // LECTURA DEL VIENTO del parque: usa cache, agrupa juegos del MISMO parque por dir (abierto) o
+  // velocidad (domo), y dice si el rango donde cae HOY tira a over/under/limbo.
+  function lecturaViento(cache, venue, dirHoy, velHoy){
+    var domo = esDomo(venue);
+    var juegos = cache.filter(function(g){
+      return g && g.venue && g.venue===venue
+        && g.away_runs!==undefined && g.away_runs!==null && g.home_runs!==undefined && g.home_runs!==null;
+    });
+    if(juegos.length < 5) return { estado:"NC", txt:"Sin muestra del parque", over:null };
+
+    // valor de hoy: grados o velocidad segun domo
+    var valHoy = domo ? velHoy : dirHoy;
+    if(valHoy===undefined || valHoy===null || valHoy==="") return { estado:"NC", txt:"Sin dato de viento hoy", over:null };
+    valHoy = Number(valHoy);
+    if(isNaN(valHoy)) return { estado:"NC", txt:"Viento no numérico", over:null };
+
+    // rango donde cae hoy: domo de 3 en 3 mph, abierto de 30 en 30 grados
+    var paso = domo ? 3 : 30;
+    var lo = Math.floor(valHoy/paso)*paso;
+
+    // junta carreras de los juegos del parque que caen en ese mismo rango
+    var carreras=[];
+    for(var i=0;i<juegos.length;i++){
+      var g=juegos[i];
+      var val = domo ? g.windspeed_mph : Number(g.wind_dir);
+      if(val===undefined||val===null||val===""||isNaN(val)) continue;
+      var glo = Math.floor(val/paso)*paso;
+      if(glo===lo){ carreras.push(Number(g.away_runs)+Number(g.home_runs)); }
+    }
+    if(carreras.length < 3) return { estado:"LIMBO", txt:"Pocos juegos en este viento ("+carreras.length+") = LIMBO/raro", over:null,
+                                     rango: lo+(domo?("-"+(lo+3)+"mph"):("-"+(lo+30)+"°")) };
+    var s=0; for(var k=0;k<carreras.length;k++) s+=carreras[k];
+    var prom = s/carreras.length;
+    var estado, over;
+    if(prom>=9){ estado="OVER"; over=true; }
+    else if(prom<=7){ estado="UNDER"; over=false; }
+    else { estado="LIMBO"; over=null; }
+    return {
+      estado: estado, over: over,
+      txt: (domo?"velocidad":"dirección")+" "+lo+(domo?("-"+(lo+3)+"mph"):("-"+(lo+30)+"°"))+
+           " → "+prom.toFixed(1)+" carreras ("+carreras.length+"j)",
+      prom: prom
+    };
+  }
+
+  // LECTURA DEL PITCHER: del cruce, woba esperado contra el lineup. >.340 le pegan, <.300 domina.
+  function lecturaPitcher(cruce){
+    if(!cruce || cruce.estado==="NO_CONFIRMADO") return { estado:"NC", txt:"Sin arsenal", over:null };
+    if(cruce.estado==="PENDIENTE") return { estado:"NC", txt:"Lineup pendiente", over:null };
+    var w = cruce.woba_esperado;
+    var estado, over;
+    if(w>=0.340){ estado="LE PEGAN"; over=true; }
+    else if(w<=0.300){ estado="DOMINA"; over=false; }
+    else { estado="PAREJO"; over=null; }
+    return { estado:estado, over:over, txt:"al pitcher le batean "+w.toFixed(3)+" (cruce)", woba:w };
+  }
+
+  // VEREDICTO: junta viento + pitcher
+  function veredicto(v, p){
+    // limbo de viento manda: si el viento esta en limbo, NO JUGAR (contamina el juego)
+    if(v.estado==="LIMBO") return { cls:"v-limbo", txt:"⚠️ VIENTO EN LIMBO — NO JUGAR", sub:"El viento no decidió. No hay seguridad en ningún mercado." };
+    if(v.estado==="NC" && p.estado==="NC") return { cls:"v-choca", txt:"SIN DATOS", sub:"Falta viento y pitcher." };
+    // si ambos apuntan al mismo lado = premium
+    if(v.over!==null && p.over!==null){
+      if(v.over===p.over){
+        return { cls:"v-premium", txt:(v.over?"🔥 OVER FUERTE (viento + pitcher)":"🔒 UNDER FUERTE (viento + pitcher)"),
+                 sub:"Viento y pitcher apuntan al mismo lado = señal premium." };
+      } else {
+        return { cls:"v-choca", txt:"⚠️ CHOCAN — CUIDADO", sub:"El viento dice un lado y el pitcher el otro. Medir más." };
+      }
+    }
+    // uno solo da señal
+    if(v.over!==null) return { cls:"v-choca", txt:"Solo viento: "+(v.over?"tira OVER":"tira UNDER"), sub:"El pitcher no da señal clara. Confiar a medias." };
+    if(p.over!==null) return { cls:"v-choca", txt:"Solo pitcher: "+(p.over?"le pegan (OVER)":"domina (UNDER)"), sub:"El viento no da señal clara. Confiar a medias." };
+    return { cls:"v-choca", txt:"PAREJO — sin señal fuerte", sub:"Ni viento ni pitcher definen. Cuidado." };
+  }
+
+  document.getElementById("go").addEventListener("click", async function(){
+    var btn=this; btn.disabled=true; btn.textContent="TRABAJANDO…";
+    consoleEl.textContent=""; listaEl.innerHTML="";
+    try {
+      if(typeof cruzarArsenal!=="function"){ log("ERROR: no cargó cruce-arsenal.js"); return; }
+      var cache = (typeof climaLeerCache==="function") ? climaLeerCache() : [];
+      log("Filas en cache: "+cache.length+(cache.length?"":" — abre index y COINCIDENCIA primero"));
+
+      var hoy = hoyISO();
+      var mlbUrl = "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date="+hoy+"&hydrate=probablePitcher";
+      var resp = await fetch(MLB_ROUTES.WORKER_BASE + encodeURIComponent(mlbUrl));
+      if(!resp.ok) throw new Error("Schedule HTTP "+resp.status);
+      var data = await resp.json();
+      var games = (data.dates && data.dates[0]) ? data.dates[0].games : [];
+      log("Juegos hoy: "+games.length);
+      if(!games.length){ log("No hay juegos hoy."); return; }
+
+      // datos de viento de hoy: del cache (juego de hoy ya guardado) por venue
+      var html="";
+      for(var i=0;i<games.length;i++){
+        var g=games[i];
+        var venue = g.venue ? g.venue.name : "";
+        var away = (g.teams&&g.teams.away&&g.teams.away.team)? g.teams.away.team.name : "?";
+        var home = (g.teams&&g.teams.home&&g.teams.home.team)? g.teams.home.team.name : "?";
+
+        // buscar el clima de hoy de este juego en el cache
+        var hoyRow = null;
+        for(var c=0;c<cache.length;c++){ if(cache[c].date===hoy && cache[c].venue===venue){ hoyRow=cache[c]; break; } }
+        var dirHoy = hoyRow ? hoyRow.wind_dir : null;
+        var velHoy = hoyRow ? hoyRow.windspeed_mph : null;
+
+        var v = lecturaViento(cache, venue, dirHoy, velHoy);
+
+        // pitcher local vs bateo visitante (la dirección que más se juega)
+        var pHomeId = (g.teams&&g.teams.home&&g.teams.home.probablePitcher) ? g.teams.home.probablePitcher.id : null;
+        var pHomeName = (g.teams&&g.teams.home&&g.teams.home.probablePitcher) ? g.teams.home.probablePitcher.fullName : "TBD";
+        var lineAway = [];
+        try {
+          var feedUrl = "https://statsapi.mlb.com/api/v1.1/game/"+g.gamePk+"/feed/live";
+          var fres = await fetch(MLB_ROUTES.WORKER_BASE + encodeURIComponent(feedUrl));
+          if(fres.ok){ var fd=await fres.json(); var box=fd&&fd.liveData&&fd.liveData.boxscore; if(box&&box.teams){ lineAway=lineupTitular(box.teams.away); } }
+        } catch(ef){}
+        var cruce = cruzarArsenal(pHomeId, lineAway);
+        var p = lecturaPitcher(cruce);
+
+        var ver = veredicto(v, p);
+
+        html += '<div class="juego">'+
+          '<div class="matchup">'+away+' @ '+home+'</div>'+
+          '<div class="estadio">'+venue+(esDomo(venue)?" · DOMO (mira velocidad)":"")+'</div>'+
+          '<div class="veredicto '+ver.cls+'">'+ver.txt+'<small>'+ver.sub+'</small></div>'+
+          '<div class="linea">'+
+            '<div class="lbox"><div class="et">VIENTO</div><div class="vv '+claseV(v.estado)+'">'+v.estado+'</div><div class="et">'+v.txt+'</div></div>'+
+            '<div class="lbox"><div class="et">PITCHER ('+pHomeName+')</div><div class="vv '+claseP(p.estado)+'">'+p.estado+'</div><div class="et">'+p.txt+'</div></div>'+
+          '</div>'+
+        '</div>';
+      }
+      listaEl.innerHTML = html;
+      log("LISTO.");
+    } catch(e){ log("ERROR: "+(e&&e.message?e.message:e)); }
+    finally { btn.disabled=false; btn.textContent="CRUZAR VIENTO + PITCHER DE HOY"; }
+  });
+
+  function claseV(e){ return e==="OVER"?"over":(e==="UNDER"?"under":(e==="LIMBO"?"limbo":"nc")); }
+  function claseP(e){ return e==="LE PEGAN"?"over":(e==="DOMINA"?"under":(e==="PAREJO"?"limbo":"nc")); }
+</script>
+</body>
+</html>
