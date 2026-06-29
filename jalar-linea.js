@@ -1,10 +1,42 @@
 // jalar-linea.js
 // Jala el over/under (total) de The Odds API para los juegos de MLB de hoy.
 // La llave NUNCA sale al cliente — la inyecta el Worker de Cloudflare.
-// Guarda en localStorage bajo la clave "lineas_mercado_cache".
-// Formato guardado: { fecha: "2026-06-29", juegos: [ { home, away, total, bookie }, ... ] }
 
 var LINEAS_CACHE_KEY = "lineas_mercado_cache";
+
+// Mapeo: nombre de equipo (como viene de The Odds API) → venue exacto del estadio
+var ODDS_TEAM_TO_VENUE = {
+  "Baltimore Orioles":       "Oriole Park at Camden Yards",
+  "Boston Red Sox":          "Fenway Park",
+  "New York Yankees":        "Yankee Stadium",
+  "Tampa Bay Rays":          "Tropicana Field",
+  "Toronto Blue Jays":       "Rogers Centre",
+  "Chicago White Sox":       "Rate Field",
+  "Cleveland Guardians":     "Progressive Field",
+  "Detroit Tigers":          "Comerica Park",
+  "Kansas City Royals":      "Kauffman Stadium",
+  "Minnesota Twins":         "Target Field",
+  "Houston Astros":          "Daikin Park",
+  "Los Angeles Angels":      "Angel Stadium",
+  "Oakland Athletics":       "Sutter Health Park",
+  "Seattle Mariners":        "T-Mobile Park",
+  "Texas Rangers":           "Globe Life Field",
+  "Atlanta Braves":          "Truist Park",
+  "Miami Marlins":           "loanDepot Park",
+  "New York Mets":           "Citi Field",
+  "Philadelphia Phillies":   "Citizens Bank Park",
+  "Washington Nationals":    "Nationals Park",
+  "Chicago Cubs":            "Wrigley Field",
+  "Cincinnati Reds":         "Great American Ball Park",
+  "Milwaukee Brewers":       "American Family Field",
+  "Pittsburgh Pirates":      "PNC Park",
+  "St. Louis Cardinals":     "Busch Stadium",
+  "Arizona Diamondbacks":    "Chase Field",
+  "Colorado Rockies":        "Coors Field",
+  "Los Angeles Dodgers":     "Dodger Stadium",
+  "San Diego Padres":        "Petco Park",
+  "San Francisco Giants":    "Oracle Park"
+};
 
 function lineasLeerCache() {
   try {
@@ -20,35 +52,27 @@ function lineasGuardarCache(obj) {
   } catch(e) {}
 }
 
-// Devuelve el total (over/under) para un juego dado home+away.
-// Busca en cache primero. Si el cache es de hoy, no vuelve a jalar.
-function lineasBuscarJuego(home, away) {
+// Busca el total por venue del parque local
+function lineasBuscarVenue(venue) {
   var cache = lineasLeerCache();
   if (!cache || !cache.juegos) return null;
-  var h = (home || "").toLowerCase().trim();
-  var a = (away || "").toLowerCase().trim();
+  var v = (venue || "").trim().toLowerCase();
   for (var i = 0; i < cache.juegos.length; i++) {
     var j = cache.juegos[i];
-    var jh = (j.home || "").toLowerCase().trim();
-    var ja = (j.away || "").toLowerCase().trim();
-    if (jh === h && ja === a) return j;
-    if (jh === a && ja === h) return j; // por si vienen invertidos
+    if ((j.venue || "").trim().toLowerCase() === v) return j;
   }
   return null;
 }
 
-// Función principal — llama una vez al día.
-// logFn es opcional (para pintar en consola de la app).
 async function jalarLineas(logFn) {
   function log(t) { if (typeof logFn === "function") logFn(t); }
 
-  // Si ya tenemos cache de hoy, no jalamos de nuevo
-  var cache = lineasLeerCache();
   var hoy = (function(){
     var d = new Date(Date.now() - 6*60*60*1000);
     return d.getFullYear()+"-"+("0"+(d.getMonth()+1)).slice(-2)+"-"+("0"+d.getDate()).slice(-2);
   })();
 
+  var cache = lineasLeerCache();
   if (cache && cache.fecha === hoy && cache.juegos && cache.juegos.length > 0) {
     log("Líneas de mercado: cache de hoy OK (" + cache.juegos.length + " juegos).");
     return cache;
@@ -62,7 +86,6 @@ async function jalarLineas(logFn) {
   var resp = await fetch(proxyUrl);
   if (!resp.ok) throw new Error("Odds API HTTP " + resp.status);
   var data = await resp.json();
-
   if (!Array.isArray(data)) throw new Error("Odds API: respuesta inesperada");
 
   log("Juegos recibidos de Odds API: " + data.length);
@@ -72,10 +95,10 @@ async function jalarLineas(logFn) {
     var g = data[i];
     var home = g.home_team || "";
     var away = g.away_team || "";
+    var venue = ODDS_TEAM_TO_VENUE[home] || null;
     var total = null;
     var bookie = null;
 
-    // Buscar el total en los bookmakers (preferimos DraftKings, luego FanDuel, luego BetMGM)
     var orden = ["draftkings", "fanduel", "betmgm"];
     for (var bo = 0; bo < orden.length && total === null; bo++) {
       for (var b = 0; b < g.bookmakers.length; b++) {
@@ -97,8 +120,8 @@ async function jalarLineas(logFn) {
       }
     }
 
-    juegos.push({ home: home, away: away, total: total, bookie: bookie });
-    log("  " + away + " @ " + home + " → total: " + (total !== null ? total : "N/C") + (bookie ? " (" + bookie + ")" : ""));
+    juegos.push({ home: home, away: away, venue: venue, total: total, bookie: bookie });
+    log("  " + away + " @ " + home + " → venue: " + (venue||"N/C") + " · total: " + (total !== null ? total : "N/C"));
   }
 
   var nuevo = { fecha: hoy, juegos: juegos };
