@@ -16,6 +16,7 @@
   .go { width:100%; border:0; border-radius:10px; padding:16px; font-size:16px; font-weight:800; color:#fff; background:#238636; cursor:pointer; margin-bottom:8px; }
   .go-viento { width:100%; border:0; border-radius:10px; padding:16px; font-size:16px; font-weight:800; color:#fff; background:#1f6feb; cursor:pointer; margin-bottom:8px; }
 
+  /* ── VISTA 1: series ── */
   .serie { background:#161b22; border:1px solid #30363d; border-radius:14px; padding:14px; margin-top:14px; }
   .serie .cab { font-size:15px; font-weight:800; }
   .serie .sub { font-size:12px; color:#8b949e; margin:3px 0 8px; }
@@ -26,17 +27,39 @@
   .jrow .r { color:#3fb950; font-weight:700; }
   .tag-sube { color:#3fb950; } .tag-baja { color:#ff7b72; } .tag-est { color:#d29922; }
 
-  /* rango de viento */
-  .rango { background:#161b22; border:1px solid #1f6feb; border-radius:14px; padding:14px; margin-top:14px; }
-  .rango .cab { font-size:15px; font-weight:800; color:#79c0ff; }
-  .rango .sub { font-size:12px; color:#8b949e; margin:3px 0 8px; }
-  .rango .prom { font-size:13px; color:#c9d1d9; margin-bottom:8px; }
-  .rango .prom b { color:#fff; }
-  .sub { background:#0d1117; border:1px solid #21262d; border-radius:8px; padding:10px; margin:6px 0; }
-  .sub .top { font-size:13px; font-weight:700; margin-bottom:4px; }
-  .sub .f { color:#79c0ff; }
-  .chip { font-size:12px; background:#0d1117; border:1px solid #30363d; border-radius:6px; padding:4px 9px; color:#c9d1d9; }
-  .chip b { color:#fff; }
+  /* ── VISTA 2: rango de viento ── */
+  .rv-bloque { border-radius:12px; margin-top:14px; overflow:hidden; border-width:2px; border-style:solid; }
+  .rv-bloque.verde   { border-color:#3fb950; }
+  .rv-bloque.amarillo{ border-color:#d29922; }
+  .rv-bloque.rojo    { border-color:#f85149; }
+
+  .rv-cab {
+    background:#161b22;
+    padding:14px 16px 10px;
+    display:flex; flex-direction:column; align-items:center; gap:5px;
+    border-bottom:1px solid #21262d;
+  }
+  .rv-equipo { font-size:14px; font-weight:800; color:#e6edf3; }
+  .rv-parque { font-size:10px; color:#6e7681; }
+  .rv-rango  { font-size:13px; font-weight:700; color:#58a6ff; margin-top:2px; }
+  .rv-meta   { font-size:10px; color:#6e7681; }
+
+  .rv-fila {
+    background:#161b22;
+    display:grid;
+    grid-template-columns: 90px 52px 52px 1fr;
+    align-items:center;
+    padding:8px 14px;
+    border-bottom:1px solid #21262d;
+    gap:6px;
+  }
+  .rv-fila:last-child { border-bottom:none; }
+  .rv-fecha { font-size:11px; color:#58a6ff; }
+  .rv-vs    { font-size:10px; color:#8b949e; }
+  .rv-dir   { font-size:13px; font-weight:700; color:#58a6ff; text-align:center; background:#0d1117; border:1px solid #1f4f8f; border-radius:5px; padding:3px 0; }
+  .rv-temp  { font-size:12px; color:#e6edf3; text-align:center; background:#0d1117; border:1px solid #30363d; border-radius:5px; padding:3px 0; }
+  .rv-marc  { font-size:13px; font-weight:700; color:#3fb950; text-align:right; }
+  .rv-total { font-size:10px; color:#6e7681; }
 
   #console { margin-top:16px; background:#010409; border:1px solid #30363d; border-radius:8px; padding:12px; min-height:50px; max-height:25vh; overflow:auto; font-family:ui-monospace,monospace; font-size:12px; white-space:pre-wrap; }
 </style>
@@ -55,26 +78,24 @@
 <script src="mlb-routes.js"></script>
 <script src="estadios.js"></script>
 <script src="clima-cache.js"></script>
+<script src="parques-orientacion.js"></script>
 
 <script>
   var consoleEl = document.getElementById("console");
-  var listaEl = document.getElementById("lista");
+  var listaEl   = document.getElementById("lista");
   var selParque = document.getElementById("parque");
+
   function log(t){ var d=document.createElement("div"); d.textContent=t; consoleEl.appendChild(d); consoleEl.scrollTop=consoleEl.scrollHeight; }
 
   (function llenarParques(){
     try {
-      var cache = (typeof climaLeerCache === "function") ? climaLeerCache() : [];
+      var cache = (typeof climaLeerCache==="function") ? climaLeerCache() : [];
       if(!cache.length){ log("CACHE VACIO. Abre el index y pulsa COINCIDENCIA para llenar el cache."); return; }
-      var set = {};
+      var set={};
       for(var i=0;i<cache.length;i++){
-        if(cache[i] && cache[i].venue && cache[i].home_team){
-          set[cache[i].venue] = cache[i].home_team;
-        }
+        if(cache[i]&&cache[i].venue&&cache[i].home_team) set[cache[i].venue]=cache[i].home_team;
       }
-      var parques = Object.keys(set).sort(function(a,b){
-        return set[a] < set[b] ? -1 : (set[a] > set[b] ? 1 : 0);
-      });
+      var parques=Object.keys(set).sort(function(a,b){ return set[a]<set[b]?-1:(set[a]>set[b]?1:0); });
       for(var j=0;j<parques.length;j++){
         var o=document.createElement("option"); o.value=parques[j];
         o.textContent=set[parques[j]]+" · "+parques[j]; selParque.appendChild(o);
@@ -83,154 +104,246 @@
     } catch(e){ log("ERROR llenando parques: "+e.message); }
   })();
 
-  function casarSeries(cache, venue){
-    var juegos = cache.filter(function(g){ return g && g.venue===venue && g.date; });
-    juegos.sort(function(a,b){ return a.date < b.date ? -1 : (a.date > b.date ? 1 : 0); });
-    var series = [], actual = null;
+  function casarSeries(cache,venue){
+    var juegos=cache.filter(function(g){ return g&&g.venue===venue&&g.date; });
+    juegos.sort(function(a,b){ return a.date<b.date?-1:(a.date>b.date?1:0); });
+    var series=[],actual=null;
     for(var i=0;i<juegos.length;i++){
-      var g = juegos[i];
-      var visit = g.away_team || g.away || "?";
-      var fecha = g.date;
-      if(actual && actual.visit===visit && diffDias(actual.ultFecha, fecha) <= 4){
-        actual.juegos.push(g); actual.ultFecha = fecha;
+      var g=juegos[i], visit=g.away_team||g.away||"?", fecha=g.date;
+      if(actual&&actual.visit===visit&&diffDias(actual.ultFecha,fecha)<=4){
+        actual.juegos.push(g); actual.ultFecha=fecha;
       } else {
         if(actual) series.push(actual);
-        actual = { visit:visit, home:(g.home_team||g.home||venue), iniFecha:fecha, ultFecha:fecha, juegos:[g] };
+        actual={visit:visit,home:(g.home_team||g.home||venue),iniFecha:fecha,ultFecha:fecha,juegos:[g]};
       }
     }
     if(actual) series.push(actual);
-    series.sort(function(a,b){ return a.iniFecha < b.iniFecha ? 1 : -1; });
+    series.sort(function(a,b){ return a.iniFecha<b.iniFecha?1:-1; });
     return series;
   }
 
-  function diffDias(d1, d2){
-    var a=new Date(d1+"T00:00:00"), b=new Date(d2+"T00:00:00");
+  function diffDias(d1,d2){
+    var a=new Date(d1+"T00:00:00"),b=new Date(d2+"T00:00:00");
     return Math.abs((b-a)/(1000*60*60*24));
   }
 
   function carrerasDe(g){
-    var ar=g.away_runs, hr=g.home_runs;
+    var ar=g.away_runs,hr=g.home_runs;
     if(ar!==null&&ar!==undefined&&hr!==null&&hr!==undefined) return Number(ar)+Number(hr);
     return null;
+  }
+
+  function fechaCorta(d){
+    // "2026-05-21" → "May 21, 26"
+    if(!d) return "—";
+    var meses=["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+    var p=d.split("-");
+    return meses[parseInt(p[1],10)-1]+" "+parseInt(p[2],10)+", "+p[0].slice(2);
+  }
+
+  // ── SVG brújula con parque orientado ──
+  function svgBrujula(hpACF, promDir) {
+    var rotParque = hpACF - 180;
+    var rotFlecha = promDir;
+    return '<svg width="160" height="160" viewBox="0 0 160 160" style="display:block;margin:0 auto">'+
+      '<circle cx="80" cy="80" r="76" fill="#0d1117" stroke="#30363d" stroke-width="1"/>'+
+      // marcas 30°
+      '<g stroke="#30363d" stroke-width="1">'+
+        '<line x1="80" y1="5" x2="80" y2="16"/>'+
+        '<line x1="118" y1="13" x2="112" y2="23"/>'+
+        '<line x1="147" y1="42" x2="137" y2="48"/>'+
+        '<line x1="155" y1="80" x2="144" y2="80"/>'+
+        '<line x1="147" y1="118" x2="137" y2="112"/>'+
+        '<line x1="118" y1="147" x2="112" y2="137"/>'+
+        '<line x1="80" y1="155" x2="80" y2="144"/>'+
+        '<line x1="42" y1="147" x2="48" y2="137"/>'+
+        '<line x1="13" y1="118" x2="23" y2="112"/>'+
+        '<line x1="5" y1="80" x2="16" y2="80"/>'+
+        '<line x1="13" y1="42" x2="23" y2="48"/>'+
+        '<line x1="42" y1="13" x2="48" y2="23"/>'+
+      '</g>'+
+      // grados
+      '<g fill="#6e7681" font-size="8" font-family="monospace" text-anchor="middle">'+
+        '<text x="80" y="4">0°</text>'+
+        '<text x="121" y="11">30°</text>'+
+        '<text x="151" y="40">60°</text>'+
+        '<text x="159" y="83">90°</text>'+
+        '<text x="151" y="124">120°</text>'+
+        '<text x="121" y="153">150°</text>'+
+        '<text x="80" y="160">180°</text>'+
+        '<text x="39" y="153">210°</text>'+
+        '<text x="9" y="124">240°</text>'+
+        '<text x="1" y="83">270°</text>'+
+        '<text x="9" y="40">300°</text>'+
+        '<text x="39" y="11">330°</text>'+
+      '</g>'+
+      // cardinales
+      '<g fill="#8b949e" font-size="9" font-family="monospace" font-weight="700" text-anchor="middle">'+
+        '<text x="80" y="22">N</text>'+
+        '<text x="80" y="142">S</text>'+
+        '<text x="142" y="83">E</text>'+
+        '<text x="18" y="83">O</text>'+
+      '</g>'+
+      // parque rotado
+      '<g transform="translate(80,80) rotate('+rotParque+')">'+
+        '<path d="M 0,28 L -24,-16 A 36,36 0 0,1 24,-16 Z" fill="#1e5c1e"/>'+
+        '<path d="M 0,28 L -16,-4 A 24,24 0 0,1 16,-4 Z" fill="#2a7a2a"/>'+
+        '<polygon points="0,-8 13,6 0,18 -13,6" fill="#8B6914"/>'+
+        '<line x1="0" y1="28" x2="-24" y2="-16" stroke="#fff" stroke-width="0.5" opacity="0.3"/>'+
+        '<line x1="0" y1="28" x2="24" y2="-16" stroke="#fff" stroke-width="0.5" opacity="0.3"/>'+
+        '<polygon points="0,24 -3,27 -3,32 3,32 3,27" fill="#fff"/>'+
+      '</g>'+
+      // flecha viento
+      '<g transform="translate(80,80) rotate('+rotFlecha+')">'+
+        '<line x1="0" y1="8" x2="0" y2="-48" stroke="#58a6ff" stroke-width="2.5" stroke-linecap="round"/>'+
+        '<polygon points="0,-56 -4,-44 4,-44" fill="#58a6ff"/>'+
+      '</g>'+
+      // etiqueta promedio
+      '<rect x="58" y="62" width="44" height="16" rx="3" fill="#0d1117" opacity="0.85"/>'+
+      '<text x="80" y="74" fill="#58a6ff" font-size="10" font-family="monospace" font-weight="700" text-anchor="middle">~'+Math.round(promDir)+'°</text>'+
+    '</svg>';
   }
 
   // ── VISTA 1: por series ──
   document.getElementById("go").addEventListener("click", function(){
     consoleEl.textContent=""; listaEl.innerHTML="";
-    var venue = selParque.value;
+    var venue=selParque.value;
     if(!venue){ log("Elige un parque."); return; }
     try {
-      var cache = climaLeerCache();
-      var series = casarSeries(cache, venue);
+      var cache=climaLeerCache();
+      var series=casarSeries(cache,venue);
       log(venue+": "+series.length+" series encontradas.");
       if(!series.length){ log("Sin series para este parque."); return; }
       var html="";
       for(var s=0;s<series.length;s++){
-        var se = series[s];
-        var sumC=0,nC=0,sumV=0,nV=0,sumT=0,nT=0;
-        var filas="", carrerasArr=[];
+        var se=series[s],sumC=0,nC=0,sumV=0,nV=0,sumT=0,nT=0,filas="",carrerasArr=[];
         for(var k=0;k<se.juegos.length;k++){
-          var g=se.juegos[k];
-          var c=carrerasDe(g);
-          var marc = (g.away_runs!==undefined&&g.away_runs!==null&&g.home_runs!==undefined&&g.home_runs!==null) ? (g.away_runs+"-"+g.home_runs) : "—";
-          if(c!==null){ sumC+=c; nC++; carrerasArr.push(c); }
-          if(typeof g.windspeed_mph==="number"){ sumV+=g.windspeed_mph; nV++; }
-          if(typeof g.temperature_f==="number"){ sumT+=g.temperature_f; nT++; }
-          var dirTxt = (g.wind_dir!==undefined&&g.wind_dir!==null&&g.wind_dir!=="") ? ("dir "+g.wind_dir) : "dir —";
-          filas += '<div class="jrow"><span class="f">'+g.date+'</span>'+
-                   '<span>'+(typeof g.temperature_f==="number"?Math.round(g.temperature_f)+"°":"—")+
-                   ' · v'+(typeof g.windspeed_mph==="number"?g.windspeed_mph.toFixed(0):"—")+
-                   ' · '+dirTxt+'</span>'+
-                   '<span class="r">'+marc+(c!==null?' ('+c+')':'')+'</span></div>';
+          var g=se.juegos[k],c=carrerasDe(g);
+          var marc=(g.away_runs!==undefined&&g.away_runs!==null&&g.home_runs!==undefined&&g.home_runs!==null)?(g.away_runs+"-"+g.home_runs):"—";
+          if(c!==null){sumC+=c;nC++;carrerasArr.push(c);}
+          if(typeof g.windspeed_mph==="number"){sumV+=g.windspeed_mph;nV++;}
+          if(typeof g.temperature_f==="number"){sumT+=g.temperature_f;nT++;}
+          var dirTxt=(g.wind_dir!==undefined&&g.wind_dir!==null&&g.wind_dir!=="")?"dir "+g.wind_dir:"dir —";
+          filas+='<div class="jrow"><span class="f">'+g.date+'</span>'+
+            '<span>'+(typeof g.temperature_f==="number"?Math.round(g.temperature_f)+"°":"—")+
+            ' · v'+(typeof g.windspeed_mph==="number"?g.windspeed_mph.toFixed(0):"—")+
+            ' · '+dirTxt+'</span>'+
+            '<span class="r">'+marc+(c!==null?' ('+c+')':'')+'</span></div>';
         }
-        var promC = nC>0 ? (sumC/nC).toFixed(1) : "—";
-        var tend="", tendCls="tag-est";
+        var promC=nC>0?(sumC/nC).toFixed(1):"—";
+        var tend="",tendCls="tag-est";
         if(carrerasArr.length>=2){
-          var d = carrerasArr[carrerasArr.length-1] - carrerasArr[0];
-          if(d>=2){ tend="SUBE"; tendCls="tag-sube"; }
-          else if(d<=-2){ tend="BAJA"; tendCls="tag-baja"; }
-          else { tend="ESTABLE"; tendCls="tag-est"; }
+          var dd=carrerasArr[carrerasArr.length-1]-carrerasArr[0];
+          if(dd>=2){tend="SUBE";tendCls="tag-sube";}
+          else if(dd<=-2){tend="BAJA";tendCls="tag-baja";}
+          else{tend="ESTABLE";tendCls="tag-est";}
         }
-        html += '<div class="serie">'+
+        html+='<div class="serie">'+
           '<div class="cab">'+se.visit+' @ '+se.home+'</div>'+
-          '<div class="sub">'+se.iniFecha+' → '+se.ultFecha+' · '+se.juegos.length+' juego(s)'+
-            (tend?' · <span class="'+tendCls+'">'+tend+'</span>':'')+'</div>'+
+          '<div class="sub">'+se.iniFecha+' → '+se.ultFecha+' · '+se.juegos.length+' juego(s)'+(tend?' · <span class="'+tendCls+'">'+tend+'</span>':'')+'</div>'+
           '<div class="prom">Carreras promedio serie: <b>'+promC+'</b>'+
             ' · temp '+(nT>0?(sumT/nT).toFixed(0)+'°':'—')+
             ' · viento '+(nV>0?(sumV/nV).toFixed(1):'—')+'</div>'+
           filas+'</div>';
       }
-      listaEl.innerHTML = html;
+      listaEl.innerHTML=html;
       log("LISTO.");
     } catch(e){ log("ERROR: "+e.message); }
   });
 
-  // ── VISTA 2: por rango de viento (bloques de 30°) ──
+  // ── VISTA 2: por rango de viento ──
   document.getElementById("goViento").addEventListener("click", function(){
     consoleEl.textContent=""; listaEl.innerHTML="";
-    var venue = selParque.value;
+    var venue=selParque.value;
     if(!venue){ log("Elige un parque."); return; }
     try {
-      var cache = climaLeerCache();
-      var juegos = cache.filter(function(g){
-        return g && g.venue===venue && g.date &&
-               g.wind_dir!==undefined && g.wind_dir!==null && g.wind_dir!=="" &&
+      var cache=climaLeerCache();
+      var hpACF=(typeof getOrientacionParque==="function")?getOrientacionParque(venue):45;
+
+      // equipo local
+      var homeTeam="";
+      for(var ii=0;ii<cache.length;ii++){
+        if(cache[ii]&&cache[ii].venue===venue&&cache[ii].home_team){ homeTeam=cache[ii].home_team; break; }
+      }
+
+      var juegos=cache.filter(function(g){
+        return g&&g.venue===venue&&g.date&&
+               g.wind_dir!==undefined&&g.wind_dir!==null&&g.wind_dir!==""&&
                !isNaN(Number(g.wind_dir));
       });
       log("Juegos con dirección de viento: "+juegos.length);
       if(!juegos.length){ log("Sin juegos con dirección de viento para este parque."); return; }
 
-      // agrupar en bloques de 30°
-      var rangos = {};
-      var etiquetas = [
+      var etiquetas=[
         "0°–30°","30°–60°","60°–90°","90°–120°","120°–150°","150°–180°",
         "180°–210°","210°–240°","240°–270°","270°–300°","300°–330°","330°–360°"
       ];
-      for(var e=0;e<etiquetas.length;e++) rangos[etiquetas[e]] = [];
-
+      var rangos={};
+      for(var e=0;e<etiquetas.length;e++) rangos[etiquetas[e]]=[];
       for(var i=0;i<juegos.length;i++){
-        var g = juegos[i];
-        var dir = Number(g.wind_dir) % 360;
-        if(dir < 0) dir += 360;
-        var idx = Math.floor(dir / 30);
-        if(idx > 11) idx = 11;
+        var g=juegos[i],dir=Number(g.wind_dir)%360;
+        if(dir<0) dir+=360;
+        var idx=Math.floor(dir/30); if(idx>11) idx=11;
         rangos[etiquetas[idx]].push(g);
       }
 
-      var html = "";
+      var html="";
       for(var r=0;r<etiquetas.length;r++){
-        var lbl = etiquetas[r];
-        var gs = rangos[lbl];
+        var lbl=etiquetas[r],gs=rangos[lbl];
         if(!gs.length) continue;
 
-        // ordenar por fecha descendente
-        gs.sort(function(a,b){ return a.date < b.date ? 1 : -1; });
+        // ordenar ASCENDENTE por dir°
+        gs.sort(function(a,b){ return Number(a.wind_dir)-Number(b.wind_dir); });
 
-        var sumC=0,nC=0,sumT=0,nT=0;
-        var filas="";
+        var sumC=0,nC=0,sumT=0,nT=0,sumDir=0,nDir=0;
         for(var k=0;k<gs.length;k++){
-          var gk = gs[k];
-          var c = carrerasDe(gk);
-          var marc = (gk.away_runs!==undefined&&gk.away_runs!==null&&gk.home_runs!==undefined&&gk.home_runs!==null) ? (gk.away_runs+"-"+gk.home_runs) : "—";
-          if(c!==null){ sumC+=c; nC++; }
-          if(typeof gk.temperature_f==="number"){ sumT+=gk.temperature_f; nT++; }
-          filas += '<div class="sub">'+
-            '<div class="top"><span class="f">'+gk.date+'</span> · '+(gk.away_team||"?")+' @ '+(gk.home_team||"?")+'</div>'+
-            '<div class="nums" style="display:flex;flex-wrap:wrap;gap:5px;margin-top:5px;">'+
-              '<span class="chip">🌡️ <b>'+(typeof gk.temperature_f==="number"?Math.round(gk.temperature_f)+"°":"—")+'</b></span>'+
-              '<span class="chip">🧭 dir <b>'+gk.wind_dir+'</b></span>'+
-              '<span class="chip r" style="color:#3fb950;font-weight:700;">⚾ '+marc+(c!==null?' ('+c+')':'')+'</span>'+
-            '</div>'+
-          '</div>';
+          var gk=gs[k],c=carrerasDe(gk);
+          if(c!==null){sumC+=c;nC++;}
+          if(typeof gk.temperature_f==="number"){sumT+=gk.temperature_f;nT++;}
+          if(!isNaN(Number(gk.wind_dir))){sumDir+=Number(gk.wind_dir);nDir++;}
         }
-        var promC = nC>0 ? (sumC/nC).toFixed(1) : "—";
-        html += '<div class="rango">'+
-          '<div class="cab">Viento '+lbl+'</div>'+
-          '<div class="sub">'+gs.length+' juego(s) · temp prom '+(nT>0?(sumT/nT).toFixed(0)+'°':'—')+'</div>'+
-          '<div class="prom">Carreras promedio: <b>'+promC+'</b></div>'+
-          filas+'</div>';
+        var promC=nC>0?(sumC/nC).toFixed(1):"—";
+        var promDir=nDir>0?sumDir/nDir:parseInt(lbl)+15;
+
+        // color borde según promedio de carreras
+        var colorCls="amarillo";
+        if(nC>0){
+          if(sumC/nC>=11) colorCls="verde";
+          else if(sumC/nC<8) colorCls="rojo";
+        }
+
+        // filas
+        var filas="";
+        for(var k2=0;k2<gs.length;k2++){
+          var gk2=gs[k2],c2=carrerasDe(gk2);
+          var marc=(gk2.away_runs!==undefined&&gk2.away_runs!==null&&gk2.home_runs!==undefined&&gk2.home_runs!==null)?(gk2.away_runs+"-"+gk2.home_runs):"—";
+          var visitante=gk2.away_team||"?";
+          filas+=
+            '<div class="rv-fila">'+
+              '<div>'+
+                '<div class="rv-fecha">'+fechaCorta(gk2.date)+'</div>'+
+                '<div class="rv-vs">vs '+visitante+'</div>'+
+              '</div>'+
+              '<div class="rv-dir">'+gk2.wind_dir+'°</div>'+
+              '<div class="rv-temp">'+(typeof gk2.temperature_f==="number"?Math.round(gk2.temperature_f)+"°":"—")+'</div>'+
+              '<div class="rv-marc">'+marc+(c2!==null?' <span class="rv-total">('+c2+')</span>':'')+'</div>'+
+            '</div>';
+        }
+
+        html+=
+          '<div class="rv-bloque '+colorCls+'">'+
+            '<div class="rv-cab">'+
+              '<div class="rv-equipo">'+homeTeam+'</div>'+
+              '<div class="rv-parque">'+venue+'</div>'+
+              svgBrujula(hpACF, promDir)+
+              '<div class="rv-rango">Viento '+lbl+'</div>'+
+              '<div class="rv-meta">'+gs.length+' juego(s) · prom <b style="color:#e6edf3">'+promC+'</b> carreras</div>'+
+            '</div>'+
+            filas+
+          '</div>';
       }
-      listaEl.innerHTML = html || '<div style="color:#8b949e;margin-top:14px;">Sin datos suficientes.</div>';
+
+      listaEl.innerHTML=html||'<div style="color:#8b949e;margin-top:14px;">Sin datos suficientes.</div>';
       log("LISTO.");
     } catch(e){ log("ERROR: "+e.message); }
   });
