@@ -18,10 +18,10 @@
   .matchup { font-size:15px; font-weight:700; }
   .venue { font-size:11px; color:#8b949e; margin-bottom:8px; }
 
-  .fila5 { display:flex; gap:6px; flex-wrap:wrap; }
-  .fila5 .cbox { flex:1; min-width:60px; }
+  .fila5 { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+  .fila5 .cbox:nth-child(5) { grid-column:1 / span 2; }
   .cbox.serie .val { color:#ff9f0a; }
-  .cbox { flex:1; background:#0d1117; border:1px solid #30363d; border-radius:8px; padding:8px; text-align:center; }
+  .cbox { background:#0d1117; border:1px solid #30363d; border-radius:8px; padding:8px; text-align:center; }
   .cbox .lbl { font-size:9px; color:#8b949e; letter-spacing:0.3px; }
   .cbox .val { font-size:15px; font-weight:800; margin-top:2px; color:#79c0ff; }
   .cbox.real .val { color:#3fb950; }
