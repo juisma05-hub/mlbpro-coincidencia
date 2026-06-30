@@ -46,6 +46,7 @@
 <script src="calcular-coincidencia.js"></script>
 <script src="resumen-juego.js"></script>
 <script src="bloques-serie.js"></script>
+<script src="jalar-linea.js"></script>
 
 <script>
   var consoleEl = document.getElementById("console");
@@ -57,7 +58,6 @@
     return d.getFullYear()+"-"+("0"+(d.getMonth()+1)).slice(-2)+"-"+("0"+d.getDate()).slice(-2);
   }
 
-  // intenta leer la linea de mercado que el otro modulo ya guarda (si existe), sin inventar nada
   function buscarLineaMercado(venue){
     try{
       if (typeof lineasBuscarVenue === "function") {
@@ -93,9 +93,14 @@
     return n>0 ? (suma/n) : null;
   }
 
-  document.getElementById("go").addEventListener("click", function(){
+  document.getElementById("go").addEventListener("click", async function(){
+    var btn = this; btn.disabled = true; btn.textContent = "TRABAJANDO…";
     consoleEl.textContent=""; listaEl.innerHTML="";
     try {
+      var lineasCache = null;
+      try { lineasCache = await jalarLineas(log); }
+      catch(el){ log("AVISO líneas: "+(el&&el.message?el.message:el)); }
+
       var cache = climaLeerCache();
       if(!cache.length){ log("CACHE VACIO."); return; }
       var bloques = (typeof armarBloques === "function") ? armarBloques(cache) : [];
@@ -143,6 +148,7 @@
       listaEl.innerHTML = html;
       log("LISTO.");
     } catch(e) { log("ERROR: "+(e&&e.message?e.message:e)); }
+    finally { btn.disabled = false; btn.textContent = "VER AUDITORÍA"; }
   });
 </script>
 </body>
