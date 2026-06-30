@@ -5,16 +5,35 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Venideros · Test</title>
 <style>
+  :root { color-scheme: dark; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   body { margin:0; font-family:-apple-system,system-ui,sans-serif; background:#0d1117; color:#e6edf3; padding:16px; }
-  .b { background:#161b22; border:1px solid #30363d; border-radius:10px; padding:12px; margin-bottom:12px; }
-  .t { font-weight:800; font-size:15px; }
-  .s { font-size:12px; color:#8b949e; margin-top:4px; }
-  .g { font-size:12px; color:#ccc; padding:3px 0; border-bottom:1px solid #21262d; }
+  h2 { font-size:17px; margin:0 0 12px; }
+  .bloque { background:#161b22; border:1px solid #30363d; border-radius:12px; margin-bottom:14px; overflow:hidden; }
+  .bloque-cab { padding:12px 14px 8px; border-bottom:1px solid #30363d; }
+  .bloque-equipo { font-size:15px; font-weight:800; color:#e6edf3; }
+  .bloque-parque { font-size:12px; color:#8b949e; margin-top:2px; }
+  .bloque-meta { font-size:11px; color:#8b949e; margin-top:3px; }
+  .tag-sube{color:#3fb950;} .tag-baja{color:#ff7b72;} .tag-est{color:#d29922;}
+  .lbox { background:#0d1117; border:1px solid #30363d; border-radius:8px; padding:7px 10px; text-align:center; margin-top:8px; display:inline-block; min-width:120px; }
+  .lbox.mercado { border-style:dashed; }
+  .lbox .lbl { font-size:9px; color:#8b949e; }
+  .lbox .val { font-size:17px; font-weight:800; margin-top:2px; color:#ffd60a; }
+  .lbox .val.nc { font-size:12px; color:#484f58; }
+  .juego { padding:8px 14px; border-bottom:1px solid #21262d; }
+  .juego:last-child { border-bottom:none; }
+  .juego-cab { font-size:12px; color:#58a6ff; font-weight:700; margin-bottom:4px; }
+  .juego-vs { font-size:11px; color:#8b949e; margin-bottom:5px; }
+  .chips { display:flex; flex-wrap:wrap; gap:5px; }
+  .chip { font-size:11px; background:#0d1117; border:1px solid #30363d; border-radius:5px; padding:3px 8px; color:#c9d1d9; }
+  .chip b { color:#fff; }
+  .chip.pend { color:#484f58; }
+  #console { font-size:11px; color:#6e7681; margin-bottom:10px; }
 </style>
 </head>
 <body>
-<h2>Series venideras (7 días)</h2>
-<div id="console" style="font-size:12px;color:#8b949e;margin-bottom:10px;">Cargando...</div>
+<h2>Series venideras · 7 días</h2>
+<div id="console">Cargando...</div>
 <div id="out"></div>
 
 <script src="mlb-routes.js"></script>
@@ -23,35 +42,83 @@
 <script src="bloques-trayectoria.js"></script>
 <script src="venideros-schedule.js"></script>
 <script src="venideros-pronostico.js"></script>
+<script src="jalar-linea.js"></script>
+
 <script>
   var cons = document.getElementById("console");
-  var out = document.getElementById("out");
+  var out  = document.getElementById("out");
   function log(t){ var d=document.createElement("div"); d.textContent=t; cons.appendChild(d); }
+
+  var MESES={"01":"Ene","02":"Feb","03":"Mar","04":"Abr","05":"May","06":"Jun","07":"Jul","08":"Ago","09":"Sep","10":"Oct","11":"Nov","12":"Dic"};
+  function fechaCorta(d){
+    if(!d||d.length<10) return d||"?";
+    return parseInt(d.slice(8,10))+" "+(MESES[d.slice(5,7)]||d.slice(5,7))+" "+d.slice(2,4);
+  }
+
   (async function(){
     try {
       var bloques = await veniderosSchedule(log);
       log("Trayendo pronóstico...");
       await pronosticoVenideros(bloques, log);
+
+      var lineasCache = null;
+      try { lineasCache = await jalarLineas(log); }
+      catch(el){ log("AVISO líneas: "+(el&&el.message?el.message:el)); }
+
       bloques.sort(function(a,b){ return a.fecha_inicio < b.fecha_inicio ? -1 : 1; });
+
       var html = "";
       for (var i=0;i<bloques.length;i++){
         var b = bloques[i];
         var tr = analizarTrayectoria(b);
-        var saltosTxt = tr.saltos.length ? (' · ⚠️ '+tr.saltos.length+' salto(s)') : '';
-        html += '<div class="b"><div class="t">'+b.home_team+' · '+b.venue+'</div>'+
-          '<div class="s">'+b.fecha_inicio+' a '+b.fecha_fin+' · '+b.n_juegos+' juegos · '+
-          tr.tendencia+' ('+tr.min+'° a '+tr.max+'°)'+saltosTxt+'</div>';
-        for (var j=0;j<b.juegos.length;j++){
-          var g=b.juegos[j];
-          html += '<div class="g">'+g.date+' · '+(g.away_team||"?")+' / '+(g.home_team||"?")+
-            ' · '+(g.temperature_f!==undefined && g.temperature_f!==""?g.temperature_f+"°":"PENDIENTE")+'</div>';
+        var tendCls = tr.tendencia==="SUBE"?"tag-sube":(tr.tendencia==="BAJA"?"tag-baja":"tag-est");
+        var saltosTxt = tr.saltos && tr.saltos.length ? (' · ⚠️ '+tr.saltos.length+' salto(s)') : '';
+
+        var lineaMercado = lineasCache ? lineasBuscarVenue(b.venue) : null;
+        var mercadoVal, mercadoCls;
+        if(lineaMercado && lineaMercado.total !== null){
+          mercadoVal = lineaMercado.total+(lineaMercado.bookie?'<br><span style="font-size:9px;color:#555;">'+lineaMercado.bookie+'</span>':'');
+          mercadoCls = 'val';
+        } else {
+          mercadoVal = 'N/C';
+          mercadoCls = 'val nc';
+        }
+
+        html += '<div class="bloque">'+
+          '<div class="bloque-cab">'+
+            '<div class="bloque-equipo">'+b.home_team+'</div>'+
+            '<div class="bloque-parque">'+b.venue+'</div>'+
+            '<div class="bloque-meta">'+
+              fechaCorta(b.fecha_inicio)+' → '+fechaCorta(b.fecha_fin)+
+              ' · '+b.n_juegos+' juego(s)'+
+              ' · <span class="'+tendCls+'">'+tr.tendencia+'</span>'+
+              ' ('+tr.min+'° – '+tr.max+'°)'+saltosTxt+
+            '</div>'+
+            '<div class="lbox mercado"><div class="lbl">LÍNEA MERCADO</div><div class="'+mercadoCls+'">'+mercadoVal+'</div></div>'+
+          '</div>';
+
+        for(var j=0;j<b.juegos.length;j++){
+          var g = b.juegos[j];
+          var tieneClima = g.temperature_f!==undefined && g.temperature_f!==null && g.temperature_f!=="";
+          var chipsHtml = tieneClima ?
+            '<span class="chip">🌡 <b>'+g.temperature_f+'°</b></span>'+
+            '<span class="chip">🌬️ <b>'+(g.windspeed_mph!==undefined?g.windspeed_mph:"?")+'</b></span>'+
+            '<span class="chip">🧭 dir <b>'+(g.wind_dir!==undefined&&g.wind_dir!==null&&g.wind_dir!==""?g.wind_dir:"N/C")+'</b></span>'+
+            '<span class="chip">💧 <b>'+(g.humidity_pct!==undefined?g.humidity_pct+"%":"?")+'</b></span>'
+            : '<span class="chip pend">clima pendiente</span>';
+
+          html += '<div class="juego">'+
+            '<div class="juego-cab">'+fechaCorta(g.date)+'</div>'+
+            '<div class="juego-vs">'+(g.away_team||"?")+' @ '+(g.home_team||"?")+'</div>'+
+            '<div class="chips">'+chipsHtml+'</div>'+
+          '</div>';
         }
         html += '</div>';
       }
-      out.innerHTML = html;
+      out.innerHTML = html || '<div style="color:#8b949e">Sin series venideras.</div>';
       log("LISTO.");
     } catch(e){
-      out.innerHTML = "ERROR: " + (e && e.message ? e.message : e);
+      out.innerHTML = "ERROR: "+(e&&e.message?e.message:e);
     }
   })();
 </script>
