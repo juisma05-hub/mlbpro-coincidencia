@@ -81,6 +81,7 @@
 <script src="mlb-routes.js"></script>
 <script src="estadios.js"></script>
 <script src="parques-orientacion.js"></script>
+<script src="clima-cache.js"></script>
 <script src="pitchers-master.js"></script>
 <script src="arsenal-master.js"></script>
 <script src="batters-vspitch.js"></script>
@@ -307,7 +308,24 @@
         var lineaKHome = lineaPonchesBuscarPitcher(pitcherHomeNom);
 
         var hpACF = (typeof getOrientacionParque==="function") ? getOrientacionParque(venue) : null;
-        var ventDir = (condHoy && typeof condHoy==="object" && condHoy.wind_dir!==undefined) ? condHoy.wind_dir : null;
+
+        // ===== FIX: ventDir ya NO sale de condHoy (string de condicion, sin wind_dir). =====
+        // Se jala del cache real de clima, igual que en index.html (climaFetchWeather + climaKeyTZ).
+        var ventDir = null;
+        try {
+          var sParq = (typeof STADIUM_INDEX!=="undefined" && typeof stadiumNorm==="function")
+            ? STADIUM_INDEX.get(stadiumNorm(venue)) : null;
+          if (sParq) {
+            var wMapHoy = await climaFetchWeather(sParq, hoy, hoy);
+            var hitHoy = wMapHoy.get(climaKeyTZ(g.gameDate, sParq.timezone));
+            if (hitHoy && hitHoy.wind_dir!==undefined && hitHoy.wind_dir!==null && hitHoy.wind_dir!=="" && !isNaN(Number(hitHoy.wind_dir))) {
+              ventDir = Number(hitHoy.wind_dir);
+            }
+          }
+        } catch (ew) {
+          log("AVISO viento "+venue+": "+(ew&&ew.message?ew.message:ew));
+        }
+        // ===== FIN FIX =====
 
         html += '<div class="marco">'+
           '<div class="cab"><div class="vs">'+away+' @ '+home+'</div><div class="parque">'+venue+' · Hoy</div></div>'+
