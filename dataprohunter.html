@@ -18,11 +18,30 @@
   .grupo-titulo { font-size:11px; color:#8b949e; font-weight:700; letter-spacing:0.5px; margin:18px 0 8px; text-transform:uppercase; }
   .grupo-titulo:first-of-type { margin-top:0; }
 
-  .item { display:block; background:#161b22; border:1px solid #30363d; border-radius:12px; padding:14px 16px; margin-bottom:8px; text-decoration:none; color:#e6edf3; }
+  .item { display:block; background:#161b22; border:1px solid #30363d; border-left:5px solid #30363d; border-radius:12px; padding:14px 16px; margin-bottom:8px; text-decoration:none; color:#e6edf3; }
   .item:active { background:#1c2128; }
   .item .nombre { font-size:15px; font-weight:700; }
   .item .archivo { font-size:11px; color:#6e7681; margin-top:2px; font-family:ui-monospace,monospace; }
   .item .peso { display:inline-block; margin-top:6px; font-size:10px; color:#8b949e; background:#0d1117; border:1px solid #30363d; border-radius:6px; padding:2px 8px; }
+
+  /* colores por categoria: amarillo arriba -> rojo en medio -> azul abajo */
+  .item.c-viento1 { border-left-color:#e3b341; }
+  .item.c-viento2 { border-left-color:#d29922; }
+  .item.c-viento3 { border-left-color:#bb8009; }
+  .item.c-viento4 { border-left-color:#a6650a; }
+  .item.c-viento5 { border-left-color:#9a5b0b; }
+
+  .item.c-series1 { border-left-color:#e85d4c; }
+  .item.c-series2 { border-left-color:#f0483a; }
+  .item.c-series3 { border-left-color:#ff453a; }
+  .item.c-series4 { border-left-color:#e0322a; }
+
+  .item.c-pitcher1 { border-left-color:#bf5af2; }
+  .item.c-pitcher2 { border-left-color:#a371f7; }
+  .item.c-pitcher3 { border-left-color:#8957e5; }
+
+  .item.c-otros1 { border-left-color:#58a6ff; }
+  .item.c-otros2 { border-left-color:#1f6feb; }
 </style>
 </head>
 <body>
@@ -34,78 +53,78 @@
   <a href="index.html" class="volver">&larr; Volver a DataPro · Coincidencia</a>
 
   <div class="grupo-titulo">Viento</div>
-  <a class="item" href="viento-nativo-test.html">
+  <a class="item c-viento1" href="viento-nativo-test.html">
     <div class="nombre">Viento Nativo (todos los parques)</div>
     <div class="archivo">viento-nativo-test.html</div>
     <span class="peso">PESO: por confirmar</span>
   </a>
-  <a class="item" href="comparar-viento-test.html">
+  <a class="item c-viento2" href="comparar-viento-test.html">
     <div class="nombre">Viento: Costa vs Adentro</div>
     <div class="archivo">comparar-viento-test.html</div>
     <span class="peso">PESO: por confirmar</span>
   </a>
-  <a class="item" href="cazador-domos-test.html">
+  <a class="item c-viento3" href="cazador-domos-test.html">
     <div class="nombre">Cazador de Domos (Miami + Tampa)</div>
     <div class="archivo">cazador-domos-test.html</div>
     <span class="peso">PESO: por confirmar</span>
   </a>
-  <a class="item" href="viento-pitcher-test.html">
+  <a class="item c-viento4" href="viento-pitcher-test.html">
     <div class="nombre">Viento + Pitcher (combinación)</div>
     <div class="archivo">viento-pitcher-test.html</div>
     <span class="peso">PESO: por confirmar</span>
   </a>
-  <a class="item" href="brujula-parque-test.html">
+  <a class="item c-viento5" href="brujula-parque-test.html">
     <div class="nombre">Brújula del Parque (orientación real)</div>
     <div class="archivo">brujula-parque-test.html</div>
     <span class="peso">PESO: por confirmar</span>
   </a>
 
   <div class="grupo-titulo">Series y bloques</div>
-  <a class="item" href="casar-series-test.html">
+  <a class="item c-series1" href="casar-series-test.html">
     <div class="nombre">Casar Series por temporada</div>
     <div class="archivo">casar-series-test.html</div>
     <span class="peso">PESO: por confirmar</span>
   </a>
-  <a class="item" href="serie-pasada-test.html">
+  <a class="item c-series2" href="serie-pasada-test.html">
     <div class="nombre">Serie Pasada</div>
     <div class="archivo">serie-pasada-test.html</div>
     <span class="peso">PESO: por confirmar</span>
   </a>
-  <a class="item" href="bloques-test.html">
+  <a class="item c-series3" href="bloques-test.html">
     <div class="nombre">Bloques (general)</div>
     <div class="archivo">bloques-test.html</div>
     <span class="peso">PESO: por confirmar</span>
   </a>
-  <a class="item" href="bloques-temporada-test.html">
+  <a class="item c-series4" href="bloques-temporada-test.html">
     <div class="nombre">Bloques por Temporada</div>
     <div class="archivo">bloques-temporada-test.html</div>
     <span class="peso">PESO: por confirmar</span>
   </a>
 
   <div class="grupo-titulo">Pitcher / Roster / Cruce</div>
-  <a class="item" href="cruce-test.html">
+  <a class="item c-pitcher1" href="cruce-test.html">
     <div class="nombre">Cruce Arsenal vs Bateo</div>
     <div class="archivo">cruce-test.html</div>
     <span class="peso">PESO: por confirmar</span>
   </a>
-  <a class="item" href="bullpen-test.html">
+  <a class="item c-pitcher2" href="bullpen-test.html">
     <div class="nombre">Bullpen</div>
     <div class="archivo">bullpen-test.html</div>
     <span class="peso">PESO: por confirmar</span>
   </a>
-  <a class="item" href="roster-test.html">
+  <a class="item c-pitcher3" href="roster-test.html">
     <div class="nombre">Roster</div>
     <div class="archivo">roster-test.html</div>
     <span class="peso">PESO: por confirmar</span>
   </a>
 
   <div class="grupo-titulo">Otros</div>
-  <a class="item" href="venideros-test.html">
+  <a class="item c-otros1" href="venideros-test.html">
     <div class="nombre">Venideros (general)</div>
     <div class="archivo">venideros-test.html</div>
     <span class="peso">PESO: por confirmar</span>
   </a>
-  <a class="item" href="dia-pasado-test.html">
+  <a class="item c-otros2" href="dia-pasado-test.html">
     <div class="nombre">Día Pasado</div>
     <div class="archivo">dia-pasado-test.html</div>
     <span class="peso">PESO: por confirmar</span>
