@@ -312,10 +312,12 @@
     else{ mercadoVal='N/C'; mercadoClass='val pendiente'; }
 
     var fhVal, fhClass, fhSub;
-    if(factorH && factorH.confirmado && factorH.factor_final !== null){
-      fhVal = factorH.factor_final;
+    if(factorH && factorH.confirmado && factorH.factor_final !== null && promRuns !== null){
+      var lineaFH = parseFloat(promRuns) * factorH.factor_final;
+      var pctCambio = (factorH.factor_final - 1) * 100;
+      fhVal = lineaFH.toFixed(3);
       fhClass = 'val';
-      fhSub = 'factor woba/liga';
+      fhSub = (pctCambio >= 0 ? '+' : '') + pctCambio.toFixed(2) + '% vs clima';
     } else {
       fhVal = 'N/C';
       fhClass = 'val pendiente';
