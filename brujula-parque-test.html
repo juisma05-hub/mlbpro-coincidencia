@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>MLBPro · Brújula del Parque</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; font-family:-apple-system,system-ui,sans-serif; background:#0d1117; color:#e6edf3; }
+  header { padding:14px 16px; border-bottom:1px solid #30363d; }
+  h1 { font-size:15px; margin:0; }
+  main { padding:14px; max-width:480px; margin:0 auto; }
+
+  label { font-size:12px; color:#8b949e; display:block; margin:10px 0 4px; }
+  select { width:100%; padding:12px; font-size:15px; background:#161b22; color:#e6edf3; border:1px solid #30363d; border-radius:10px; }
+
+  .compass-wrap { display:flex; justify-content:center; margin-bottom:8px; }
+  .compass-wrap svg { width:150px; height:150px; }
+  .caja { background:#161b22; border:1px solid #30363d; border-radius:14px; padding:16px; margin-top:14px; }
+  .fila-abajo { display:flex; gap:16px; justify-content:center; align-items:center; }
+  .wrap { position:relative; width:100px; height:420px; flex-shrink:0; }
+  svg { width:100%; height:100%; display:block; }
+  .hit { position:absolute; top:50%; left:50%; width:420px; height:70px;
+    transform: translate(-50%,-50%) rotate(-90deg); -webkit-appearance:none; background:transparent; opacity:0; margin:0; padding:0; }
+  .hit::-webkit-slider-thumb { -webkit-appearance:none; width:1px; height:1px; }
+  .panel { width:200px; display:flex; flex-direction:column; justify-content:center; gap:8px; }
+  .lbox { background:#0d1117; border:1px solid #30363d; border-radius:10px; padding:8px; text-align:center; }
+  .lbox .lbl { font-size:9px; color:#8b949e; letter-spacing:0.3px; }
+  .lbox .val { font-size:16px; font-weight:800; margin-top:2px; color:#79c0ff; }
+  .lbox .val.alto { color:#ff7b72; }
+  .lbox .val.bajo { color:#3fb950; }
+  .lbox .val.limbo { color:#d29922; }
+  .lbox .sub { font-size:10px; color:#6e7681; margin-top:3px; }
+
+  #console { margin-top:14px; background:#010409; border:1px solid #30363d; border-radius:8px; padding:10px; min-height:30px; max-height:18vh; overflow:auto; font-family:ui-monospace,monospace; font-size:11px; white-space:pre-wrap; }
+</style>
+</head>
+<body>
+<header><h1>MLBPro · BRÚJULA DEL PARQUE</h1></header>
+<main>
+
+  <label>Parque (de lo que hay en cache):</label>
+  <select id="parqueSel"><option value="">— elegir —</option></select>
+
+  <label for="orientInput">Orientación home→jardín central de este parque (°, opcional):</label>
+  <input type="number" id="orientInput" min="0" max="359" placeholder="vacío = NO_CONFIRMADO" style="width:100%; padding:10px; font-size:14px; background:#161b22; color:#e6edf3; border:1px solid #30363d; border-radius:8px;" />
+
+  <div class="caja">
+    <div class="fila-abajo">
+      <div class="wrap" id="reglaWrap">
+        <svg id="svg" viewBox="0 0 130 420"></svg>
+        <input type="range" id="barra" class="hit" min="0" max="359" value="0" />
+      </div>
+      <div class="panel">
+        <div class="compass-wrap">
+          <svg id="compassSvg" viewBox="0 0 220 220">
+            <circle cx="110" cy="110" r="95" fill="#0d1117" stroke="#30363d" stroke-width="2"/>
+            <g id="compassMarcas"></g>
+            <g id="compassFlecha" transform="rotate(0 110 110)">
+              <line x1="110" y1="110" x2="110" y2="30" stroke="#1f6feb" stroke-width="4"/>
+              <path d="M110,18 L100,33 L120,33 Z" fill="#1f6feb"/>
+            </g>
+            <g id="compassOrient" transform="rotate(0 110 110)" style="display:none;">
+              <line x1="110" y1="110" x2="110" y2="50" stroke="#ff9f0a" stroke-width="3" stroke-dasharray="4,3"/>
+              <circle cx="110" cy="50" r="5" fill="#ff9f0a"/>
+            </g>
+            <circle cx="110" cy="110" r="4" fill="#e6edf3"/>
+          </svg>
+        </div>
+        <div class="lbox"><div class="lbl">DIRECCIÓN VIENTO</div><div class="val" id="lecDir">—</div></div>
+        <div class="lbox"><div class="lbl">CARRERAJE EN ESTE RANGO</div><div class="val" id="lecCarr">—</div><div class="sub" id="lecSub">elige un parque</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="console">Elige el parque, pon su orientación si la tienes (línea naranja punteada = hacia el jardín), y mueve la flecha azul (viento) de arriba a abajo en la regla.</div>
+</main>
+
+<script src="mlb-routes.js"></script>
+<script src="estadios.js"></script>
+<script src="clima-cache.js"></script>
+
+<script>
+  var consoleEl = document.getElementById("console");
+  function log(t){ var d=document.createElement("div"); d.textContent=t; consoleEl.appendChild(d); consoleEl.scrollTop=consoleEl.scrollHeight; }
+
+  // ---- llenar el selector de parques con lo que haya en cache ----
+  (function llenarParques(){
+    try {
+      var cache = (typeof climaLeerCache === "function") ? climaLeerCache() : [];
+      var set = {};
+      for (var i=0; i<cache.length; i++){ if (cache[i] && cache[i].venue) set[cache[i].venue] = true; }
+      var nombres = Object.keys(set).sort();
+      var sel = document.getElementById("parqueSel");
+      nombres.forEach(function(n){
+        var o = document.createElement("option"); o.value = n; o.textContent = n; sel.appendChild(o);
+      });
+      log("Parques en cache: " + nombres.length + " · Filas: " + cache.length);
+    } catch(e) { log("AVISO: " + e.message); }
+  })();
+
+  document.getElementById("parqueSel").addEventListener("change", actualizar);
+
+  // ---- pinta los 16 puntos cardinales en el circulo grande, una sola vez ----
+  (function pintarCompassGrande(){
+    var puntos16 = [
+      {g:0,t:"N"},{g:22.5,t:"NNE"},{g:45,t:"NE"},{g:67.5,t:"ENE"},
+      {g:90,t:"E"},{g:112.5,t:"ESE"},{g:135,t:"SE"},{g:157.5,t:"SSE"},
+      {g:180,t:"S"},{g:202.5,t:"SSO"},{g:225,t:"SO"},{g:247.5,t:"OSO"},
+      {g:270,t:"O"},{g:292.5,t:"ONO"},{g:315,t:"NO"},{g:337.5,t:"NNO"}
+    ];
+    var cx=110, cy=110, r=95;
+    var html = "";
+    puntos16.forEach(function(p){
+      var rad = p.g * Math.PI/180;
+      var esMayor = (p.g % 90 === 0);
+      var rTxt = r - (esMayor?16:12);
+      var x = cx + rTxt*Math.sin(rad), y = cy - rTxt*Math.cos(rad);
+      html += '<text x="'+x+'" y="'+(y+4)+'" fill="'+(esMayor?"#79c0ff":"#8b949e")+'" font-size="'+(esMayor?13:9)+'" font-weight="'+(esMayor?800:600)+'" text-anchor="middle">'+p.t+'</text>';
+      var p1x = cx + r*Math.sin(rad), p1y = cy - r*Math.cos(rad);
+      var p2x = cx + (r-6)*Math.sin(rad), p2y = cy - (r-6)*Math.cos(rad);
+      html += '<line x1="'+p1x+'" y1="'+p1y+'" x2="'+p2x+'" y2="'+p2y+'" stroke="'+(esMayor?"#e6edf3":"#484f58")+'" stroke-width="'+(esMayor?2:1)+'"/>';
+    });
+    document.getElementById("compassMarcas").innerHTML = html;
+  })();
+
+  document.getElementById("orientInput").addEventListener("input", function(){
+    var v = this.value;
+    var g = document.getElementById("compassOrient");
+    if (v === "" || isNaN(v)) { g.style.display = "none"; return; }
+    g.style.display = "block";
+    g.setAttribute("transform", "rotate("+(Number(v)%360)+" 110 110)");
+  });
+
+  // ---- dibujo de la regla (tubo + rayitas + bombilla), aprobado hoy ----
+  var wrap = document.getElementById("reglaWrap");
+  var svg = document.getElementById("svg");
+  var tuboX = 30, tuboW = 22;
+  var topY = 20, bottomY = 370;
+  var bulbY = 400, bulbR = 22;
+
+  function construirRegla(){
+    var partes = [];
+    partes.push('<rect x="'+tuboX+'" y="'+(topY-15)+'" width="'+tuboW+'" height="'+(bulbY-topY+15)+'" rx="'+(tuboW/2)+'" fill="#0d1117" stroke="#30363d" stroke-width="2"/>');
+    partes.push('<circle cx="'+(tuboX+tuboW/2)+'" cy="'+bulbY+'" r="'+bulbR+'" fill="#0d1117" stroke="#30363d" stroke-width="2"/>');
+
+    var H = bottomY - topY;
+    for (var g = 0; g <= 359; g += 15) {
+      var y = topY + (g / 359) * H;
+      var esMayor = (g % 90 === 0);
+      var largo = esMayor ? 14 : 6;
+      var x1 = tuboX + tuboW + 2;
+      var x2 = x1 + largo;
+      partes.push('<line x1="'+x1+'" y1="'+y+'" x2="'+x2+'" y2="'+y+'" stroke="'+(esMayor?"#e6edf3":"#6e7681")+'" stroke-width="'+(esMayor?2:1)+'"/>');
+    }
+    // etiquetas: los 16 puntos cardinales completos
+    var puntos16 = [
+      {g:0,t:"N"},{g:22.5,t:"NNE"},{g:45,t:"NE"},{g:67.5,t:"ENE"},
+      {g:90,t:"E"},{g:112.5,t:"ESE"},{g:135,t:"SE"},{g:157.5,t:"SSE"},
+      {g:180,t:"S"},{g:202.5,t:"SSO"},{g:225,t:"SO"},{g:247.5,t:"OSO"},
+      {g:270,t:"O"},{g:292.5,t:"ONO"},{g:315,t:"NO"},{g:337.5,t:"NNO"}
+    ];
+    puntos16.forEach(function(p){
+      var y = topY + (p.g/359)*H;
+      var esMayor = (p.g % 90 === 0);
+      partes.push('<text x="'+(tuboX+tuboW+10)+'" y="'+(y+2.5)+'" fill="'+(esMayor?"#79c0ff":"#8b949e")+'" font-size="'+(esMayor?9:7)+'" font-weight="'+(esMayor?800:600)+'">'+p.t+'</text>');
+    });
+
+    svg.innerHTML = partes.join("");
+  }
+
+  function degToPunto16(deg){
+    var nombres = ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSO","SO","OSO","O","ONO","NO","NNO"];
+    var idx = Math.round(deg / 22.5) % 16;
+    return nombres[idx];
+  }
+
+  // ---- carreraje real por rango de 30°, leido del cache de ESE parque ----
+  function carrerasDeJuego(g){
+    var ar=g.away_runs, hr=g.home_runs;
+    if (ar!==null && ar!==undefined && hr!==null && hr!==undefined) return Number(ar)+Number(hr);
+    return null;
+  }
+
+  function carrerajeDelRango(venue, deg){
+    var cache = climaLeerCache();
+    var lo = Math.floor(deg/30)*30, hi = lo+30;
+    var juegos = cache.filter(function(g){
+      return g && g.venue === venue && g.wind_dir!==undefined && g.wind_dir!==null && g.wind_dir!=="" &&
+             !isNaN(Number(g.wind_dir)) && (Number(g.wind_dir)%360) >= lo && (Number(g.wind_dir)%360) < hi;
+    });
+    var carreras = [];
+    juegos.forEach(function(g){ var c = carrerasDeJuego(g); if (c!==null) carreras.push(c); });
+    var prom = carreras.length ? (carreras.reduce(function(a,b){return a+b;},0)/carreras.length) : null;
+    return { lo:lo, hi:hi, n:juegos.length, prom:prom };
+  }
+
+  function actualizar(){
+    var venue = document.getElementById("parqueSel").value;
+    var deg = Number(document.getElementById("barra").value);
+    document.getElementById("lecDir").textContent = deg + "° (" + degToPunto16(deg) + ")";
+
+    var flecha = document.getElementById("compassFlecha");
+    if (flecha) flecha.setAttribute("transform", "rotate("+deg+" 110 110)");
+
+    if (!venue) {
+      document.getElementById("lecCarr").textContent = "—";
+      document.getElementById("lecCarr").className = "val";
+      document.getElementById("lecSub").textContent = "elige un parque";
+      return;
+    }
+    var res = carrerajeDelRango(venue, deg);
+    var val = document.getElementById("lecCarr");
+    if (res.n === 0) {
+      val.textContent = "NO_CONFIRMADO";
+      val.className = "val";
+      document.getElementById("lecSub").textContent = res.lo+"-"+res.hi+"° · sin juegos en cache";
+    } else {
+      val.textContent = res.prom!==null ? res.prom.toFixed(1) : "—";
+      val.className = "val " + (res.prom===null ? "" : (res.prom>=9?"alto":(res.prom<=7?"bajo":"limbo")));
+      document.getElementById("lecSub").textContent = res.lo+"-"+res.hi+"° · "+res.n+" juego(s)"+(res.n<3?" (muestra chica)":"");
+    }
+  }
+
+  document.getElementById("barra").addEventListener("input", actualizar);
+  construirRegla();
+  actualizar();
+</script>
+</body>
+</html>
