@@ -61,9 +61,88 @@
   .serieparque .spprom .lbl { font-size:12px; color:#8b949e; }
   .serieparque .spprom .val { font-size:20px; font-weight:800; color:#79c0ff; }
   #console { margin-top:16px; background:#010409; border:1px solid #30363d; border-radius:8px; padding:12px; min-height:60px; max-height:30vh; overflow:auto; font-family:ui-monospace,monospace; font-size:12px; white-space:pre-wrap; }
+
+  /* ── PORTADA ── */
+  #portada {
+    position:fixed; inset:0; z-index:9999;
+    background: linear-gradient(180deg, #030303 0%, #0A0908 45%, #11100E 100%);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    padding:50px 24px;
+  }
+  #portada::before, #portada::after {
+    content:""; position:absolute; width:60px; height:60px; border:1px solid #4A3212;
+  }
+  #portada::before { top:24px; left:24px; border-right:0; border-bottom:0; }
+  #portada::after  { top:24px; right:24px; border-left:0; border-bottom:0; }
+  .p-sub { font-size:11px; letter-spacing:5px; color:#A9782D; margin-bottom:6px; text-transform:uppercase; }
+  .p-tri { width:0; height:0; border-left:6px solid transparent; border-right:6px solid transparent; border-top:7px solid #A9782D; margin-bottom:30px; }
+  .p-logo { width:200px; height:200px; margin-bottom:24px; }
+  .p-titulo { font-size:36px; font-weight:900; letter-spacing:3px; margin:8px 0; font-family:'Arial Black',Impact,sans-serif;
+    background: linear-gradient(180deg, #FFF0B0 0%, #F6D77A 20%, #C9953A 45%, #6F4B1C 75%, #E4B85A 100%);
+    -webkit-background-clip: text; background-clip:text; color:transparent; }
+  .p-linea { width:80%; height:1px; background:linear-gradient(90deg,transparent,#C9953A,transparent); margin:10px 0; }
+  .p-desc { font-size:11px; color:#B8B0A2; margin-bottom:18px; letter-spacing:0.5px; text-align:center; }
+  .p-autor { font-size:13px; color:#B8B0A2; margin-bottom:32px; }
+  .p-autor b { color:#E4B85A; font-weight:700; }
+  #btnEntrar {
+    background: linear-gradient(180deg, #FFF0B0 0%, #E4B85A 18%, #A9782D 50%, #6F4B1C 100%);
+    color:#11100E; border:0; border-radius:8px; padding:18px 80px;
+    font-size:18px; font-weight:800; letter-spacing:1px; cursor:pointer;
+    box-shadow: 0 0 18px #F6D77A55, 0 4px 14px #00000066;
+    font-family:-apple-system,sans-serif;
+  }
+  #appContenido { display:none; }
 </style>
 </head>
 <body>
+<div id="portada">
+  <div class="p-sub">Sport Tradition</div>
+  <div class="p-tri"></div>
+  <svg class="p-logo" viewBox="0 0 220 220">
+    <defs>
+      <linearGradient id="goldRing" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stop-color="#FFF0B0"/>
+        <stop offset="20%" stop-color="#F6D77A"/>
+        <stop offset="45%" stop-color="#C9953A"/>
+        <stop offset="75%" stop-color="#6F4B1C"/>
+        <stop offset="100%" stop-color="#E4B85A"/>
+      </linearGradient>
+      <radialGradient id="bgBlack" cx="50%" cy="45%" r="60%">
+        <stop offset="0%" stop-color="#11100E"/>
+        <stop offset="100%" stop-color="#030303"/>
+      </radialGradient>
+    </defs>
+    <circle cx="110" cy="110" r="104" fill="none" stroke="url(#goldRing)" stroke-width="7"/>
+    <circle cx="110" cy="110" r="96" fill="url(#bgBlack)"/>
+    <circle cx="110" cy="110" r="96" fill="none" stroke="#C9953A" stroke-width="1.5" opacity="0.7"/>
+    <path d="M 50,55 Q 110,95 170,55" fill="none" stroke="#C9953A" stroke-width="2.5"/>
+    <path d="M 50,165 Q 110,125 170,165" fill="none" stroke="#C9953A" stroke-width="2.5"/>
+    <g stroke="#E4B85A" stroke-width="1.8">
+      <line x1="58" y1="58" x2="62" y2="48"/><line x1="68" y1="68" x2="74" y2="59"/>
+      <line x1="79" y1="76" x2="86" y2="68"/><line x1="91" y1="82" x2="97" y2="75"/>
+      <line x1="103" y1="86" x2="107" y2="78"/><line x1="116" y1="86" x2="113" y2="78"/>
+      <line x1="128" y1="82" x2="123" y2="75"/><line x1="140" y1="76" x2="134" y2="68"/>
+      <line x1="151" y1="68" x2="146" y2="59"/><line x1="161" y1="58" x2="158" y2="48"/>
+    </g>
+    <g stroke="#E4B85A" stroke-width="1.8">
+      <line x1="58" y1="162" x2="62" y2="172"/><line x1="68" y1="152" x2="74" y2="161"/>
+      <line x1="79" y1="144" x2="86" y2="152"/><line x1="91" y1="138" x2="97" y2="145"/>
+      <line x1="103" y1="134" x2="107" y2="142"/><line x1="116" y1="134" x2="113" y2="142"/>
+      <line x1="128" y1="138" x2="123" y2="145"/><line x1="140" y1="144" x2="134" y2="152"/>
+      <line x1="151" y1="152" x2="146" y2="161"/><line x1="161" y1="162" x2="158" y2="172"/>
+    </g>
+    <text x="110" y="40" fill="#C9953A" font-size="13" text-anchor="middle" letter-spacing="6">★ ★ ★</text>
+    <text x="110" y="190" fill="#C9953A" font-size="13" text-anchor="middle" letter-spacing="6">★ ★ ★</text>
+    <text x="110" y="118" fill="url(#goldRing)" font-size="34" font-weight="900" font-family="Georgia,serif" text-anchor="middle">MLB<tspan font-style="italic" font-weight="400">Pro</tspan></text>
+  </svg>
+  <div class="p-titulo">FACTOR CLIMA</div>
+  <div class="p-linea"></div>
+  <div class="p-desc">ANÁLISIS DEL TIEMPO · IMPACTO DEL PARQUE · ESCENA DEL JUEGO</div>
+  <div class="p-autor">by <b>Juan Isidro Pérez</b></div>
+  <button id="btnEntrar">ENTRAR</button>
+</div>
+
+<div id="appContenido">
 <header><h1>DataPro · Coincidencia</h1></header>
 <main>
   <button id="go" class="go">COINCIDENCIA DATAPRO</button>
@@ -388,5 +467,12 @@
     '</div>';
   }
 </script>
+<script>
+  document.getElementById("btnEntrar").addEventListener("click", function(){
+    document.getElementById("portada").style.display = "none";
+    document.getElementById("appContenido").style.display = "block";
+  });
+</script>
+</div>
 </body>
 </html>
