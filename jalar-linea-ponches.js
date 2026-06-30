@@ -1,100 +1,109 @@
 // jalar-linea-ponches.js
-// PIEZA - trae la LINEA DE MERCADO de ponches (K) por pitcher, via The Odds API.
-// Market: pitcher_strikeouts. Requiere 2 pasos: 1) events del dia, 2) odds por eventId.
-// Misma API key que jalar-linea.js (Over/Under de carreras), distinto market.
-// Cachea en localStorage por dia, igual logica que jalar-linea.js.
-// NO inventa: si el market no esta disponible para ese juego/libro, queda NO_CONFIRMADO.
+// Jala la linea de mercado de ponches (pitcher_strikeouts) de The Odds API.
+// Mismo patron que jalar-linea.js: la llave NUNCA sale al cliente, la inyecta el Worker.
+// Cachea en localStorage por dia.
 
 var LINEAS_PONCHES_CACHE_KEY = "lineas_ponches_cache_v1";
 
-async function jalarLineasPonches(logFn) {
-  function log(t){ if (typeof logFn === "function") logFn(t); }
-
-  var hoy = new Date(Date.now() - 6*60*60*1000);
-  var hoyISO = hoy.getFullYear()+"-"+("0"+(hoy.getMonth()+1)).slice(-2)+"-"+("0"+hoy.getDate()).slice(-2);
-
-  // revisar cache del dia
+function lineasPonchesLeerCache() {
   try {
-    var cacheRaw = localStorage.getItem(LINEAS_PONCHES_CACHE_KEY);
-    if (cacheRaw) {
-      var cache = JSON.parse(cacheRaw);
-      if (cache.fecha === hoyISO && cache.datos) {
-        log("Líneas de ponches: cache de hoy OK ("+cache.datos.length+" pitchers).");
-        return cache.datos;
-      }
-    }
-  } catch(e) { /* cache corrupto, sigue a jalar de nuevo */ }
-
-  // 1. eventos del dia (mismo formato que jalar-linea.js)
-  var eventsUrl = "https://api.the-odds-api.com/v4/sports/baseball_mlb/events?apiKey=" + MLB_ROUTES.ODDS_API_KEY;
-  var resEvents = await fetch(MLB_ROUTES.WORKER_BASE + encodeURIComponent(eventsUrl));
-  if (!resEvents.ok) throw new Error("ODDS_API_EVENTS_HTTP_" + resEvents.status);
-  var events = await resEvents.json();
-  log("Eventos MLB encontrados: " + events.length);
-
-  var resultado = [];
-
-  for (var i = 0; i < events.length; i++) {
-    var ev = events[i];
-    try {
-      var oddsUrl = "https://api.the-odds-api.com/v4/sports/baseball_mlb/events/" + ev.id +
-        "/odds?regions=us&markets=pitcher_strikeouts&oddsFormat=american&apiKey=" + MLB_ROUTES.ODDS_API_KEY;
-      var resOdds = await fetch(MLB_ROUTES.WORKER_BASE + encodeURIComponent(oddsUrl));
-      if (!resOdds.ok) { log("AVISO: sin odds K para " + ev.away_team + " @ " + ev.home_team); continue; }
-      var dataOdds = await resOdds.json();
-
-      var bookmakers = dataOdds.bookmakers || [];
-      for (var b = 0; b < bookmakers.length; b++) {
-        var bk = bookmakers[b];
-        var markets = bk.markets || [];
-        for (var m = 0; m < markets.length; m++) {
-          if (markets[m].key !== "pitcher_strikeouts") continue;
-          var outcomes = markets[m].outcomes || [];
-          // agrupar por nombre de pitcher (description), Over/Under vienen separados
-          var porPitcher = {};
-          outcomes.forEach(function(o) {
-            var nombre = o.description || "NO_CONFIRMADO";
-            if (!porPitcher[nombre]) porPitcher[nombre] = { pitcher: nombre, over: null, under: null, point: o.point !== undefined ? o.point : null };
-            if (o.name === "Over") porPitcher[nombre].over = o.price;
-            if (o.name === "Under") porPitcher[nombre].under = o.price;
-          });
-          Object.keys(porPitcher).forEach(function(nom) {
-            resultado.push({
-              pitcher: nom,
-              away_team: ev.away_team,
-              home_team: ev.home_team,
-              total_k: porPitcher[nom].point,
-              over_price: porPitcher[nom].over,
-              under_price: porPitcher[nom].under,
-              bookie: bk.title
-            });
-          });
-          break; // solo el primer bookie con el market, evita duplicar
-        }
-        if (resultado.length) break;
-      }
-    } catch (eEv) {
-      log("AVISO evento " + ev.away_team + " @ " + ev.home_team + ": " + (eEv && eEv.message ? eEv.message : eEv));
-    }
-  }
-
-  try {
-    localStorage.setItem(LINEAS_PONCHES_CACHE_KEY, JSON.stringify({ fecha: hoyISO, datos: resultado }));
-  } catch(e) { /* localStorage lleno o bloqueado, no es critico */ }
-
-  log("Líneas de ponches jaladas: " + resultado.length);
-  return resultado;
+    var raw = localStorage.getItem(LINEAS_PONCHES_CACHE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch(e) { return null; }
 }
 
-// Helper: busca la linea de K de un pitcher por nombre (cruce por nombre, no por id,
-// porque el market de Odds API no trae player_id de MLB).
-function lineaPonchesBuscarPitcher(nombreCompleto, datosLineas) {
-  if (!datosLineas || !datosLineas.length || !nombreCompleto) return null;
-  var normalizado = nombreCompleto.trim().toLowerCase();
-  for (var i = 0; i < datosLineas.length; i++) {
-    if (datosLineas[i].pitcher && datosLineas[i].pitcher.trim().toLowerCase() === normalizado) {
-      return datosLineas[i];
-    }
+function lineasPonchesGuardarCache(obj) {
+  try {
+    localStorage.setItem(LINEAS_PONCHES_CACHE_KEY, JSON.stringify(obj));
+  } catch(e) {}
+}
+
+// Busca la linea de K de un pitcher por nombre (Odds API no trae player_id de MLB,
+// solo el nombre en "description", asi que el cruce es por nombre normalizado).
+function lineaPonchesBuscarPitcher(nombreCompleto) {
+  var cache = lineasPonchesLeerCache();
+  if (!cache || !cache.pitchers || !nombreCompleto) return null;
+  var v = nombreCompleto.trim().toLowerCase();
+  for (var i = 0; i < cache.pitchers.length; i++) {
+    if ((cache.pitchers[i].pitcher || "").trim().toLowerCase() === v) return cache.pitchers[i];
   }
   return null;
+}
+
+async function jalarLineasPonches(logFn) {
+  function log(t) { if (typeof logFn === "function") logFn(t); }
+
+  var hoy = (function(){
+    var d = new Date(Date.now() - 6*60*60*1000);
+    return d.getFullYear()+"-"+("0"+(d.getMonth()+1)).slice(-2)+"-"+("0"+d.getDate()).slice(-2);
+  })();
+
+  var cache = lineasPonchesLeerCache();
+  if (cache && cache.fecha === hoy && cache.pitchers && cache.pitchers.length > 0) {
+    log("Líneas de ponches: cache de hoy OK (" + cache.pitchers.length + " pitchers).");
+    return cache;
+  }
+
+  log("Jalando líneas de mercado de ponches (pitcher_strikeouts)...");
+
+  var oddsUrl = "https://api.the-odds-api.com/v4/sports/baseball_mlb/odds/?regions=us&markets=pitcher_strikeouts&oddsFormat=american&bookmakers=draftkings,fanduel,betmgm";
+  var proxyUrl = MLB_ROUTES.WORKER_BASE + encodeURIComponent(oddsUrl);
+
+  var resp = await fetch(proxyUrl);
+  if (!resp.ok) throw new Error("Odds API K HTTP " + resp.status);
+  var data = await resp.json();
+  if (!Array.isArray(data)) throw new Error("Odds API K: respuesta inesperada");
+
+  log("Juegos recibidos de Odds API (ponches): " + data.length);
+
+  var pitchers = [];
+  var orden = ["draftkings", "fanduel", "betmgm"];
+
+  for (var i = 0; i < data.length; i++) {
+    var g = data[i];
+    var home = g.home_team || "";
+    var away = g.away_team || "";
+    var bookmakers = g.bookmakers || [];
+
+    for (var bo = 0; bo < orden.length; bo++) {
+      var bk = null;
+      for (var b = 0; b < bookmakers.length; b++) {
+        if (bookmakers[b].key === orden[bo]) { bk = bookmakers[b]; break; }
+      }
+      if (!bk) continue;
+
+      var mkts = bk.markets || [];
+      var encontrado = false;
+      for (var m = 0; m < mkts.length; m++) {
+        if (mkts[m].key !== "pitcher_strikeouts") continue;
+        var outs = mkts[m].outcomes || [];
+        var porNombre = {};
+        outs.forEach(function(o) {
+          var nom = o.description || "NO_CONFIRMADO";
+          if (!porNombre[nom]) porNombre[nom] = { pitcher: nom, total_k: o.point !== undefined ? o.point : null, over_price: null, under_price: null };
+          if (o.name === "Over") porNombre[nom].over_price = o.price;
+          if (o.name === "Under") porNombre[nom].under_price = o.price;
+        });
+        Object.keys(porNombre).forEach(function(nom) {
+          pitchers.push({
+            pitcher: nom,
+            away_team: away,
+            home_team: home,
+            total_k: porNombre[nom].total_k,
+            over_price: porNombre[nom].over_price,
+            under_price: porNombre[nom].under_price,
+            bookie: bk.title
+          });
+        });
+        encontrado = true;
+      }
+      if (encontrado) break;
+    }
+  }
+
+  var nuevo = { fecha: hoy, pitchers: pitchers };
+  lineasPonchesGuardarCache(nuevo);
+  log("Líneas de ponches guardadas en cache: " + pitchers.length + " registros.");
+  return nuevo;
 }
