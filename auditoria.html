@@ -18,7 +18,9 @@
   .matchup { font-size:15px; font-weight:700; }
   .venue { font-size:11px; color:#8b949e; margin-bottom:8px; }
 
-  .fila4 { display:flex; gap:6px; }
+  .fila5 { display:flex; gap:6px; flex-wrap:wrap; }
+  .fila5 .cbox { flex:1; min-width:60px; }
+  .cbox.serie .val { color:#ff9f0a; }
   .cbox { flex:1; background:#0d1117; border:1px solid #30363d; border-radius:8px; padding:8px; text-align:center; }
   .cbox .lbl { font-size:9px; color:#8b949e; letter-spacing:0.3px; }
   .cbox .val { font-size:15px; font-weight:800; margin-top:2px; color:#79c0ff; }
@@ -43,6 +45,7 @@
 <script src="score-match.js"></script>
 <script src="calcular-coincidencia.js"></script>
 <script src="resumen-juego.js"></script>
+<script src="bloques-serie.js"></script>
 
 <script>
   var consoleEl = document.getElementById("console");
@@ -65,11 +68,37 @@
     return null;
   }
 
+  function carrerasDeJuego(g){
+    var ar=g.away_runs, hr=g.home_runs;
+    if (ar!==null && ar!==undefined && hr!==null && hr!==undefined) return Number(ar)+Number(hr);
+    return null;
+  }
+
+  function serieDelParque(venue, bloques){
+    if(!venue || !bloques || !bloques.length) return null;
+    var candidatos = bloques.filter(function(b){ return b.venue === venue; });
+    if(!candidatos.length) return null;
+    candidatos.sort(function(a,b){ return a.fecha_inicio < b.fecha_inicio ? 1 : -1; });
+    return candidatos[0];
+  }
+
+  function carrerajeSerie(venue, bloques){
+    var b = serieDelParque(venue, bloques);
+    if(!b) return null;
+    var suma=0, n=0;
+    b.juegos.forEach(function(g){
+      var c = carrerasDeJuego(g);
+      if (c!==null){ suma+=c; n++; }
+    });
+    return n>0 ? (suma/n) : null;
+  }
+
   document.getElementById("go").addEventListener("click", function(){
     consoleEl.textContent=""; listaEl.innerHTML="";
     try {
       var cache = climaLeerCache();
       if(!cache.length){ log("CACHE VACIO."); return; }
+      var bloques = (typeof armarBloques === "function") ? armarBloques(cache) : [];
       var desde = ayerISO();
       var juegos = cache.filter(function(g){ return g && g.date && g.date >= desde; });
       juegos.sort(function(a,b){ return a.date < b.date ? -1 : (a.date > b.date ? 1 : 0); });
@@ -94,6 +123,7 @@
         var coincProm = resumen ? resumen.coinc_prom : null;
 
         var lineaMercado = buscarLineaMercado(g.venue);
+        var serieCarr = carrerajeSerie(g.venue, bloques);
 
         var realRuns = (g.away_runs!==undefined && g.away_runs!==null && g.home_runs!==undefined && g.home_runs!==null) ? (g.away_runs+g.home_runs) : null;
         var scoreFinalTxt = realRuns!==null ? (g.away_runs+"-"+g.home_runs) : "—";
@@ -101,9 +131,10 @@
         html += '<div class="juego">'+
           '<div class="matchup">'+(g.away_team||"?")+' @ '+(g.home_team||"?")+'</div>'+
           '<div class="venue">'+(g.venue||"SIN PARQUE")+' · '+(g.status||"")+'</div>'+
-          '<div class="fila4">'+
-            '<div class="cbox"><div class="lbl">DATAPRO (carr.)</div><div class="val'+(carrerasEstim===null?" nc":"")+'">'+(carrerasEstim!==null?carrerasEstim.toFixed(1):"NO_CONFIRMADO")+'</div></div>'+
+          '<div class="fila5">'+
+            '<div class="cbox"><div class="lbl">DATAPRO (clima)</div><div class="val'+(carrerasEstim===null?" nc":"")+'">'+(carrerasEstim!==null?carrerasEstim.toFixed(1):"NO_CONFIRMADO")+'</div></div>'+
             '<div class="cbox"><div class="lbl">COINC. %</div><div class="val'+(coincProm===null?" nc":"")+'">'+(coincProm!==null?coincProm+"%":"NO_CONFIRMADO")+'</div></div>'+
+            '<div class="cbox serie"><div class="lbl">CARRERAJE SERIE</div><div class="val'+(serieCarr===null?" nc":"")+'">'+(serieCarr!==null?serieCarr.toFixed(1):"NO_CONFIRMADO")+'</div></div>'+
             '<div class="cbox mercado"><div class="lbl">LÍNEA MERCADO</div><div class="val'+(lineaMercado===null?" nc":"")+'">'+(lineaMercado!==null?lineaMercado:"NO_CONFIRMADO")+'</div></div>'+
             '<div class="cbox real"><div class="lbl">SCORE FINAL</div><div class="val'+(realRuns===null?" nc":"")+'">'+scoreFinalTxt+'</div></div>'+
           '</div>'+
