@@ -18,15 +18,21 @@
   .matchup { font-size:15px; font-weight:700; }
   .venue { font-size:11px; color:#8b949e; margin-bottom:8px; }
 
-  .fila5 { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
-  .fila5 .cbox:nth-child(5) { grid-column:1 / span 2; }
-  .cbox.serie .val { color:#ff9f0a; }
+  .fila { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:6px; }
   .cbox { background:#0d1117; border:1px solid #30363d; border-radius:8px; padding:8px; text-align:center; }
   .cbox .lbl { font-size:9px; color:#8b949e; letter-spacing:0.3px; }
   .cbox .val { font-size:15px; font-weight:800; margin-top:2px; color:#79c0ff; }
+  .cbox.serie .val { color:#ff9f0a; }
+  .cbox.fh .val { color:#ff9f0a; }
   .cbox.real .val { color:#3fb950; }
   .cbox.mercado .val { color:#ffd60a; }
   .cbox .val.nc { font-size:11px; color:#6e7681; font-weight:700; }
+  .cbox .err { font-size:9px; color:#6e7681; margin-top:2px; }
+  .cbox .err.bueno { color:#3fb950; }
+  .cbox .err.malo { color:#ff7b72; }
+
+  .scorefinal { background:#0d1117; border:1px solid #30363d; border-radius:8px; padding:8px; text-align:center; margin-bottom:6px; }
+  .scorefinal .val { font-size:15px; font-weight:800; color:#3fb950; }
 
   #console { margin-top:16px; background:#010409; border:1px solid #30363d; border-radius:8px; padding:12px; min-height:50px; max-height:25vh; overflow:auto; font-family:ui-monospace,monospace; font-size:12px; white-space:pre-wrap; }
 </style>
@@ -47,6 +53,15 @@
 <script src="resumen-juego.js"></script>
 <script src="bloques-serie.js"></script>
 <script src="jalar-linea.js"></script>
+<script src="pitchers-master.js"></script>
+<script src="jalar-roster.js"></script>
+<script src="arsenal-master.js"></script>
+<script src="batters-vspitch.js"></script>
+<script src="park-factors.js"></script>
+<script src="jalar-lineup.js"></script>
+<script src="jalar-bullpen.js"></script>
+<script src="factor-arsenal-lineup.js"></script>
+<script src="factor-pitcheo-completo.js"></script>
 
 <script>
   var consoleEl = document.getElementById("console");
@@ -93,6 +108,18 @@
     return n>0 ? (suma/n) : null;
   }
 
+  // % de error de una linea contra el resultado real (menor = mejor)
+  function pctError(linea, real){
+    if (linea===null || linea===undefined || real===null || real===undefined || real===0) return null;
+    return Math.abs((linea - real) / real) * 100;
+  }
+
+  function errHtml(pct){
+    if (pct === null) return '';
+    var cls = pct <= 15 ? 'bueno' : 'malo';
+    return '<div class="err '+cls+'">error '+pct.toFixed(1)+'%</div>';
+  }
+
   document.getElementById("go").addEventListener("click", async function(){
     var btn = this; btn.disabled = true; btn.textContent = "TRABAJANDO…";
     consoleEl.textContent=""; listaEl.innerHTML="";
@@ -130,19 +157,50 @@
         var lineaMercado = buscarLineaMercado(g.venue);
         var serieCarr = carrerajeSerie(g.venue, bloques);
 
+        // ── LÍNEA F.H. (factor humano) — solo si hay game_id para sacar lineup/roster ──
+        var lineaFH = null;
+        if (g.game_id) {
+          try {
+            var rosterG = await jalarRoster(g.game_id);
+            var lineupG = await jalarLineup(g.game_id);
+            var pitcherAwayId = rosterG ? rosterG.pitcher_away_id : null;
+            var pitcherHomeId = rosterG ? rosterG.pitcher_home_id : null;
+            // team ids no estan en el cache de clima -> sin team_id no se puede sacar bullpen de ayer,
+            // se usa solo el factor del abridor en auditoria (mas simple, mismo principio)
+            if (pitcherAwayId && pitcherAwayId !== "NO_CONFIRMADO" && lineupG.lineup_home.length) {
+              var rA = calcularFactorArsenalLineup(pitcherAwayId, lineupG.lineup_home);
+              var rH = (pitcherHomeId && pitcherHomeId !== "NO_CONFIRMADO" && lineupG.lineup_away.length)
+                ? calcularFactorArsenalLineup(pitcherHomeId, lineupG.lineup_away) : null;
+              if (rA.confirmado && rH && rH.confirmado && carrerasEstim !== null) {
+                var factorProm = (rA.factor + rH.factor) / 2;
+                lineaFH = carrerasEstim * factorProm;
+              }
+            }
+          } catch (efh) { /* sin datos, queda null, no se inventa */ }
+        }
+
         var realRuns = (g.away_runs!==undefined && g.away_runs!==null && g.home_runs!==undefined && g.home_runs!==null) ? (g.away_runs+g.home_runs) : null;
         var scoreFinalTxt = realRuns!==null ? (g.away_runs+"-"+g.home_runs) : "—";
+
+        var errClima = pctError(carrerasEstim, realRuns);
+        var errFH = pctError(lineaFH, realRuns);
+        var errMercado = pctError(lineaMercado, realRuns);
 
         html += '<div class="juego">'+
           '<div class="matchup">'+(g.away_team||"?")+' @ '+(g.home_team||"?")+'</div>'+
           '<div class="venue">'+(g.venue||"SIN PARQUE")+' · '+(g.status||"")+'</div>'+
-          '<div class="fila5">'+
-            '<div class="cbox"><div class="lbl">DATAPRO (clima)</div><div class="val'+(carrerasEstim===null?" nc":"")+'">'+(carrerasEstim!==null?carrerasEstim.toFixed(1):"NO_CONFIRMADO")+'</div></div>'+
-            '<div class="cbox"><div class="lbl">COINC. %</div><div class="val'+(coincProm===null?" nc":"")+'">'+(coincProm!==null?coincProm+"%":"NO_CONFIRMADO")+'</div></div>'+
-            '<div class="cbox serie"><div class="lbl">CARRERAJE SERIE</div><div class="val'+(serieCarr===null?" nc":"")+'">'+(serieCarr!==null?serieCarr.toFixed(1):"NO_CONFIRMADO")+'</div></div>'+
-            '<div class="cbox mercado"><div class="lbl">LÍNEA MERCADO</div><div class="val'+(lineaMercado===null?" nc":"")+'">'+(lineaMercado!==null?lineaMercado:"NO_CONFIRMADO")+'</div></div>'+
-            '<div class="cbox real"><div class="lbl">SCORE FINAL</div><div class="val'+(realRuns===null?" nc":"")+'">'+scoreFinalTxt+'</div></div>'+
+
+          '<div class="scorefinal"><div class="lbl">SCORE FINAL</div><div class="val">'+scoreFinalTxt+(realRuns!==null?' ('+realRuns+')':'')+'</div></div>'+
+
+          '<div class="fila">'+
+            '<div class="cbox"><div class="lbl">DATAPRO (clima)</div><div class="val'+(carrerasEstim===null?" nc":"")+'">'+(carrerasEstim!==null?carrerasEstim.toFixed(1):"NO_CONFIRMADO")+'</div>'+errHtml(errClima)+'</div>'+
+            '<div class="cbox fh"><div class="lbl">LÍNEA F.H.</div><div class="val'+(lineaFH===null?" nc":"")+'">'+(lineaFH!==null?lineaFH.toFixed(3):"NO_CONFIRMADO")+'</div>'+errHtml(errFH)+'</div>'+
           '</div>'+
+          '<div class="fila">'+
+            '<div class="cbox serie"><div class="lbl">CARRERAJE SERIE</div><div class="val'+(serieCarr===null?" nc":"")+'">'+(serieCarr!==null?serieCarr.toFixed(1):"NO_CONFIRMADO")+'</div></div>'+
+            '<div class="cbox mercado"><div class="lbl">LÍNEA MERCADO</div><div class="val'+(lineaMercado===null?" nc":"")+'">'+(lineaMercado!==null?lineaMercado:"NO_CONFIRMADO")+'</div>'+errHtml(errMercado)+'</div>'+
+          '</div>'+
+          '<div class="cbox"><div class="lbl">COINC. %</div><div class="val'+(coincProm===null?" nc":"")+'">'+(coincProm!==null?coincProm+"%":"NO_CONFIRMADO")+'</div></div>'+
         '</div>';
       }
       listaEl.innerHTML = html;
