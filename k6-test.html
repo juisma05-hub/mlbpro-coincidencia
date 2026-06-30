@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>MLBPro · K6 Test</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; font-family:-apple-system,system-ui,sans-serif; background:#0a0e16; color:#dce6f0; }
+  header { padding:14px 16px; border-bottom:1px solid #1f2e44; }
+  h1 { font-size:17px; margin:0; }
+  main { padding:14px; max-width:900px; margin:0 auto; }
+  .go { width:100%; border:0; border-radius:10px; padding:16px; font-size:16px; font-weight:800; color:#fff; background:#5b3da8; cursor:pointer; }
+  .go:disabled { background:#1f2e44; color:#5a6478; }
+
+  .marco { background:#0d1420; border:1px solid #1f2e44; border-radius:16px; margin-top:14px; overflow:hidden; }
+  .cab { text-align:center; padding:14px 12px 8px; }
+  .cab .vs { font-size:15px; font-weight:700; color:#fff; }
+  .cab .parque { font-size:10px; color:#5b7fb5; margin-top:2px; }
+
+  .duo { display:flex; padding:0 8px 14px; gap:5px; flex-wrap:wrap; }
+  .col-arsenal { width:50px; text-align:center; }
+  .pitch-row { margin-bottom:7px; }
+  .pitch-lbl { font-size:8px; color:#7a8aa0; font-weight:700; }
+  .pitch-bar { height:2px; width:100%; margin:2px 0; border-radius:1px; }
+  .pitch-val { font-size:10px; color:#dce6f0; font-weight:700; }
+
+  .col-pitcher { flex:1; min-width:130px; text-align:center; padding-top:2px; }
+  .foto { width:56px; height:56px; border-radius:50%; background:#1f2e44; margin:0 auto 5px; border:2px solid #2d4a73; object-fit:cover; }
+  .pnombre { font-size:13px; font-weight:700; color:#fff; }
+  .pequipo { font-size:9px; color:#7a8aa0; margin-bottom:6px; }
+  .pmano { font-size:8px; color:#5b7fb5; }
+
+  .stat2 { display:flex; gap:4px; margin-top:5px; }
+  .stat2 .box { flex:1; background:#0a0e16; border:1px solid #1f2e44; border-radius:7px; padding:5px 2px; }
+  .stat2 .box .l { font-size:7px; color:#7a8aa0; text-transform:uppercase; }
+  .stat2 .box .v { font-size:14px; font-weight:800; color:#5b9fd8; margin-top:1px; }
+  .stat2 .box .v.proy { color:#d8b85b; }
+  .stat2 .box .v.confirmado { color:#5bd87a; }
+
+  .badge { display:inline-block; font-size:7px; padding:1px 5px; border-radius:8px; margin-top:3px; font-weight:700; }
+  .badge.proyectado { background:#3a2e0a; color:#d8b85b; }
+  .badge.confirmado { background:#0a3a14; color:#5bd87a; }
+
+  .col-parque { width:80px; text-align:center; padding-top:14px; }
+  .parque-nombre { font-size:8px; color:#7a8aa0; margin-bottom:6px; }
+  .brujula-mini { width:62px; height:62px; margin:0 auto; }
+  .viento-deg { font-size:11px; font-weight:700; color:#5b9fd8; margin-top:4px; }
+
+  .alin-titulo { text-align:center; font-size:10px; color:#7a8aa0; letter-spacing:1px; text-transform:uppercase; padding:12px 0 8px; border-top:1px solid #1f2e44; }
+  .alin-fila { display:flex; padding:0 12px 16px; gap:6px; flex-wrap:wrap; }
+  .alin-col { flex:1; min-width:160px; }
+  .alin-equipo { font-size:10px; font-weight:700; margin-bottom:6px; }
+  .alin-equipo.away { color:#5b9fd8; }
+  .alin-equipo.home { color:#d85b5b; }
+  .bat { display:flex; align-items:center; gap:5px; font-size:10px; padding:3px 0; }
+  .bat .num { color:#5a6478; width:12px; }
+  .bat .nom { color:#dce6f0; flex:1; }
+  .bat .kp { font-weight:700; font-size:10px; }
+  .kp.favorece-bateador { color:#3fb950; }
+  .kp.favorece-pitcher { color:#ff7b72; }
+  .kp.neutro { color:#7a8aa0; }
+  .kp.nc { color:#3a3a3a; font-size:8px; }
+
+  .no-lineup { text-align:center; font-size:10px; color:#5a6478; padding:10px; }
+
+  #console { margin-top:14px; background:#010409; border:1px solid #1f2e44; border-radius:8px; padding:10px; min-height:30px; max-height:20vh; overflow:auto; font-family:ui-monospace,monospace; font-size:11px; white-space:pre-wrap; }
+</style>
+</head>
+<body>
+<header><h1>MLBPro · K6 (proyección de ponches a 6 IP)</h1></header>
+<main>
+  <button id="go" class="go">VER K6 DE HOY</button>
+  <div id="lista"></div>
+  <div id="console">Pulsa el botón.</div>
+</main>
+
+<script src="mlb-routes.js"></script>
+<script src="estadios.js"></script>
+<script src="parques-orientacion.js"></script>
+<script src="pitchers-master.js"></script>
+<script src="arsenal-master.js"></script>
+<script src="batters-vspitch.js"></script>
+<script src="park-factors.js"></script>
+<script src="umpires-master.js"></script>
+<script src="catchers-master.js"></script>
+<script src="traducir-catcher.js"></script>
+<script src="traducir-umpire.js"></script>
+<script src="jalar-roster.js"></script>
+<script src="jalar-lineup.js"></script>
+<script src="jalar-bullpen.js"></script>
+<script src="jalar-pitch-hand.js"></script>
+<script src="jalar-ultimos5.js"></script>
+<script src="jalar-condition.js"></script>
+
+<script>
+  var consoleEl = document.getElementById("console");
+  var listaEl = document.getElementById("lista");
+  function log(t){ var d=document.createElement("div"); d.textContent=t; consoleEl.appendChild(d); consoleEl.scrollTop=consoleEl.scrollHeight; }
+
+  function hoyISO(){
+    var d=new Date(Date.now()-6*60*60*1000);
+    return d.getFullYear()+"-"+("0"+(d.getMonth()+1)).slice(-2)+"-"+("0"+d.getDate()).slice(-2);
+  }
+
+  function topArsenal(pitcherId){
+    var data = (typeof ARSENAL_MASTER_2026!=="undefined") ? ARSENAL_MASTER_2026[pitcherId] : null;
+    if(!data || !data.arsenal) return [];
+    return data.arsenal.slice().sort(function(a,b){ return b.usage - a.usage; }).slice(0,4);
+  }
+
+  var COLOR_PITCH = { FF:"#d85b5b", SI:"#5bd0d8", SL:"#d8b85b", CH:"#5bd87a", CU:"#9a5bd8", FC:"#d85bb8", ST:"#b8d85b", FS:"#5b7fd8" };
+
+  function arsenalHtml(pitcherId){
+    var top = topArsenal(pitcherId);
+    if(!top.length) return '<div class="col-arsenal"><div class="pitch-lbl" style="color:#3a3a3a;">N/C</div></div>';
+    var html = '<div class="col-arsenal">';
+    top.forEach(function(p){
+      var color = COLOR_PITCH[p.pt] || "#7a8aa0";
+      html += '<div class="pitch-row"><div class="pitch-lbl">'+p.pt+'</div>'+
+        '<div class="pitch-bar" style="background:'+color+';"></div>'+
+        '<div class="pitch-val">'+p.usage.toFixed(0)+'%</div></div>';
+    });
+    html += '</div>';
+    return html;
+  }
+
+  function calcularK6Base(ultimos5){
+    if(!ultimos5 || ultimos5.k_promedio===null || ultimos5.ip_promedio===null || ultimos5.ip_promedio===0) return null;
+    var kPorInning = ultimos5.k_promedio / ultimos5.ip_promedio;
+    return Math.round(kPorInning * 6.0 * 1000) / 1000;
+  }
+
+  function factorUmpireK(umpireNombre){
+    var u = (typeof traducirUmpire==="function") ? traducirUmpire(umpireNombre) : null;
+    if(!u || u.zone_type==="NO_CONFIRMADO" || u.k_factor===undefined) return 1.0;
+    return u.k_factor;
+  }
+
+  function factorCatcherK(catcherId){
+    var c = (typeof traducirCatcher==="function") ? traducirCatcher(catcherId) : null;
+    if(!c || c.rv_tot===undefined || c.rv_tot===null || c.rv_tot==="NO_CONFIRMADO") return 1.0;
+    return Math.round((1 + (Number(c.rv_tot)/5)*0.02) * 1000) / 1000;
+  }
+
+  function factorParqueK(venue){
+    var pf = (typeof PARK_FACTORS_2026!=="undefined") ? PARK_FACTORS_2026[venue] : null;
+    if(!pf || pf.so_factor===undefined) return 1.0;
+    return Math.round((pf.so_factor/100) * 1000) / 1000;
+  }
+
+  function kPromedioBateador(bateadorId, arsenal){
+    var bd = (typeof BATTERS_VSPITCH_2026!=="undefined") ? BATTERS_VSPITCH_2026[bateadorId] : null;
+    if(!bd || !bd.vs || !arsenal || !arsenal.length) return null;
+    var sumaUso=0, sumaKPond=0;
+    arsenal.forEach(function(p){
+      var st = bd.vs[p.pt];
+      if(!st || st.k===undefined || !st.pa || st.pa<5) return;
+      sumaKPond += (st.k/100) * p.usage;
+      sumaUso += p.usage;
+    });
+    if(sumaUso===0) return null;
+    return Math.round((sumaKPond/sumaUso) * 1000) / 1000;
+  }
+
+  function claseKp(kprom){
+    if(kprom===null) return "nc";
+    if(kprom >= 0.27) return "favorece-pitcher";
+    if(kprom <= 0.16) return "favorece-bateador";
+    return "neutro";
+  }
+
+  function lineupHtml(equipo, claseEquipo, lineup, arsenalRival){
+    if(!lineup || !lineup.length){
+      return '<div class="alin-col"><div class="alin-equipo '+claseEquipo+'">'+equipo+'</div><div class="no-lineup">Lineup NO_CONFIRMADO (MLB publica ~1-2h antes)</div></div>';
+    }
+    var html = '<div class="alin-col"><div class="alin-equipo '+claseEquipo+'">'+equipo+'</div>';
+    lineup.forEach(function(b, idx){
+      var kp = kPromedioBateador(b.player_id, arsenalRival);
+      var kpTxt = kp!==null ? kp.toFixed(3) : "N/C";
+      var cls = kp!==null ? claseKp(kp) : "nc";
+      html += '<div class="bat"><span class="num">'+(idx+1)+'</span><span class="nom">'+b.nombre+'</span><span class="kp '+cls+'">'+kpTxt+'</span></div>';
+    });
+    html += '</div>';
+    return html;
+  }
+
+  function fotoUrl(pitcherId){
+    return "https://img.mlbstatic.com/mlb-photos/image/upload/w_120,q_auto:best/v1/people/"+pitcherId+"/headshot/67/current";
+  }
+
+  function pcardHtml(pitcherId, nombre, equipo, ultimos5, manoData, k6base, factorRival, factorUmp, factorCat, factorParq, confirmado){
+    var k6proy = (k6base!==null) ? Math.round(k6base*factorRival*factorUmp*factorCat*factorParq*1000)/1000 : null;
+    var manoTxt = (manoData && manoData.mano!=="NO_CONFIRMADO") ? manoData.mano+"HP" : "N/C";
+    var badgeCls = confirmado ? "confirmado" : "proyectado";
+    var badgeTxt = confirmado ? "CONFIRMADO" : "PROYECTADO";
+    var k6Cls = confirmado ? "confirmado" : "proy";
+
+    return '<div class="col-pitcher">'+
+      '<img class="foto" src="'+fotoUrl(pitcherId)+'" onerror="this.style.display=\'none\'"/>'+
+      '<div class="pnombre">'+nombre+'</div>'+
+      '<div class="pequipo">'+equipo+' · <span class="pmano">'+manoTxt+'</span></div>'+
+      '<div class="stat2">'+
+        '<div class="box"><div class="l">K6 Proy</div><div class="v '+k6Cls+'">'+(k6proy!==null?k6proy.toFixed(3):"N/C")+'</div></div>'+
+        '<div class="box"><div class="l">K6 base</div><div class="v">'+(k6base!==null?k6base.toFixed(3):"N/C")+'</div></div>'+
+      '</div>'+
+      '<div class="badge '+badgeCls+'">'+badgeTxt+'</div>'+
+    '</div>';
+  }
+
+  function brujulaMini(hpACF, ventDir){
+    var rotParque = (hpACF!==null) ? hpACF - 180 : 0;
+    var rotFlecha = (ventDir!==null) ? ventDir : 0;
+    return '<svg class="brujula-mini" viewBox="0 0 80 80">'+
+      '<circle cx="40" cy="40" r="36" fill="#0a0e16" stroke="#1f2e44" stroke-width="1"/>'+
+      '<g transform="translate(40,40) rotate('+rotParque+')">'+
+        '<path d="M 0,14 L -12,-8 A 18,18 0 0,1 12,-8 Z" fill="#1a3a1a"/>'+
+        '<polygon points="0,12 -2,14 -2,17 2,17 2,14" fill="#dce6f0"/>'+
+      '</g>'+
+      (ventDir!==null ? '<g transform="translate(40,40) rotate('+rotFlecha+')">'+
+        '<line x1="0" y1="4" x2="0" y2="-24" stroke="#5b9fd8" stroke-width="2" stroke-linecap="round"/>'+
+        '<polygon points="0,-28 -3,-22 3,-22" fill="#5b9fd8"/>'+
+      '</g>' : '')+
+    '</svg>';
+  }
+
+  document.getElementById("go").addEventListener("click", async function(){
+    var btn=this; btn.disabled=true; btn.textContent="TRABAJANDO…";
+    consoleEl.textContent=""; listaEl.innerHTML="";
+    try {
+      var hoy = hoyISO();
+      var mlbUrl = "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date="+hoy+"&hydrate=probablePitcher";
+      var resp = await fetch(MLB_ROUTES.WORKER_BASE + encodeURIComponent(mlbUrl));
+      if(!resp.ok) throw new Error("Schedule HTTP "+resp.status);
+      var data = await resp.json();
+      var games = (data.dates && data.dates[0]) ? data.dates[0].games : [];
+      log("Juegos hoy: "+games.length);
+      if(!games.length){ log("No hay juegos hoy."); return; }
+
+      var html = "";
+      for(var i=0;i<games.length;i++){
+        var g = games[i];
+        var venue = g.venue ? g.venue.name : "";
+        var away = (g.teams&&g.teams.away&&g.teams.away.team)?g.teams.away.team.name:"?";
+        var home = (g.teams&&g.teams.home&&g.teams.home.team)?g.teams.home.team.name:"?";
+        var pitcherAwayId = (g.teams&&g.teams.away&&g.teams.away.probablePitcher)?g.teams.away.probablePitcher.id:null;
+        var pitcherHomeId = (g.teams&&g.teams.home&&g.teams.home.probablePitcher)?g.teams.home.probablePitcher.id:null;
+        var pitcherAwayNom = (g.teams&&g.teams.away&&g.teams.away.probablePitcher)?g.teams.away.probablePitcher.fullName:"TBD";
+        var pitcherHomeNom = (g.teams&&g.teams.home&&g.teams.home.probablePitcher)?g.teams.home.probablePitcher.fullName:"TBD";
+
+        log("Procesando "+away+" @ "+home+"...");
+
+        var lineupData = await jalarLineup(g.gamePk);
+        var rosterHoy = await jalarRoster(g.gamePk);
+        var condHoy = await jalarCondition(g.gamePk);
+
+        var manoAway = pitcherAwayId ? await jalarPitchHand(pitcherAwayId) : null;
+        var manoHome = pitcherHomeId ? await jalarPitchHand(pitcherHomeId) : null;
+        var ultimos5Away = pitcherAwayId ? await jalarUltimos5(pitcherAwayId, 2026) : null;
+        var ultimos5Home = pitcherHomeId ? await jalarUltimos5(pitcherHomeId, 2026) : null;
+
+        var k6BaseAway = calcularK6Base(ultimos5Away);
+        var k6BaseHome = calcularK6Base(ultimos5Home);
+
+        var arsenalAway = topArsenal(pitcherAwayId);
+        var arsenalHome = topArsenal(pitcherHomeId);
+
+        function factorRivalDe(arsenal, lineupRival){
+          if(!lineupRival || !lineupRival.length || !arsenal.length) return 1.0;
+          var suma=0, n=0;
+          lineupRival.forEach(function(b){
+            var kp = kPromedioBateador(b.player_id, arsenal);
+            if(kp!==null){ suma+=kp; n++; }
+          });
+          if(n===0) return 1.0;
+          var kpromLineup = suma/n;
+          return Math.round((kpromLineup/0.22)*1000)/1000;
+        }
+        var factorRivalAway = factorRivalDe(arsenalAway, lineupData.lineup_home);
+        var factorRivalHome = factorRivalDe(arsenalHome, lineupData.lineup_away);
+
+        var umpireNombre = rosterHoy ? rosterHoy.umpire_home : "NO_CONFIRMADO";
+        var factorUmp = factorUmpireK(umpireNombre);
+
+        var catcherAwayId = rosterHoy ? rosterHoy.catcher_away_id : "NO_CONFIRMADO";
+        var catcherHomeId = rosterHoy ? rosterHoy.catcher_home_id : "NO_CONFIRMADO";
+        var factorCatAway = factorCatcherK(catcherAwayId);
+        var factorCatHome = factorCatcherK(catcherHomeId);
+
+        var factorParq = factorParqueK(venue);
+
+        var confirmadoAway = lineupData.confirmado_home;
+        var confirmadoHome = lineupData.confirmado_away;
+
+        var hpACF = (typeof getOrientacionParque==="function") ? getOrientacionParque(venue) : null;
+        var ventDir = (condHoy && typeof condHoy==="object" && condHoy.wind_dir!==undefined) ? condHoy.wind_dir : null;
+
+        html += '<div class="marco">'+
+          '<div class="cab"><div class="vs">'+away+' @ '+home+'</div><div class="parque">'+venue+' · Hoy</div></div>'+
+          '<div class="duo">'+
+            arsenalHtml(pitcherAwayId)+
+            pcardHtml(pitcherAwayId, pitcherAwayNom, away, ultimos5Away, manoAway, k6BaseAway, factorRivalAway, factorUmp, factorCatAway, factorParq, confirmadoAway)+
+            '<div class="col-parque">'+
+              '<div class="parque-nombre">'+venue+'</div>'+
+              brujulaMini(hpACF, ventDir)+
+              '<div class="viento-deg">'+(ventDir!==null?ventDir+"°":"N/C")+'</div>'+
+            '</div>'+
+            pcardHtml(pitcherHomeId, pitcherHomeNom, home, ultimos5Home, manoHome, k6BaseHome, factorRivalHome, factorUmp, factorCatHome, factorParq, confirmadoHome)+
+            arsenalHtml(pitcherHomeId)+
+          '</div>'+
+          '<div class="alin-titulo">Alineación probable</div>'+
+          '<div class="alin-fila">'+
+            lineupHtml(away, "away", lineupData.lineup_away, arsenalHome)+
+            lineupHtml(home, "home", lineupData.lineup_home, arsenalAway)+
+          '</div>'+
+        '</div>';
+      }
+      listaEl.innerHTML = html;
+      log("LISTO.");
+    } catch(e) {
+      log("ERROR: "+(e&&e.message?e.message:e));
+    } finally {
+      btn.disabled=false; btn.textContent="VER K6 DE HOY";
+    }
+  });
+</script>
+</body>
+</html>
