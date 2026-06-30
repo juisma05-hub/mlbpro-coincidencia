@@ -38,6 +38,7 @@
   .stat2 .box .v { font-size:14px; font-weight:800; color:#5b9fd8; margin-top:1px; }
   .stat2 .box .v.proy { color:#d8b85b; }
   .stat2 .box .v.confirmado { color:#5bd87a; }
+  .stat2 .box .v.pendiente-k { font-size:11px; color:#5a6478; }
 
   .badge { display:inline-block; font-size:7px; padding:1px 5px; border-radius:8px; margin-top:3px; font-weight:700; }
   .badge.proyectado { background:#3a2e0a; color:#d8b85b; }
@@ -93,6 +94,7 @@
 <script src="jalar-pitch-hand.js"></script>
 <script src="jalar-ultimos5.js"></script>
 <script src="jalar-condition.js"></script>
+<script src="jalar-linea-ponches.js"></script>
 
 <script>
   var consoleEl = document.getElementById("console");
@@ -190,12 +192,15 @@
     return "https://img.mlbstatic.com/mlb-photos/image/upload/w_120,q_auto:best/v1/people/"+pitcherId+"/headshot/67/current";
   }
 
-  function pcardHtml(pitcherId, nombre, equipo, ultimos5, manoData, k6base, factorRival, factorUmp, factorCat, factorParq, confirmado){
+  function pcardHtml(pitcherId, nombre, equipo, ultimos5, manoData, k6base, factorRival, factorUmp, factorCat, factorParq, confirmado, lineaKMercado){
     var k6proy = (k6base!==null) ? Math.round(k6base*factorRival*factorUmp*factorCat*factorParq*1000)/1000 : null;
     var manoTxt = (manoData && manoData.mano!=="NO_CONFIRMADO") ? manoData.mano+"HP" : "N/C";
     var badgeCls = confirmado ? "confirmado" : "proyectado";
     var badgeTxt = confirmado ? "CONFIRMADO" : "PROYECTADO";
     var k6Cls = confirmado ? "confirmado" : "proy";
+
+    var mercadoVal = (lineaKMercado && lineaKMercado.total_k!==null && lineaKMercado.total_k!==undefined) ? lineaKMercado.total_k : "N/C";
+    var mercadoCls = (lineaKMercado && lineaKMercado.total_k!==null) ? "v" : "v pendiente-k";
 
     return '<div class="col-pitcher">'+
       '<img class="foto" src="'+fotoUrl(pitcherId)+'" onerror="this.style.display=\'none\'"/>'+
@@ -203,7 +208,7 @@
       '<div class="pequipo">'+equipo+' · <span class="pmano">'+manoTxt+'</span></div>'+
       '<div class="stat2">'+
         '<div class="box"><div class="l">K6 Proy</div><div class="v '+k6Cls+'">'+(k6proy!==null?k6proy.toFixed(3):"N/C")+'</div></div>'+
-        '<div class="box"><div class="l">K6 base</div><div class="v">'+(k6base!==null?k6base.toFixed(3):"N/C")+'</div></div>'+
+        '<div class="box"><div class="l">Línea Mercado</div><div class="'+mercadoCls+'">'+mercadoVal+'</div></div>'+
       '</div>'+
       '<div class="badge '+badgeCls+'">'+badgeTxt+'</div>'+
     '</div>';
@@ -229,6 +234,10 @@
     var btn=this; btn.disabled=true; btn.textContent="TRABAJANDO…";
     consoleEl.textContent=""; listaEl.innerHTML="";
     try {
+      var lineasKCache = null;
+      try { lineasKCache = await jalarLineasPonches(log); }
+      catch(elk){ log("AVISO líneas K: "+(elk&&elk.message?elk.message:elk)); }
+
       var hoy = hoyISO();
       var mlbUrl = "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date="+hoy+"&hydrate=probablePitcher";
       var resp = await fetch(MLB_ROUTES.WORKER_BASE + encodeURIComponent(mlbUrl));
@@ -293,6 +302,9 @@
         var confirmadoAway = lineupData.confirmado_home;
         var confirmadoHome = lineupData.confirmado_away;
 
+        var lineaKAway = lineaPonchesBuscarPitcher(pitcherAwayNom);
+        var lineaKHome = lineaPonchesBuscarPitcher(pitcherHomeNom);
+
         var hpACF = (typeof getOrientacionParque==="function") ? getOrientacionParque(venue) : null;
         var ventDir = (condHoy && typeof condHoy==="object" && condHoy.wind_dir!==undefined) ? condHoy.wind_dir : null;
 
@@ -300,13 +312,13 @@
           '<div class="cab"><div class="vs">'+away+' @ '+home+'</div><div class="parque">'+venue+' · Hoy</div></div>'+
           '<div class="duo">'+
             arsenalHtml(pitcherAwayId)+
-            pcardHtml(pitcherAwayId, pitcherAwayNom, away, ultimos5Away, manoAway, k6BaseAway, factorRivalAway, factorUmp, factorCatAway, factorParq, confirmadoAway)+
+            pcardHtml(pitcherAwayId, pitcherAwayNom, away, ultimos5Away, manoAway, k6BaseAway, factorRivalAway, factorUmp, factorCatAway, factorParq, confirmadoAway, lineaKAway)+
             '<div class="col-parque">'+
               '<div class="parque-nombre">'+venue+'</div>'+
               brujulaMini(hpACF, ventDir)+
               '<div class="viento-deg">'+(ventDir!==null?ventDir+"°":"N/C")+'</div>'+
             '</div>'+
-            pcardHtml(pitcherHomeId, pitcherHomeNom, home, ultimos5Home, manoHome, k6BaseHome, factorRivalHome, factorUmp, factorCatHome, factorParq, confirmadoHome)+
+            pcardHtml(pitcherHomeId, pitcherHomeNom, home, ultimos5Home, manoHome, k6BaseHome, factorRivalHome, factorUmp, factorCatHome, factorParq, confirmadoHome, lineaKHome)+
             arsenalHtml(pitcherHomeId)+
           '</div>'+
           '<div class="alin-titulo">Alineación probable</div>'+
