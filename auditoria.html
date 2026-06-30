@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>DataPro · Auditoría</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; font-family:-apple-system,system-ui,sans-serif; background:#0d1117; color:#e6edf3; }
+  header { padding:14px 16px; border-bottom:1px solid #30363d; }
+  h1 { font-size:17px; margin:0; }
+  main { padding:16px; max-width:900px; margin:0 auto; }
+  .go { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#fff; background:#238636; cursor:pointer; }
+
+  .dia-hdr { font-size:13px; color:#79c0ff; font-weight:800; margin:18px 0 6px; }
+  .juego { background:#161b22; border:1px solid #30363d; border-radius:12px; padding:14px; margin-bottom:8px; }
+  .matchup { font-size:15px; font-weight:700; }
+  .venue { font-size:11px; color:#8b949e; margin-bottom:8px; }
+
+  .fila4 { display:flex; gap:6px; }
+  .cbox { flex:1; background:#0d1117; border:1px solid #30363d; border-radius:8px; padding:8px; text-align:center; }
+  .cbox .lbl { font-size:9px; color:#8b949e; letter-spacing:0.3px; }
+  .cbox .val { font-size:15px; font-weight:800; margin-top:2px; color:#79c0ff; }
+  .cbox.real .val { color:#3fb950; }
+  .cbox.mercado .val { color:#ffd60a; }
+  .cbox .val.nc { font-size:11px; color:#6e7681; font-weight:700; }
+
+  #console { margin-top:16px; background:#010409; border:1px solid #30363d; border-radius:8px; padding:12px; min-height:50px; max-height:25vh; overflow:auto; font-family:ui-monospace,monospace; font-size:12px; white-space:pre-wrap; }
+</style>
+</head>
+<body>
+<header><h1>DataPro · Auditoría (desde ayer)</h1></header>
+<main>
+  <button id="go" class="go">VER AUDITORÍA</button>
+  <div id="lista"></div>
+  <div id="console">Pulsa el botón.</div>
+</main>
+
+<script src="mlb-routes.js"></script>
+<script src="estadios.js"></script>
+<script src="clima-cache.js"></script>
+<script src="score-match.js"></script>
+<script src="calcular-coincidencia.js"></script>
+<script src="resumen-juego.js"></script>
+
+<script>
+  var consoleEl = document.getElementById("console");
+  var listaEl = document.getElementById("lista");
+  function log(t){ var d=document.createElement("div"); d.textContent=t; consoleEl.appendChild(d); consoleEl.scrollTop=consoleEl.scrollHeight; }
+
+  function ayerISO(){
+    var d=new Date(); d.setDate(d.getDate()-1);
+    return d.getFullYear()+"-"+("0"+(d.getMonth()+1)).slice(-2)+"-"+("0"+d.getDate()).slice(-2);
+  }
+
+  // intenta leer la linea de mercado que el otro modulo ya guarda (si existe), sin inventar nada
+  function buscarLineaMercado(venue){
+    try{
+      if (typeof lineasBuscarVenue === "function") {
+        var l = lineasBuscarVenue(venue);
+        if (l && l.total !== null && l.total !== undefined) return l.total;
+      }
+    }catch(e){}
+    return null;
+  }
+
+  document.getElementById("go").addEventListener("click", function(){
+    consoleEl.textContent=""; listaEl.innerHTML="";
+    try {
+      var cache = climaLeerCache();
+      if(!cache.length){ log("CACHE VACIO."); return; }
+      var desde = ayerISO();
+      var juegos = cache.filter(function(g){ return g && g.date && g.date >= desde; });
+      juegos.sort(function(a,b){ return a.date < b.date ? -1 : (a.date > b.date ? 1 : 0); });
+      log("Juegos desde "+desde+": "+juegos.length);
+
+      var diaActual = null, html = "";
+      for (var i=0; i<juegos.length; i++){
+        var g = juegos[i];
+        if (g.date !== diaActual){ html += '<div class="dia-hdr">'+g.date+'</div>'; diaActual = g.date; }
+
+        var climaOk = (typeof g.temperature_f === "number");
+        var clima = { temperature_f:g.temperature_f, windspeed_mph:g.windspeed_mph, humidity_pct:g.humidity_pct, precipitation_mm:g.precipitation_mm, wind_dir:g.wind_dir, venueName:g.venue };
+        var r = climaOk ? calcularCoincidencia(clima) : null;
+        if (r && r.ranked && r.ranked.length) {
+          r.ranked = r.ranked.filter(function(h){
+            return !(h.date===g.date && h.venue===g.venue && h.home_team===g.home_team && h.away_team===g.away_team);
+          });
+          r.top = r.ranked.length ? r.ranked[0] : null;
+        }
+        var resumen = (typeof resumenJuego === "function" && r) ? resumenJuego(r) : null;
+        var carrerasEstim = resumen ? resumen.carreras_estim : null;
+        var coincProm = resumen ? resumen.coinc_prom : null;
+
+        var lineaMercado = buscarLineaMercado(g.venue);
+
+        var realRuns = (g.away_runs!==undefined && g.away_runs!==null && g.home_runs!==undefined && g.home_runs!==null) ? (g.away_runs+g.home_runs) : null;
+        var scoreFinalTxt = realRuns!==null ? (g.away_runs+"-"+g.home_runs) : "—";
+
+        html += '<div class="juego">'+
+          '<div class="matchup">'+(g.away_team||"?")+' @ '+(g.home_team||"?")+'</div>'+
+          '<div class="venue">'+(g.venue||"SIN PARQUE")+' · '+(g.status||"")+'</div>'+
+          '<div class="fila4">'+
+            '<div class="cbox"><div class="lbl">DATAPRO (carr.)</div><div class="val'+(carrerasEstim===null?" nc":"")+'">'+(carrerasEstim!==null?carrerasEstim.toFixed(1):"NO_CONFIRMADO")+'</div></div>'+
+            '<div class="cbox"><div class="lbl">COINC. %</div><div class="val'+(coincProm===null?" nc":"")+'">'+(coincProm!==null?coincProm+"%":"NO_CONFIRMADO")+'</div></div>'+
+            '<div class="cbox mercado"><div class="lbl">LÍNEA MERCADO</div><div class="val'+(lineaMercado===null?" nc":"")+'">'+(lineaMercado!==null?lineaMercado:"NO_CONFIRMADO")+'</div></div>'+
+            '<div class="cbox real"><div class="lbl">SCORE FINAL</div><div class="val'+(realRuns===null?" nc":"")+'">'+scoreFinalTxt+'</div></div>'+
+          '</div>'+
+        '</div>';
+      }
+      listaEl.innerHTML = html;
+      log("LISTO.");
+    } catch(e) { log("ERROR: "+(e&&e.message?e.message:e)); }
+  });
+</script>
+</body>
+</html>
