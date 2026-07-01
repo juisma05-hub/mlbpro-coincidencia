@@ -74,6 +74,7 @@
   <select id="parque"></select>
   <button id="go" class="go">CASAR SERIES DE ESTE PARQUE</button>
   <button id="goViento" class="go-viento">VER POR RANGO DE VIENTO</button>
+  <button id="goExportar" class="go-viento" style="background:#8957e5;">EXPORTAR CACHE (para revisar)</button>
   <div id="lista"></div>
   <div id="console">Elige un parque y pulsa el botón.</div>
 </main>
@@ -360,6 +361,15 @@
 
       listaEl.innerHTML=html||'<div style="color:#8b949e;margin-top:14px;">Sin datos suficientes.</div>';
       log("LISTO.");
+    } catch(e){ log("ERROR: "+e.message); }
+  });
+  document.getElementById("goExportar").addEventListener("click", function(){
+    consoleEl.textContent=""; listaEl.innerHTML="";
+    try {
+      var cache = climaLeerCache();
+      var texto = JSON.stringify(cache);
+      listaEl.innerHTML = '<textarea readonly style="width:100%;height:300px;background:#161b22;color:#e6edf3;border:1px solid #30363d;border-radius:8px;padding:10px;font-size:11px;box-sizing:border-box;" onclick="this.select()">'+texto+'</textarea>';
+      log("Cache exportado: "+cache.length+" filas. Toca el cuadro de texto, selecciona todo y copia.");
     } catch(e){ log("ERROR: "+e.message); }
   });
 </script>
