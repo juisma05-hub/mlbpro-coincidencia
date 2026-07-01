@@ -43,6 +43,9 @@
   .rv-parque { font-size:10px; color:#6e7681; }
   .rv-rango  { font-size:13px; font-weight:700; color:#58a6ff; margin-top:2px; }
   .rv-meta   { font-size:10px; color:#6e7681; }
+  .rv-favor  { font-size:11px; font-weight:800; padding:3px 10px; border-radius:6px; margin-top:4px; }
+  .rv-favor.si  { color:#3fb950; background:#1a2f1e; border:1px solid #3fb950; }
+  .rv-favor.no  { color:#f85149; background:#2f1a1a; border:1px solid #f85149; }
 
   .rv-fila {
     background:#161b22;
@@ -86,6 +89,16 @@
   var selParque = document.getElementById("parque");
 
   function log(t){ var d=document.createElement("div"); d.textContent=t; consoleEl.appendChild(d); consoleEl.scrollTop=consoleEl.scrollHeight; }
+
+  // ── NUEVO: determina si el viento es favorable (empuja la bola hacia el
+  // jardin) o desfavorable (entra desde el jardin hacia el plato), relativo
+  // a la orientacion real del parque (hpACF).
+  function vientoFavorable(windDir, hpACF) {
+    var opuesto = (hpACF + 180) % 360;
+    var diff = Math.abs(windDir - opuesto);
+    if (diff > 180) diff = 360 - diff;
+    return diff <= 90; // true = favorable (mas carreras esperadas)
+  }
 
   (function llenarParques(){
     try {
@@ -134,7 +147,6 @@
   }
 
   function fechaCorta(d){
-    // "2026-05-21" → "May 21, 26"
     if(!d) return "—";
     var meses=["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
     var p=d.split("-");
@@ -142,15 +154,11 @@
   }
 
   // ── SVG brújula con parque orientado ──
-  // FIX (confirmado): la rotación del parque debe ser hpACF directo, SIN restar 180.
-  // Restar 180 hacía que el jardín central terminara apuntando al lado opuesto
-  // del ángulo real. rotate(hpACF) es lo correcto matemáticamente.
   function svgBrujula(hpACF, promDir) {
     var rotParque = hpACF;
     var rotFlecha = promDir;
     return '<svg width="160" height="160" viewBox="0 0 160 160" style="display:block;margin:0 auto">'+
       '<circle cx="80" cy="80" r="76" fill="#0d1117" stroke="#30363d" stroke-width="1"/>'+
-      // marcas 30°
       '<g stroke="#30363d" stroke-width="1">'+
         '<line x1="80" y1="5" x2="80" y2="16"/>'+
         '<line x1="118" y1="13" x2="112" y2="23"/>'+
@@ -165,7 +173,6 @@
         '<line x1="13" y1="42" x2="23" y2="48"/>'+
         '<line x1="42" y1="13" x2="48" y2="23"/>'+
       '</g>'+
-      // grados
       '<g fill="#6e7681" font-size="8" font-family="monospace" text-anchor="middle">'+
         '<text x="80" y="4">0°</text>'+
         '<text x="121" y="11">30°</text>'+
@@ -180,22 +187,18 @@
         '<text x="9" y="40">300°</text>'+
         '<text x="39" y="11">330°</text>'+
       '</g>'+
-      // cardinales principales (anillo externo, ya existian)
       '<g fill="#8b949e" font-size="9" font-family="monospace" font-weight="700" text-anchor="middle">'+
         '<text x="80" y="22">N</text>'+
         '<text x="80" y="142">S</text>'+
         '<text x="142" y="83">E</text>'+
         '<text x="18" y="83">O</text>'+
       '</g>'+
-      // cardinales intermedios (anillo interno) — para que nunca haya duda
-      // de hacia donde apunta cada zona, sin tener que calcular mentalmente
       '<g fill="#58a6ff" font-size="8" font-family="monospace" font-weight="700" text-anchor="middle">'+
         '<text x="121" y="39">NE</text>'+
         '<text x="121" y="121">SE</text>'+
         '<text x="39" y="121">SO</text>'+
         '<text x="39" y="39">NO</text>'+
       '</g>'+
-      // parque rotado
       '<g transform="translate(80,80) rotate('+rotParque+')">'+
         '<path d="M 0,28 L -24,-16 A 36,36 0 0,1 24,-16 Z" fill="#1e5c1e"/>'+
         '<path d="M 0,28 L -16,-4 A 24,24 0 0,1 16,-4 Z" fill="#2a7a2a"/>'+
@@ -204,12 +207,10 @@
         '<line x1="0" y1="28" x2="24" y2="-16" stroke="#fff" stroke-width="0.5" opacity="0.3"/>'+
         '<polygon points="0,24 -3,27 -3,32 3,32 3,27" fill="#fff"/>'+
       '</g>'+
-      // flecha viento
       '<g transform="translate(80,80) rotate('+rotFlecha+')">'+
         '<line x1="0" y1="8" x2="0" y2="-48" stroke="#58a6ff" stroke-width="2.5" stroke-linecap="round"/>'+
         '<polygon points="0,-56 -4,-44 4,-44" fill="#58a6ff"/>'+
       '</g>'+
-      // etiqueta promedio
       '<rect x="58" y="62" width="44" height="16" rx="3" fill="#0d1117" opacity="0.85"/>'+
       '<text x="80" y="74" fill="#58a6ff" font-size="10" font-family="monospace" font-weight="700" text-anchor="middle">~'+Math.round(promDir)+'°</text>'+
     '</svg>';
@@ -271,7 +272,6 @@
       var cache=climaLeerCache();
       var hpACF=(typeof getOrientacionParque==="function")?getOrientacionParque(venue):45;
 
-      // equipo local
       var homeTeam="";
       for(var ii=0;ii<cache.length;ii++){
         if(cache[ii]&&cache[ii].venue===venue&&cache[ii].home_team){ homeTeam=cache[ii].home_team; break; }
@@ -303,7 +303,6 @@
         var lbl=etiquetas[r],gs=rangos[lbl];
         if(!gs.length) continue;
 
-        // ordenar ASCENDENTE por dir°
         gs.sort(function(a,b){ return Number(a.wind_dir)-Number(b.wind_dir); });
 
         var sumC=0,nC=0,sumT=0,nT=0,sumDir=0,nDir=0;
@@ -316,14 +315,18 @@
         var promC=nC>0?(sumC/nC).toFixed(1):"—";
         var promDir=nDir>0?sumDir/nDir:parseInt(lbl)+15;
 
-        // color borde según promedio de carreras
         var colorCls="amarillo";
         if(nC>0){
           if(sumC/nC>=11) colorCls="verde";
           else if(sumC/nC<8) colorCls="rojo";
         }
 
-        // filas
+        // ── NUEVO: etiqueta FAVORABLE / DESFAVORABLE segun hpACF ──
+        var esFavor = vientoFavorable(promDir, hpACF);
+        var favorHtml = '<div class="rv-favor '+(esFavor?"si":"no")+'">'+
+          (esFavor ? "FAVORABLE (empuja la bola)" : "DESFAVORABLE (frena la bola)")+
+          '</div>';
+
         var filas="";
         for(var k2=0;k2<gs.length;k2++){
           var gk2=gs[k2],c2=carrerasDe(gk2);
@@ -348,6 +351,7 @@
               '<div class="rv-parque">'+venue+'</div>'+
               svgBrujula(hpACF, promDir)+
               '<div class="rv-rango">Viento '+lbl+'</div>'+
+              favorHtml+
               '<div class="rv-meta">'+gs.length+' juego(s) · prom <b style="color:#e6edf3">'+promC+'</b> carreras</div>'+
             '</div>'+
             filas+
