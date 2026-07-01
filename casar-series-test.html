@@ -180,12 +180,20 @@
         '<text x="9" y="40">300°</text>'+
         '<text x="39" y="11">330°</text>'+
       '</g>'+
-      // cardinales
+      // cardinales principales (anillo externo, ya existian)
       '<g fill="#8b949e" font-size="9" font-family="monospace" font-weight="700" text-anchor="middle">'+
         '<text x="80" y="22">N</text>'+
         '<text x="80" y="142">S</text>'+
         '<text x="142" y="83">E</text>'+
         '<text x="18" y="83">O</text>'+
+      '</g>'+
+      // cardinales intermedios (anillo interno) — para que nunca haya duda
+      // de hacia donde apunta cada zona, sin tener que calcular mentalmente
+      '<g fill="#58a6ff" font-size="8" font-family="monospace" font-weight="700" text-anchor="middle">'+
+        '<text x="121" y="39">NE</text>'+
+        '<text x="121" y="121">SE</text>'+
+        '<text x="39" y="121">SO</text>'+
+        '<text x="39" y="39">NO</text>'+
       '</g>'+
       // parque rotado
       '<g transform="translate(80,80) rotate('+rotParque+')">'+
