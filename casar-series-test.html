@@ -75,6 +75,7 @@
   <button id="go" class="go">CASAR SERIES DE ESTE PARQUE</button>
   <button id="goViento" class="go-viento">VER POR RANGO DE VIENTO</button>
   <button id="goExportar" class="go-viento" style="background:#8957e5;">EXPORTAR CACHE (para revisar)</button>
+  <button id="goConclusion" class="go-viento" style="background:#238636;">CONCLUSIÓN GENERAL FAVORABLE/DESFAVORABLE</button>
   <div id="lista"></div>
   <div id="console">Elige un parque y pulsa el botón.</div>
 </main>
@@ -370,6 +371,45 @@
       var texto = JSON.stringify(cache);
       listaEl.innerHTML = '<textarea readonly style="width:100%;height:300px;background:#161b22;color:#e6edf3;border:1px solid #30363d;border-radius:8px;padding:10px;font-size:11px;box-sizing:border-box;" onclick="this.select()">'+texto+'</textarea>';
       log("Cache exportado: "+cache.length+" filas. Toca el cuadro de texto, selecciona todo y copia.");
+    } catch(e){ log("ERROR: "+e.message); }
+  document.getElementById("goConclusion").addEventListener("click", function(){
+    consoleEl.textContent=""; listaEl.innerHTML="";
+    try {
+      var cache = climaLeerCache();
+      if (typeof PARQUES_ORIENTACION === "undefined" || typeof getOrientacionParque !== "function") {
+        log("ERROR: parques-orientacion.js no está cargado en esta página.");
+        return;
+      }
+      var favJuegos = [], desfJuegos = [], excluidos = [];
+      for (var i=0; i<cache.length; i++) {
+        var g = cache[i];
+        if (g.status !== "Final") continue;
+        if (typeof g.total_runs !== "number") continue;
+        if (g.roof === "fixed_dome") { excluidos.push(g); continue; }
+        if (typeof g.wind_dir !== "number") { excluidos.push(g); continue; }
+        var hpACF = null;
+        for (var key in PARQUES_ORIENTACION) {
+          if (g.venue && (g.venue.toLowerCase().indexOf(key.toLowerCase())>=0 || key.toLowerCase().indexOf(g.venue.toLowerCase())>=0)) {
+            hpACF = PARQUES_ORIENTACION[key].hpACF; break;
+          }
+        }
+        if (hpACF === null) { excluidos.push(g); continue; }
+        if (vientoFavorable(g.wind_dir, hpACF)) favJuegos.push(g);
+        else desfJuegos.push(g);
+      }
+      function prom(arr){ if(!arr.length) return 0; var s=0; for(var i=0;i<arr.length;i++) s+=arr[i].total_runs; return (s/arr.length); }
+      var promFav = prom(favJuegos), promDesf = prom(desfJuegos);
+      var totalUsados = favJuegos.length + desfJuegos.length;
+      var pctFav = totalUsados ? (favJuegos.length/totalUsados*100).toFixed(1) : "0.0";
+      var pctDesf = totalUsados ? (desfJuegos.length/totalUsados*100).toFixed(1) : "0.0";
+      var html = '<div style="margin-top:16px;padding:14px;background:#161b22;border:1px solid #30363d;border-radius:8px;">';
+      html += '<div style="font-size:15px;font-weight:700;color:#e6edf3;margin-bottom:10px;">Conclusión general del cache</div>';
+      html += '<div style="color:#3fb950;font-weight:600;">FAVORABLE: '+favJuegos.length+' juegos ('+pctFav+'%) · prom '+promFav.toFixed(2)+' carreras</div>';
+      html += '<div style="color:#f85149;font-weight:600;margin-top:6px;">DESFAVORABLE: '+desfJuegos.length+' juegos ('+pctDesf+'%) · prom '+promDesf.toFixed(2)+' carreras</div>';
+      html += '<div style="color:#8b949e;margin-top:10px;font-size:12px;">Excluidos (domo fijo, sin dato de viento, o parque sin orientación confirmada): '+excluidos.length+' juegos</div>';
+      html += '</div>';
+      listaEl.innerHTML = html;
+      log("Cálculo completo. Total usado: "+totalUsados+" de "+cache.length+" filas en cache.");
     } catch(e){ log("ERROR: "+e.message); }
   });
 </script>
