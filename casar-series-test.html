@@ -142,8 +142,11 @@
   }
 
   // ── SVG brújula con parque orientado ──
+  // FIX (confirmado): la rotación del parque debe ser hpACF directo, SIN restar 180.
+  // Restar 180 hacía que el jardín central terminara apuntando al lado opuesto
+  // del ángulo real. rotate(hpACF) es lo correcto matemáticamente.
   function svgBrujula(hpACF, promDir) {
-    var rotParque = hpACF - 180;
+    var rotParque = hpACF;
     var rotFlecha = promDir;
     return '<svg width="160" height="160" viewBox="0 0 160 160" style="display:block;margin:0 auto">'+
       '<circle cx="80" cy="80" r="76" fill="#0d1117" stroke="#30363d" stroke-width="1"/>'+
