@@ -15,10 +15,18 @@ const PARQUES_ORIENTACION = {
   // MLB cae entre 150-315 grados). Camden Yards esta confirmado NE. Valor
   // aproximado (no hay grado exacto al decimal en fuente publica accesible).
   "Oriole Park at Camden Yards":      { hpACF: 55,  nota: "HP hacia NE (aprox, corregido — antes 157 SSE era incorrecto)" },
-  "Fenway Park":                       { hpACF: 90,  nota: "HP hacia E — confirmado" },
-  "Yankee Stadium":                    { hpACF: 65,  nota: "HP hacia ENE — confirmado" },
+  // CORREGIDO: era 90 (E), verificado contra shadedseats.com (texto: "oriented
+  // to the northeast") + fuente citando 4 sitios incl. Reddit r/baseball: 45°.
+  "Fenway Park":                       { hpACF: 45,  nota: "HP hacia NE — corregido (antes 90 E era incorrecto, 45 confirmado por 4 fuentes)" },
+  // CORREGIDO: era 65, verificado contra fuente citando 4 sitios incl. Reddit
+  // r/baseball: 75°. Coincide con shadedseats.com ("facing east") y grafica
+  // Craig Robinson (~80-85, mismo cuadrante ENE/E).
+  "Yankee Stadium":                    { hpACF: 75,  nota: "HP hacia E — corregido (antes 65, ahora 75 confirmado por 4 fuentes)" },
   "Citi Field":                        { hpACF: 45,  nota: "HP hacia NE" },
-  "Rogers Centre":                     { hpACF: 65,  nota: "HP hacia ENE (techo retractil)" },
+  // CORREGIDO: era 65 (ENE), verificado incorrecto contra shadedseats.com
+  // (texto explicito: "Rogers Centre is one of the few major league parks
+  // where the batter faces north when hitting").
+  "Rogers Centre":                     { hpACF: 0,   nota: "HP hacia N — corregido (antes 65 ENE era incorrecto, shadedseats.com confirma bateador mira al norte) (techo retractil)" },
 
   // ── AL CENTRAL ──
   "Guaranteed Rate Field":             { hpACF: 135, nota: "HP hacia SE — confirmado con 3 fuentes (120-135 SE)" },
@@ -62,7 +70,9 @@ const PARQUES_ORIENTACION = {
   "Coors Field":                       { hpACF: 40,  nota: "HP hacia NE" },
 
   // ── Tropicana (domo fijo) ──
-  "Tropicana Field":                   { hpACF: 60,  nota: "Domo fijo — brisa exterior no aplica" },
+  // SIN CAMBIO: domo fijo cerrado, no hay fuente confiable con grado especifico
+  // (el sol/viento exterior no aplica adentro del domo).
+  "Tropicana Field":                   { hpACF: 60,  nota: "Domo fijo — brisa exterior no aplica — NO_CONFIRMADO grado especifico" },
 };
 
 // Helper: dado el nombre del parque, devuelve el ángulo HP→CF
