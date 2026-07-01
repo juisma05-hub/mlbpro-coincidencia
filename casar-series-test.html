@@ -372,6 +372,7 @@
       listaEl.innerHTML = '<textarea readonly style="width:100%;height:300px;background:#161b22;color:#e6edf3;border:1px solid #30363d;border-radius:8px;padding:10px;font-size:11px;box-sizing:border-box;" onclick="this.select()">'+texto+'</textarea>';
       log("Cache exportado: "+cache.length+" filas. Toca el cuadro de texto, selecciona todo y copia.");
     } catch(e){ log("ERROR: "+e.message); }
+  });
   document.getElementById("goConclusion").addEventListener("click", function(){
     consoleEl.textContent=""; listaEl.innerHTML="";
     try {
