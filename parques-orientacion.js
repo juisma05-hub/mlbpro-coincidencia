@@ -8,7 +8,11 @@
 
 const PARQUES_ORIENTACION = {
   // ── AL ESTE ──
-  "Oriole Park at Camden Yards":      { hpACF: 157, nota: "HP hacia SSE" },
+  // CORREGIDO: era 157 (SSE), verificado incorrecto contra 3 fuentes (TickPick,
+  // Orioles Tickets/Shaded Seats, regla general Clem's Baseball: ningun parque
+  // MLB cae entre 150-315 grados). Camden Yards esta confirmado NE. Valor
+  // aproximado (no hay grado exacto al decimal en fuente publica accesible).
+  "Oriole Park at Camden Yards":      { hpACF: 55,  nota: "HP hacia NE (aprox, corregido — antes 157 SSE era incorrecto)" },
   "Fenway Park":                       { hpACF: 90,  nota: "HP hacia E" },
   "Yankee Stadium":                    { hpACF: 65,  nota: "HP hacia ENE" },
   "Citi Field":                        { hpACF: 45,  nota: "HP hacia NE" },
