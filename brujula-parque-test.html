@@ -22,7 +22,7 @@
   .wrap { position:relative; width:100px; height:420px; flex-shrink:0; }
   svg { width:100%; height:100%; display:block; }
   .hit { position:absolute; top:50%; left:50%; width:420px; height:70px;
-    transform: translate(-50%,-50%) rotate(-90deg); -webkit-appearance:none; background:transparent; opacity:0; margin:0; padding:0; }
+    transform: translate(-50%,-50%) rotate(-90deg); -webkit-appearance:none; background:transparent; opacity:0; margin:0; padding:0; touch-action:none; }
   .hit::-webkit-slider-thumb { -webkit-appearance:none; width:1px; height:1px; }
   .panel { width:200px; display:flex; flex-direction:column; justify-content:center; gap:8px; }
   .lbox { background:#0d1117; border:1px solid #30363d; border-radius:10px; padding:8px; text-align:center; }
@@ -80,6 +80,7 @@
 <script src="mlb-routes.js"></script>
 <script src="estadios.js"></script>
 <script src="clima-cache.js"></script>
+<script src="orientacion-parques.js"></script>
 
 <script>
   var consoleEl = document.getElementById("console");
@@ -154,7 +155,6 @@
       var x2 = x1 + largo;
       partes.push('<line x1="'+x1+'" y1="'+y+'" x2="'+x2+'" y2="'+y+'" stroke="'+(esMayor?"#e6edf3":"#6e7681")+'" stroke-width="'+(esMayor?2:1)+'"/>');
     }
-    // etiquetas: los 16 puntos cardinales completos
     var puntos16 = [
       {g:0,t:"N"},{g:22.5,t:"NNE"},{g:45,t:"NE"},{g:67.5,t:"ENE"},
       {g:90,t:"E"},{g:112.5,t:"ESE"},{g:135,t:"SE"},{g:157.5,t:"SSE"},
@@ -176,7 +176,6 @@
     return nombres[idx];
   }
 
-  // ---- carreraje real por rango de 30°, leido del cache de ESE parque ----
   function carrerasDeJuego(g){
     var ar=g.away_runs, hr=g.home_runs;
     if (ar!==null && ar!==undefined && hr!==null && hr!==undefined) return Number(ar)+Number(hr);
@@ -196,6 +195,26 @@
     return { lo:lo, hi:hi, n:juegos.length, prom:prom };
   }
 
+  // ---- NUEVO: cuando cambia el parque, si hay orientacion confirmada, se pone SOLA (automatico) ----
+  function aplicarOrientacionAutomatica(venue){
+    var input = document.getElementById("orientInput");
+    if (typeof orientacionDelParque !== "function") return;
+    var info = orientacionDelParque(venue);
+    if (info && info.grado_aproximado !== null && info.grado_aproximado !== undefined) {
+      input.value = info.grado_aproximado;
+      input.dispatchEvent(new Event("input"));
+      log("Orientación automática: " + venue + " = " + info.grado_aproximado + "° (" + info.fuente + ")");
+    } else if (info && info.direccion_texto) {
+      log("Orientación confirmada en texto (" + info.direccion_texto + ") pero SIN grado exacto todavía — fuente: " + info.fuente);
+      input.value = "";
+      input.dispatchEvent(new Event("input"));
+    } else {
+      log("Orientación de " + venue + ": NO_CONFIRMADO todavía.");
+      input.value = "";
+      input.dispatchEvent(new Event("input"));
+    }
+  }
+
   function actualizar(){
     var venue = document.getElementById("parqueSel").value;
     var deg = Number(document.getElementById("barra").value);
@@ -203,6 +222,8 @@
 
     var flecha = document.getElementById("compassFlecha");
     if (flecha) flecha.setAttribute("transform", "rotate("+deg+" 110 110)");
+
+    if (venue) aplicarOrientacionAutomatica(venue);
 
     if (!venue) {
       document.getElementById("lecCarr").textContent = "—";
