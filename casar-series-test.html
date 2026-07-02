@@ -75,7 +75,11 @@
   <button id="go" class="go">CASAR SERIES DE ESTE PARQUE</button>
   <button id="goViento" class="go-viento">VER POR RANGO DE VIENTO</button>
   <button id="goExportar" class="go-viento" style="background:#8957e5;">EXPORTAR CACHE (para revisar)</button>
+
+  <label style="margin-top:14px;">Viento mínimo para la conclusión (mph, 0 = todos):</label>
+  <input type="number" id="vientoMin" min="0" step="1" value="0" style="width:100%; padding:12px; font-size:15px; background:#161b22; color:#e6edf3; border:1px solid #30363d; border-radius:8px; margin-bottom:8px;" />
   <button id="goConclusion" class="go-viento" style="background:#238636;">CONCLUSIÓN GENERAL FAVORABLE/DESFAVORABLE</button>
+
   <div id="lista"></div>
   <div id="console">Elige un parque y pulsa el botón.</div>
 </main>
@@ -92,7 +96,7 @@
 
   function log(t){ var d=document.createElement("div"); d.textContent=t; consoleEl.appendChild(d); consoleEl.scrollTop=consoleEl.scrollHeight; }
 
-  // ── NUEVO: determina si el viento es favorable (empuja la bola hacia el
+  // ── determina si el viento es favorable (empuja la bola hacia el
   // jardin) o desfavorable (entra desde el jardin hacia el plato), relativo
   // a la orientacion real del parque (hpACF).
   function vientoFavorable(windDir, hpACF) {
@@ -323,7 +327,6 @@
           else if(sumC/nC<8) colorCls="rojo";
         }
 
-        // ── NUEVO: etiqueta FAVORABLE / DESFAVORABLE segun hpACF ──
         var esFavor = vientoFavorable(promDir, hpACF);
         var favorHtml = '<div class="rv-favor '+(esFavor?"si":"no")+'">'+
           (esFavor ? "FAVORABLE (empuja la bola)" : "DESFAVORABLE (frena la bola)")+
@@ -377,6 +380,7 @@
     consoleEl.textContent=""; listaEl.innerHTML="";
     try {
       var cache = climaLeerCache();
+      var vientoMin = Number(document.getElementById("vientoMin").value) || 0;
       if (typeof PARQUES_ORIENTACION === "undefined" || typeof getOrientacionParque !== "function") {
         log("ERROR: parques-orientacion.js no está cargado en esta página.");
         return;
@@ -388,6 +392,7 @@
         if (typeof g.total_runs !== "number") continue;
         if (g.roof === "fixed_dome") { excluidos.push(g); continue; }
         if (typeof g.wind_dir !== "number") { excluidos.push(g); continue; }
+        if (typeof g.windspeed_mph === "number" && g.windspeed_mph < vientoMin) { excluidos.push(g); continue; }
         var hpACF = null;
         for (var key in PARQUES_ORIENTACION) {
           if (g.venue && (g.venue.toLowerCase().indexOf(key.toLowerCase())>=0 || key.toLowerCase().indexOf(g.venue.toLowerCase())>=0)) {
@@ -404,10 +409,10 @@
       var pctFav = totalUsados ? (favJuegos.length/totalUsados*100).toFixed(1) : "0.0";
       var pctDesf = totalUsados ? (desfJuegos.length/totalUsados*100).toFixed(1) : "0.0";
       var html = '<div style="margin-top:16px;padding:14px;background:#161b22;border:1px solid #30363d;border-radius:8px;">';
-      html += '<div style="font-size:15px;font-weight:700;color:#e6edf3;margin-bottom:10px;">Conclusión general del cache</div>';
+      html += '<div style="font-size:15px;font-weight:700;color:#e6edf3;margin-bottom:10px;">Conclusión general del cache'+(vientoMin>0?' (viento ≥ '+vientoMin+' mph)':'')+'</div>';
       html += '<div style="color:#3fb950;font-weight:600;">FAVORABLE: '+favJuegos.length+' juegos ('+pctFav+'%) · prom '+promFav.toFixed(2)+' carreras</div>';
       html += '<div style="color:#f85149;font-weight:600;margin-top:6px;">DESFAVORABLE: '+desfJuegos.length+' juegos ('+pctDesf+'%) · prom '+promDesf.toFixed(2)+' carreras</div>';
-      html += '<div style="color:#8b949e;margin-top:10px;font-size:12px;">Excluidos (domo fijo, sin dato de viento, o parque sin orientación confirmada): '+excluidos.length+' juegos</div>';
+      html += '<div style="color:#8b949e;margin-top:10px;font-size:12px;">Excluidos (domo fijo, sin dato de viento, viento debajo del mínimo, o parque sin orientación confirmada): '+excluidos.length+' juegos</div>';
       html += '</div>';
       listaEl.innerHTML = html;
       log("Cálculo completo. Total usado: "+totalUsados+" de "+cache.length+" filas en cache.");
