@@ -13,12 +13,28 @@
   main { padding:16px; max-width:900px; margin:0 auto; }
   .go { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#fff; background:#238636; cursor:pointer; }
   .go:disabled { background:#30363d; color:#8b949e; }
+  .go .sub2 { display:block; font-size:11px; font-weight:600; opacity:0.85; margin-top:3px; }
   .go-venideros { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#fff; background:#1f6feb; cursor:pointer; margin-top:12px; pointer-events:auto !important; opacity:1 !important; }
   .go-pasados { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#fff; background:#d2691e; cursor:pointer; margin-top:12px; pointer-events:auto !important; opacity:1 !important; }
   .go-hunter { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#fff; background:#8957e5; cursor:pointer; margin-top:12px; }
   .go-auditoria { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#fff; background:#da3633; cursor:pointer; margin-top:12px; }
   .go-k6 { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#fff; background:#5b3da8; cursor:pointer; margin-top:12px; }
+  .go-brujula { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#0d1117; background:linear-gradient(180deg,#7ee8e0,#1f9e93); cursor:pointer; margin-bottom:12px; }
+  .go-brujula .sub2 { display:block; font-size:11px; font-weight:600; opacity:0.8; margin-top:3px; }
+
   .juego { background:#161b22; border:1px solid #30363d; border-radius:14px; padding:16px; margin-top:14px; }
+
+  /* colapsable de cada juego (punto 1) */
+  .juego-cab { cursor:pointer; display:flex; justify-content:space-between; align-items:center; gap:10px; }
+  .juego-cab .chev { color:#8b949e; font-size:14px; transition:transform 0.2s; flex-shrink:0; }
+  .juego-cab.abierto .chev { transform:rotate(90deg); }
+  .juego-cab .coin-mini { font-size:16px; font-weight:800; padding:5px 12px; border-radius:8px; flex-shrink:0; }
+  .juego-cab .coin-mini.ok  { color:#3fb950; background:#0d2818; }
+  .juego-cab .coin-mini.mid { color:#ffd60a; background:#2d2408; }
+  .juego-cab .coin-mini.bad { color:#ff453a; background:#2d0d0d; }
+  .juego-cuerpo { display:none; margin-top:14px; }
+  .juego-cuerpo.abierto { display:block; }
+
   .matchup { font-size:18px; font-weight:800; }
   .estadio { font-size:13px; color:#8b949e; margin:3px 0; }
   .hoychips { display:flex; flex-wrap:wrap; gap:6px; margin:10px 0; }
@@ -62,7 +78,14 @@
   .serieparque .spprom .val { font-size:20px; font-weight:800; color:#79c0ff; }
   #console { margin-top:16px; background:#010409; border:1px solid #30363d; border-radius:8px; padding:12px; min-height:60px; max-height:30vh; overflow:auto; font-family:ui-monospace,monospace; font-size:12px; white-space:pre-wrap; }
 
-  /* ── PORTADA ── */
+  /* brujula del juego + explorador de rango (puntos 6 y 7) */
+  .brujula-explorer-wrap { text-align:center; padding:10px 0 6px; margin:6px 0; border-bottom:1px solid #21262d; touch-action:none; cursor:grab; }
+  .brujula-explorer-wrap:active { cursor:grabbing; }
+  .brujula-explorer-wrap svg { width:190px; height:194px; display:block; margin:0 auto; }
+  .explorer-txt { font-size:12px; color:#8b949e; margin-top:3px; }
+  .explorer-txt b { color:#58a6ff; }
+  .explorer-hint { font-size:10px; color:#6e7681; margin-top:6px; font-style:italic; }
+
   #portada {
     position:fixed; inset:0; z-index:9999;
     background: linear-gradient(180deg, #030303 0%, #0A0908 45%, #11100E 100%);
@@ -145,18 +168,21 @@
 <div id="appContenido">
 <header><h1>DataPro · Coincidencia</h1></header>
 <main>
-  <button id="go" class="go">COINCIDENCIA DATAPRO</button>
+  <button id="goBrujula" class="go-brujula">🧭 BRÚJULA DEL VIENTO POR PARQUE<span class="sub2">Ver rango de viento favorable/desfavorable de cualquier parque</span></button>
+
+  <button id="go" class="go">COINCIDENCIA DATAPRO<span class="sub2">Money Line · clima de hoy vs histórico</span></button>
   <button id="goVenideros" class="go-venideros">SERIES VENIDERAS (7 días)</button>
   <button id="goPasados" class="go-pasados">DÍAS PASADOS</button>
   <button id="goHunter" class="go-hunter">DATAPRO HUNTER</button>
   <button id="goAuditoria" class="go-auditoria">AUDITORÍA</button>
-  <button id="goK6" class="go-k6">K6 · PONCHES</button>
+  <button id="goK6" class="go-k6">K6 · PONCHES<span class="sub2">Proyección de ponches del pitcher a 6 IP</span></button>
   <div id="lista"></div>
   <div id="console">Pulsa el botón.</div>
 </main>
 <script src="mlb-routes.js"></script>
 <script src="estadios.js"></script>
 <script src="clima-cache.js"></script>
+<script src="parques-orientacion.js"></script>
 <script src="rellenar-carreras.js"></script>
 <script src="jalar-clima.js"></script>
 <script src="score-match.js"></script>
@@ -197,11 +223,157 @@
     return dd+" "+(MESES_CORTOS[mm]||mm)+" "+yy.slice(2);
   }
 
+  document.getElementById("goBrujula").addEventListener("click",function(){ location.href="casar-series.html"; });
   document.getElementById("goVenideros").addEventListener("click",function(){ location.href="venideros-test.html"; });
   document.getElementById("goPasados").addEventListener("click",function(){ location.href="dia-pasado-test.html"; });
   document.getElementById("goHunter").addEventListener("click",function(){ location.href="dataprohunter.html"; });
   document.getElementById("goAuditoria").addEventListener("click",function(){ location.href="auditoria.html"; });
   document.getElementById("goK6").addEventListener("click",function(){ location.href="k6-test.html"; });
+
+  function toggleJuego(idx){
+    var cab = document.getElementById('cab_'+idx);
+    var cuerpo = document.getElementById('cuerpo_'+idx);
+    if(!cab || !cuerpo) return;
+    var abierto = cuerpo.classList.toggle('abierto');
+    cab.classList.toggle('abierto', abierto);
+  }
+
+  function svgBrujulaJuego(idx, venue, hpACF, hoyDir, hoyVel){
+    var cx=100, cy=100;
+    var hp = (hpACF!==null && hpACF!==undefined) ? hpACF : 45;
+    var puntos16=[
+      {g:0,t:"N"},{g:22.5,t:"NNE"},{g:45,t:"NE"},{g:67.5,t:"ENE"},
+      {g:90,t:"E"},{g:112.5,t:"ESE"},{g:135,t:"SE"},{g:157.5,t:"SSE"},
+      {g:180,t:"S"},{g:202.5,t:"SSO"},{g:225,t:"SO"},{g:247.5,t:"OSO"},
+      {g:270,t:"O"},{g:292.5,t:"ONO"},{g:315,t:"NO"},{g:337.5,t:"NNO"}
+    ];
+    var cardHtml="", degHtml="";
+    puntos16.forEach(function(p){
+      cardHtml+='<g transform="rotate('+p.g+' '+cx+' '+cy+')"><text x="'+cx+'" y="14" font-size="9" font-weight="700" fill="#9b59ff" text-anchor="middle">'+p.t+'</text></g>';
+      degHtml+='<g transform="rotate('+p.g+' '+cx+' '+cy+')"><text x="'+cx+'" y="38" font-size="7" font-weight="700" fill="#fff" text-anchor="middle">'+Math.round(p.g)+'°</text></g>';
+    });
+
+    var hoyFlechaHtml = "";
+    var hoyTxt = "N/C";
+    if (hoyDir !== null && hoyDir !== undefined && hoyDir !== "" && !isNaN(Number(hoyDir))) {
+      var vieneDe = ((Number(hoyDir)%360)+360)%360;
+      var vaHacia = (vieneDe+180)%360;
+      hoyFlechaHtml =
+        '<g transform="rotate('+vaHacia+' '+cx+' '+cy+')">'+
+          '<line x1="'+cx+'" y1="'+(cy+50)+'" x2="'+cx+'" y2="'+(cy-38)+'" stroke="#ff2222" stroke-width="2" stroke-linecap="round"/>'+
+          '<polygon points="'+cx+','+(cy-46)+' '+(cx-6)+','+(cy-32)+' '+(cx+6)+','+(cy-32)+'" fill="#ff2222"/>'+
+          '<circle cx="'+cx+'" cy="'+(cy+50)+'" r="6" fill="#ff2222" stroke="#fff" stroke-width="1.5"/>'+
+        '</g>';
+      hoyTxt = Math.round(vieneDe)+"°";
+    }
+
+    var venueEsc = String(venue||"").replace(/&/g,"&amp;").replace(/"/g,"&quot;");
+
+    return '<div class="brujula-explorer-wrap" data-idx="'+idx+'" data-venue="'+venueEsc+'">'+
+      '<svg viewBox="0 0 200 205">'+
+        '<circle cx="'+cx+'" cy="'+cy+'" r="95" fill="none" stroke="#333" stroke-width="1"/>'+
+        '<circle cx="'+cx+'" cy="'+cy+'" r="68" fill="none" stroke="#333" stroke-width="1"/>'+
+        '<circle cx="'+cx+'" cy="'+cy+'" r="66" fill="#0e1420" stroke="#222" stroke-width="1"/>'+
+        cardHtml + degHtml +
+        '<g transform="rotate('+hp+' '+cx+' '+cy+')">'+
+          '<line x1="'+cx+'" y1="'+(cy+60)+'" x2="'+cx+'" y2="'+(cy-60)+'" stroke="#ff9f0a" stroke-width="1" stroke-dasharray="3,3" opacity="0.8"/>'+
+          '<path d="M '+cx+' '+(cy+42)+' L '+(cx-45)+' '+(cy-21)+' A 60 60 0 0 1 '+(cx+45)+' '+(cy-21)+' Z" fill="#1a4d2e" stroke="#2d7a4a" stroke-width="1" opacity="0.9"/>'+
+          '<path d="M '+(cx-21)+' '+(cy+42)+' Q '+cx+' '+(cy+18)+' '+(cx+21)+' '+(cy+42)+'" fill="none" stroke="#c9a94d" stroke-width="1" opacity="0.8"/>'+
+          '<path d="M '+(cx-27)+' '+(cy+42)+' Q '+cx+' '+(cy+9)+' '+(cx+27)+' '+(cy+42)+'" fill="none" stroke="#c9a94d" stroke-width="0.7" opacity="0.5"/>'+
+          '<g stroke="#c9a94d" stroke-width="1.5" fill="none">'+
+            '<polygon points="'+cx+','+cy+' '+(cx+18)+','+(cy+21)+' '+cx+','+(cy+42)+' '+(cx-18)+','+(cy+21)+'"/>'+
+            '<circle cx="'+cx+'" cy="'+cy+'" r="2.5" fill="#c9a94d"/>'+
+            '<circle cx="'+(cx+18)+'" cy="'+(cy+21)+'" r="2" fill="#c9a94d"/>'+
+            '<circle cx="'+cx+'" cy="'+(cy+42)+'" r="2" fill="#c9a94d"/>'+
+            '<circle cx="'+(cx-18)+'" cy="'+(cy+21)+'" r="2" fill="#c9a94d"/>'+
+          '</g>'+
+        '</g>'+
+        hoyFlechaHtml+
+        '<g id="explorerArrow_'+idx+'" transform="rotate(0 '+cx+' '+cy+')">'+
+          '<line x1="'+cx+'" y1="'+(cy+50)+'" x2="'+cx+'" y2="'+(cy-38)+'" stroke="#1f6feb" stroke-width="2" stroke-dasharray="4,3" stroke-linecap="round"/>'+
+          '<polygon points="'+cx+','+(cy-46)+' '+(cx-6)+','+(cy-32)+' '+(cx+6)+','+(cy-32)+'" fill="#1f6feb"/>'+
+        '</g>'+
+        '<circle cx="'+cx+'" cy="'+cy+'" r="3" fill="#e6edf3" opacity="0.9"/>'+
+      '</svg>'+
+      '<div class="explorer-txt">🔴 viento de hoy: <b>'+hoyTxt+(hoyVel!==null&&hoyVel!==undefined&&typeof hoyVel==="number"?' · '+hoyVel.toFixed(0)+' mph':'')+'</b></div>'+
+      '<div class="explorer-txt">🔵 explorando: <b id="explorerRango_'+idx+'">arrastra la flecha azul</b></div>'+
+      '<div class="explorer-txt">históricamente: <b id="explorerCarr_'+idx+'">—</b></div>'+
+      '<div class="explorer-hint">mové el dedo apretado sobre la brújula para ver otros rangos de viento</div>'+
+    '</div>';
+  }
+
+  function carrerasDeHist(g){
+    var ar=g.away_runs, hr=g.home_runs;
+    if(ar!==null&&ar!==undefined&&hr!==null&&hr!==undefined) return Number(ar)+Number(hr);
+    return null;
+  }
+
+  function actualizarExplorer(wrap, deg){
+    var idx = wrap.getAttribute('data-idx');
+    var venue = wrap.getAttribute('data-venue');
+    var lo = Math.floor(deg/30)*30, hi = lo+30;
+    var arrow = document.getElementById('explorerArrow_'+idx);
+    if(arrow) arrow.setAttribute('transform','rotate('+deg+' 100 100)');
+    var rangoEl = document.getElementById('explorerRango_'+idx);
+    if(rangoEl) rangoEl.textContent = lo+'°–'+hi+'°';
+    var carrEl = document.getElementById('explorerCarr_'+idx);
+    try{
+      var cache = climaLeerCache();
+      var juegos = cache.filter(function(g){
+        return g && g.venue===venue && g.wind_dir!==undefined && g.wind_dir!==null && g.wind_dir!=="" &&
+               !isNaN(Number(g.wind_dir)) && (Number(g.wind_dir)%360)>=lo && (Number(g.wind_dir)%360)<hi;
+      });
+      var carreras=[], vels=[];
+      juegos.forEach(function(g){
+        var c=carrerasDeHist(g); if(c!==null) carreras.push(c);
+        if(typeof g.windspeed_mph==="number") vels.push(g.windspeed_mph);
+      });
+      var prom = carreras.length ? (carreras.reduce(function(a,b){return a+b;},0)/carreras.length) : null;
+      var promV = vels.length ? (vels.reduce(function(a,b){return a+b;},0)/vels.length) : null;
+      if(carrEl){
+        carrEl.textContent = juegos.length
+          ? prom.toFixed(1)+' carreras prom. ('+juegos.length+' juego(s)'+(promV!==null?' · '+promV.toFixed(1)+' mph avg':'')+')'
+          : 'sin juegos en cache para este rango';
+      }
+    }catch(e){ if(carrEl) carrEl.textContent='ERROR: '+e.message; }
+  }
+
+  function clienteASvgPoint(svg, clientX, clientY){
+    var pt = svg.createSVGPoint();
+    pt.x=clientX; pt.y=clientY;
+    var ctm = svg.getScreenCTM();
+    if(!ctm) return {x:100,y:100};
+    return pt.matrixTransform(ctm.inverse());
+  }
+
+  function degDesdeEvento(wrap, clientX, clientY){
+    var svg = wrap.querySelector('svg');
+    var p = clienteASvgPoint(svg, clientX, clientY);
+    var dx = p.x-100, dy = p.y-100;
+    var deg = Math.atan2(dx, -dy)*180/Math.PI;
+    if(deg<0) deg+=360;
+    return deg;
+  }
+
+  listaEl.addEventListener('pointerdown', function(e){
+    var wrap = e.target.closest ? e.target.closest('.brujula-explorer-wrap') : null;
+    if(!wrap) return;
+    wrap.setAttribute('data-dragging','1');
+    actualizarExplorer(wrap, degDesdeEvento(wrap, e.clientX, e.clientY));
+    e.preventDefault();
+  });
+  listaEl.addEventListener('pointermove', function(e){
+    var wrap = e.target.closest ? e.target.closest('.brujula-explorer-wrap') : null;
+    if(!wrap || wrap.getAttribute('data-dragging')!=='1') return;
+    actualizarExplorer(wrap, degDesdeEvento(wrap, e.clientX, e.clientY));
+    e.preventDefault();
+  });
+  function pararArrastreGlobal(){
+    var wraps = listaEl.querySelectorAll('.brujula-explorer-wrap');
+    wraps.forEach(function(w){ w.setAttribute('data-dragging','0'); });
+  }
+  listaEl.addEventListener('pointerup', pararArrastreGlobal);
+  listaEl.addEventListener('pointercancel', pararArrastreGlobal);
 
   var lineasCache=null;
 
@@ -290,7 +462,7 @@
       listaEl.innerHTML=html;
       log("LISTO.");
     }catch(e){ log("ERROR: "+(e&&e.message?e.message:e)); }
-    finally{ btn.disabled=false; btn.textContent="COINCIDENCIA DATAPRO"; }
+    finally{ btn.disabled=false; btn.innerHTML='COINCIDENCIA DATAPRO<span class="sub2">Money Line · clima de hoy vs histórico</span>'; }
   });
 
   function serieDelParque(venue,bloquesSerie){
@@ -459,11 +631,27 @@
       }
     }else{ det5='<div class="sub">Sin históricos para mostrar.</div>'; }
     var fold5='<div class="serieparque"><div class="sphdr">5 PARECIDOS · CLIMA EN ESTE PARQUE</div>'+det5+'</div>';
-    var serieHtml='<details class="fold"><summary>Serie en este parque (por si ya jugaron en escena parecida)</summary>'+serieParqueHtml(venue,bloquesSerie,rosterMap)+'</details>';
+
+    var serieHtml='<details class="fold" open><summary>Serie en este parque (por si ya jugaron en escena parecida)</summary>'+serieParqueHtml(venue,bloquesSerie,rosterMap)+'</details>';
+
+    var hpACFCard = (venue && typeof getOrientacionParque==="function") ? getOrientacionParque(venue) : 45;
+    var brujulaHoy = venue ? svgBrujulaJuego(idx, venue, hpACFCard, today?today.wind_dir:null, today?today.windspeed_mph:null) : '';
+
     return '<div class="juego">'+
-      '<div class="matchup">'+away+' @ '+home+'</div>'+
-      '<div class="estadio">'+(venue||"SIN PARQUE")+'</div>'+
-      hoychips+panel+lineas+fold5+foldHoy+serieHtml+
+      '<div class="juego-cab" id="cab_'+idx+'" onclick="toggleJuego('+idx+')">'+
+        '<div><div class="matchup">'+away+' @ '+home+'</div><div class="estadio">'+(venue||"SIN PARQUE")+'</div></div>'+
+        '<div style="display:flex;align-items:center;gap:8px;">'+
+          '<span class="coin-mini '+cls+'">'+coinTxt+'</span>'+
+          '<span class="chev">▶</span>'+
+        '</div>'+
+      '</div>'+
+      '<div class="juego-cuerpo" id="cuerpo_'+idx+'">'+
+        hoychips+
+        brujulaHoy+
+        serieHtml+
+        panel+lineas+fold5+
+        foldHoy+
+      '</div>'+
     '</div>';
   }
 </script>
