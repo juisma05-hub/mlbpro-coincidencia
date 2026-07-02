@@ -19,6 +19,15 @@
   .cab .vs { font-size:15px; font-weight:700; color:#fff; }
   .cab .parque { font-size:10px; color:#5b7fb5; margin-top:2px; }
 
+  /* ── brújula completa del parque, entre el encabezado y las tarjetas de
+     pitchers, mismo estilo aprobado que casar-series.html (2 aros, 16
+     puntos cardinales afuera, diamante+abanico adentro, flecha de viento
+     con velocidad) pero más chica para que quepa en esta tarjeta ── */
+  .brujula-full-wrap { text-align:center; padding:4px 12px 14px; border-bottom:1px solid #1f2e44; }
+  .brujula-full-wrap svg { width:170px; height:174px; display:block; margin:0 auto; }
+  .brujula-full-wrap .viento-txt { font-size:12px; color:#7a8aa0; margin-top:2px; }
+  .brujula-full-wrap .viento-txt b { color:#5b9fd8; }
+
   .duo { display:flex; padding:0 8px 14px; gap:5px; flex-wrap:wrap; }
   .col-arsenal { width:50px; text-align:center; }
   .pitch-row { margin-bottom:7px; }
@@ -43,11 +52,6 @@
   .badge { display:inline-block; font-size:7px; padding:1px 5px; border-radius:8px; margin-top:3px; font-weight:700; }
   .badge.proyectado { background:#3a2e0a; color:#d8b85b; }
   .badge.confirmado { background:#0a3a14; color:#5bd87a; }
-
-  .col-parque { width:80px; text-align:center; padding-top:14px; }
-  .parque-nombre { font-size:8px; color:#7a8aa0; margin-bottom:6px; }
-  .brujula-mini { width:62px; height:62px; margin:0 auto; }
-  .viento-deg { font-size:11px; font-weight:700; color:#5b9fd8; margin-top:4px; }
 
   .alin-titulo { text-align:center; font-size:10px; color:#7a8aa0; letter-spacing:1px; text-transform:uppercase; padding:12px 0 8px; border-top:1px solid #1f2e44; }
   .alin-fila { display:flex; padding:0 12px 16px; gap:6px; flex-wrap:wrap; }
@@ -216,20 +220,67 @@
     '</div>';
   }
 
-  function brujulaMini(hpACF, ventDir){
-    var rotParque = (hpACF!==null) ? hpACF - 180 : 0;
-    var rotFlecha = (ventDir!==null) ? ventDir : 0;
-    return '<svg class="brujula-mini" viewBox="0 0 80 80">'+
-      '<circle cx="40" cy="40" r="36" fill="#0a0e16" stroke="#1f2e44" stroke-width="1"/>'+
-      '<g transform="translate(40,40) rotate('+rotParque+')">'+
-        '<path d="M 0,14 L -12,-8 A 18,18 0 0,1 12,-8 Z" fill="#1a3a1a"/>'+
-        '<polygon points="0,12 -2,14 -2,17 2,17 2,14" fill="#dce6f0"/>'+
-      '</g>'+
-      (ventDir!==null ? '<g transform="translate(40,40) rotate('+rotFlecha+')">'+
-        '<line x1="0" y1="4" x2="0" y2="-24" stroke="#5b9fd8" stroke-width="2" stroke-linecap="round"/>'+
-        '<polygon points="0,-28 -3,-22 3,-22" fill="#5b9fd8"/>'+
-      '</g>' : '')+
-    '</svg>';
+  // ── brújula completa: MISMO estilo aprobado de casar-series.html (2 aros,
+  // 16 puntos cardinales afuera, diamante+abanico adentro rotando según
+  // hpACF, flecha de viento apuntando hacia donde VA -no de donde viene-,
+  // grado y velocidad visibles) — reescalada mas chica para esta tarjeta. ──
+  function brujulaCompleta(venue, hpACF, ventDir, ventVel){
+    var cx=100, cy=100;
+    var hp = (hpACF!==null && hpACF!==undefined) ? hpACF : 45;
+
+    var puntos16=[
+      {g:0,t:"N"},{g:22.5,t:"NNE"},{g:45,t:"NE"},{g:67.5,t:"ENE"},
+      {g:90,t:"E"},{g:112.5,t:"ESE"},{g:135,t:"SE"},{g:157.5,t:"SSE"},
+      {g:180,t:"S"},{g:202.5,t:"SSO"},{g:225,t:"SO"},{g:247.5,t:"OSO"},
+      {g:270,t:"O"},{g:292.5,t:"ONO"},{g:315,t:"NO"},{g:337.5,t:"NNO"}
+    ];
+    var cardHtml="", degHtml="";
+    puntos16.forEach(function(p){
+      cardHtml+='<g transform="rotate('+p.g+' '+cx+' '+cy+')"><text x="'+cx+'" y="14" font-size="9" font-weight="700" fill="#9b59ff" text-anchor="middle">'+p.t+'</text></g>';
+      degHtml+='<g transform="rotate('+p.g+' '+cx+' '+cy+')"><text x="'+cx+'" y="38" font-size="7" font-weight="700" fill="#fff" text-anchor="middle">'+Math.round(p.g)+'°</text></g>';
+    });
+
+    var flechaHtml = "";
+    var lecturaTxt = "N/C";
+    if (ventDir !== null && ventDir !== undefined) {
+      var vieneDe = ((Number(ventDir)%360)+360)%360;
+      var vaHacia = (vieneDe + 180) % 360;
+      flechaHtml =
+        '<g transform="rotate('+vaHacia+' '+cx+' '+cy+')">'+
+          '<line x1="'+cx+'" y1="'+(cy+50)+'" x2="'+cx+'" y2="'+(cy-38)+'" stroke="#ff2222" stroke-width="2" stroke-linecap="round"/>'+
+          '<polygon points="'+cx+','+(cy-46)+' '+(cx-6)+','+(cy-32)+' '+(cx+6)+','+(cy-32)+'" fill="#ff2222"/>'+
+          '<circle cx="'+cx+'" cy="'+(cy+50)+'" r="6" fill="#ff2222" stroke="#fff" stroke-width="1.5"/>'+
+        '</g>';
+      lecturaTxt = Math.round(vieneDe)+"°";
+    }
+
+    return '<div class="brujula-full-wrap">'+
+      '<svg viewBox="0 0 200 205">'+
+        '<circle cx="'+cx+'" cy="'+cy+'" r="95" fill="none" stroke="#333" stroke-width="1"/>'+
+        '<circle cx="'+cx+'" cy="'+cy+'" r="68" fill="none" stroke="#333" stroke-width="1"/>'+
+        '<circle cx="'+cx+'" cy="'+cy+'" r="66" fill="#0e1420" stroke="#222" stroke-width="1"/>'+
+        cardHtml + degHtml +
+        '<g transform="rotate('+hp+' '+cx+' '+cy+')">'+
+          '<line x1="'+cx+'" y1="'+(cy+60)+'" x2="'+cx+'" y2="'+(cy-60)+'" stroke="#ff9f0a" stroke-width="1" stroke-dasharray="3,3" opacity="0.8"/>'+
+          '<path d="M '+cx+' '+(cy+42)+' L '+(cx-45)+' '+(cy-21)+' A 60 60 0 0 1 '+(cx+45)+' '+(cy-21)+' Z" fill="#1a4d2e" stroke="#2d7a4a" stroke-width="1" opacity="0.9"/>'+
+          '<path d="M '+(cx-21)+' '+(cy+42)+' Q '+cx+' '+(cy+18)+' '+(cx+21)+' '+(cy+42)+'" fill="none" stroke="#c9a94d" stroke-width="1" opacity="0.8"/>'+
+          '<path d="M '+(cx-27)+' '+(cy+42)+' Q '+cx+' '+(cy+9)+' '+(cx+27)+' '+(cy+42)+'" fill="none" stroke="#c9a94d" stroke-width="0.7" opacity="0.5"/>'+
+          '<g stroke="#c9a94d" stroke-width="1.5" fill="none">'+
+            '<polygon points="'+cx+','+cy+' '+(cx+18)+','+(cy+21)+' '+cx+','+(cy+42)+' '+(cx-18)+','+(cy+21)+'"/>'+
+            '<circle cx="'+cx+'" cy="'+cy+'" r="2.5" fill="#c9a94d"/>'+
+            '<circle cx="'+(cx+18)+'" cy="'+(cy+21)+'" r="2" fill="#c9a94d"/>'+
+            '<circle cx="'+cx+'" cy="'+(cy+42)+'" r="2" fill="#c9a94d"/>'+
+            '<circle cx="'+(cx-18)+'" cy="'+(cy+21)+'" r="2" fill="#c9a94d"/>'+
+          '</g>'+
+        '</g>'+
+        flechaHtml+
+        '<circle cx="'+cx+'" cy="'+cy+'" r="3" fill="#ff2222" opacity="0.9"/>'+
+        '<rect x="'+(cx-24)+'" y="'+(cy-6)+'" width="48" height="14" rx="3" fill="#0d1117" opacity="0.85"/>'+
+        '<text x="'+cx+'" y="'+(cy+4)+'" fill="#58a6ff" font-size="9" font-family="monospace" font-weight="700" text-anchor="middle">~'+lecturaTxt+'</text>'+
+      '</svg>'+
+      '<div class="viento-txt">'+venue+' · viento <b>'+(ventDir!==null&&ventDir!==undefined?lecturaTxt:"N/C")+
+        (ventVel!==null&&ventVel!==undefined?' · '+ventVel.toFixed(0)+' mph':'')+'</b></div>'+
+    '</div>';
   }
 
   document.getElementById("go").addEventListener("click", async function(){
@@ -309,9 +360,11 @@
 
         var hpACF = (typeof getOrientacionParque==="function") ? getOrientacionParque(venue) : null;
 
-        // ===== FIX: ventDir ya NO sale de condHoy (string de condicion, sin wind_dir). =====
-        // Se jala del cache real de clima, igual que en index.html (climaFetchWeather + climaKeyTZ).
+        // ===== Viento del cache real de clima (igual que index.html) =====
+        // Se pide DIRECCION y VELOCIDAD juntas — antes solo se pedia
+        // direccion, la velocidad faltaba en toda esta pantalla.
         var ventDir = null;
+        var ventVel = null;
         try {
           var sParq = (typeof STADIUM_INDEX!=="undefined" && typeof stadiumNorm==="function")
             ? STADIUM_INDEX.get(stadiumNorm(venue)) : null;
@@ -321,22 +374,21 @@
             if (hitHoy && hitHoy.wind_dir!==undefined && hitHoy.wind_dir!==null && hitHoy.wind_dir!=="" && !isNaN(Number(hitHoy.wind_dir))) {
               ventDir = Number(hitHoy.wind_dir);
             }
+            if (hitHoy && typeof hitHoy.windspeed_mph === "number") {
+              ventVel = hitHoy.windspeed_mph;
+            }
           }
         } catch (ew) {
           log("AVISO viento "+venue+": "+(ew&&ew.message?ew.message:ew));
         }
-        // ===== FIN FIX =====
+        // ===== FIN =====
 
         html += '<div class="marco">'+
           '<div class="cab"><div class="vs">'+away+' @ '+home+'</div><div class="parque">'+venue+' · Hoy</div></div>'+
+          brujulaCompleta(venue, hpACF, ventDir, ventVel)+
           '<div class="duo">'+
             arsenalHtml(pitcherAwayId)+
             pcardHtml(pitcherAwayId, pitcherAwayNom, away, ultimos5Away, manoAway, k6BaseAway, factorRivalAway, factorUmp, factorCatAway, factorParq, confirmadoAway, lineaKAway)+
-            '<div class="col-parque">'+
-              '<div class="parque-nombre">'+venue+'</div>'+
-              brujulaMini(hpACF, ventDir)+
-              '<div class="viento-deg">'+(ventDir!==null?ventDir+"°":"N/C")+'</div>'+
-            '</div>'+
             pcardHtml(pitcherHomeId, pitcherHomeNom, home, ultimos5Home, manoHome, k6BaseHome, factorRivalHome, factorUmp, factorCatHome, factorParq, confirmadoHome, lineaKHome)+
             arsenalHtml(pitcherHomeId)+
           '</div>'+
