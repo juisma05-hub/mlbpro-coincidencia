@@ -182,23 +182,21 @@
       '<circle cx="'+cx+'" cy="'+cy+'" r="68" fill="none" stroke="#333" stroke-width="1"/>'+
       '<circle cx="'+cx+'" cy="'+cy+'" r="66" fill="#0e1420" stroke="#222" stroke-width="1"/>'+
       cardHtml + degHtml +
-      // linea de orientacion del parque, grado a grado, naranja punteada
+      // TODO EL PARQUE rota junto como una pieza: linea de orientacion + abanico + medialunas + diamante
       '<g transform="rotate('+hpACF+' '+cx+' '+cy+')">'+
         '<line x1="'+cx+'" y1="'+(cy+60)+'" x2="'+cx+'" y2="'+(cy-60)+'" stroke="#ff9f0a" stroke-width="1" stroke-dasharray="3,3" opacity="0.8"/>'+
+        '<path d="M '+cx+' '+(cy+42)+' L '+(cx-45)+' '+(cy-21)+' A 60 60 0 0 1 '+(cx+45)+' '+(cy-21)+' Z" fill="#1a4d2e" stroke="#2d7a4a" stroke-width="1" opacity="0.9"/>'+
+        '<path d="M '+(cx-21)+' '+(cy+42)+' Q '+cx+' '+(cy+18)+' '+(cx+21)+' '+(cy+42)+'" fill="none" stroke="#c9a94d" stroke-width="1" opacity="0.8"/>'+
+        '<path d="M '+(cx-27)+' '+(cy+42)+' Q '+cx+' '+(cy+9)+' '+(cx+27)+' '+(cy+42)+'" fill="none" stroke="#c9a94d" stroke-width="0.7" opacity="0.5"/>'+
+        '<g stroke="#c9a94d" stroke-width="1.5" fill="none">'+
+          '<polygon points="'+cx+','+cy+' '+(cx+18)+','+(cy+21)+' '+cx+','+(cy+42)+' '+(cx-18)+','+(cy+21)+'"/>'+
+          '<circle cx="'+cx+'" cy="'+cy+'" r="2.5" fill="#c9a94d"/>'+
+          '<circle cx="'+(cx+18)+'" cy="'+(cy+21)+'" r="2" fill="#c9a94d"/>'+
+          '<circle cx="'+cx+'" cy="'+(cy+42)+'" r="2" fill="#c9a94d"/>'+
+          '<circle cx="'+(cx-18)+'" cy="'+(cy+21)+'" r="2" fill="#c9a94d"/>'+
+        '</g>'+
       '</g>'+
-      // abanico verde del outfield + medialunas doradas del infield
-      '<path d="M '+cx+' '+(cy+42)+' L '+(cx-45)+' '+(cy-21)+' A 60 60 0 0 1 '+(cx+45)+' '+(cy-21)+' Z" fill="#1a4d2e" stroke="#2d7a4a" stroke-width="1" opacity="0.9"/>'+
-      '<path d="M '+(cx-21)+' '+(cy+42)+' Q '+cx+' '+(cy+18)+' '+(cx+21)+' '+(cy+42)+'" fill="none" stroke="#c9a94d" stroke-width="1" opacity="0.8"/>'+
-      '<path d="M '+(cx-27)+' '+(cy+42)+' Q '+cx+' '+(cy+9)+' '+(cx+27)+' '+(cy+42)+'" fill="none" stroke="#c9a94d" stroke-width="0.7" opacity="0.5"/>'+
-      // diamante, home abajo, segunda base = centro exacto (punto fijo)
-      '<g stroke="#c9a94d" stroke-width="1.5" fill="none">'+
-        '<polygon points="'+cx+','+cy+' '+(cx+18)+','+(cy+21)+' '+cx+','+(cy+42)+' '+(cx-18)+','+(cy+21)+'"/>'+
-        '<circle cx="'+cx+'" cy="'+cy+'" r="2.5" fill="#c9a94d"/>'+
-        '<circle cx="'+(cx+18)+'" cy="'+(cy+21)+'" r="2" fill="#c9a94d"/>'+
-        '<circle cx="'+cx+'" cy="'+(cy+42)+'" r="2" fill="#c9a94d"/>'+
-        '<circle cx="'+(cx-18)+'" cy="'+(cy+21)+'" r="2" fill="#c9a94d"/>'+
-      '</g>'+
-      // flecha roja del viento, nace/pasa por segunda base (punto fijo = centro), bolita atras = de donde viene
+      // flecha roja del viento, con su propio grado real, INDEPENDIENTE del parque (referencia = brujula fija)
       '<g transform="rotate('+promDir+' '+cx+' '+cy+')">'+
         '<line x1="'+cx+'" y1="'+(cy+50)+'" x2="'+cx+'" y2="'+(cy-38)+'" stroke="#ff2222" stroke-width="2" stroke-linecap="round"/>'+
         '<polygon points="'+cx+','+(cy-46)+' '+(cx-6)+','+(cy-32)+' '+(cx+6)+','+(cy-32)+'" fill="#ff2222"/>'+
