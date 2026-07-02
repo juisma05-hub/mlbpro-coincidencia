@@ -14,6 +14,10 @@
   .go { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#fff; background:#238636; cursor:pointer; }
   .go:disabled { background:#30363d; color:#8b949e; }
   .go .sub2 { display:block; font-size:11px; font-weight:600; opacity:0.85; margin-top:3px; }
+  /* mismo estilo de subtitulo para CUALQUIER boton, no solo el verde (.go) —
+     este era el bug: K6 y otros botones de color no heredaban el salto de
+     linea del subtitulo y quedaba todo pegado en una sola linea */
+  button .sub2 { display:block; font-size:11px; font-weight:600; opacity:0.85; margin-top:3px; }
   .go-venideros { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#fff; background:#1f6feb; cursor:pointer; margin-top:12px; pointer-events:auto !important; opacity:1 !important; }
   .go-pasados { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#fff; background:#d2691e; cursor:pointer; margin-top:12px; pointer-events:auto !important; opacity:1 !important; }
   .go-hunter { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#fff; background:#8957e5; cursor:pointer; margin-top:12px; }
@@ -223,6 +227,16 @@
     return dd+" "+(MESES_CORTOS[mm]||mm)+" "+yy.slice(2);
   }
 
+  // NUEVO: hora del juego en horario local del telefono, formato 12h con AM/PM
+  function horaBonita(gameDateISO){
+    if(!gameDateISO) return "";
+    try {
+      var d = new Date(gameDateISO);
+      if (isNaN(d.getTime())) return "";
+      return d.toLocaleTimeString('es', {hour:'numeric', minute:'2-digit', hour12:true});
+    } catch(e) { return ""; }
+  }
+
   document.getElementById("goBrujula").addEventListener("click",function(){ location.href="casar-series.html"; });
   document.getElementById("goVenideros").addEventListener("click",function(){ location.href="venideros-test.html"; });
   document.getElementById("goPasados").addEventListener("click",function(){ location.href="dia-pasado-test.html"; });
@@ -390,6 +404,8 @@
       if(!resp.ok) throw new Error("Schedule hoy HTTP "+resp.status);
       var data=await resp.json();
       var games=(data.dates&&data.dates[0])?data.dates[0].games:[];
+      // NUEVO: ordenar de mas temprano a mas tarde por hora real del juego
+      games.sort(function(a,b){ return new Date(a.gameDate) - new Date(b.gameDate); });
       log("Juegos hoy: "+games.length);
       if(games.length===0){ log("No hay juegos hoy ("+hoy+")."); return; }
       var bloquesSerie=[];
@@ -449,15 +465,16 @@
         }
 
         var s=STADIUM_INDEX.get(stadiumNorm(venue));
-        if(!s){ html+=tarjeta(away,home,venue,null,i,null,pitcherAway,pitcherHome,pitcherAwayId,pitcherHomeId,bloquesSerie,rosterMap,catcherAwayId,catcherHomeId,umpireHomeHoy,lineaMercado,factorH); continue; }
+        var horaTxt = horaBonita(g.gameDate);
+        if(!s){ html+=tarjeta(away,home,venue,horaTxt,null,i,null,pitcherAway,pitcherHome,pitcherAwayId,pitcherHomeId,bloquesSerie,rosterMap,catcherAwayId,catcherHomeId,umpireHomeHoy,lineaMercado,factorH); continue; }
         var w=await climaFetchWeather(s,hoy,hoy);
         var hit=w.get(climaKeyTZ(g.gameDate,s.timezone));
-        if(!hit){ html+=tarjeta(away,home,venue,null,i,null,pitcherAway,pitcherHome,pitcherAwayId,pitcherHomeId,bloquesSerie,rosterMap,catcherAwayId,catcherHomeId,umpireHomeHoy,lineaMercado,factorH); continue; }
+        if(!hit){ html+=tarjeta(away,home,venue,horaTxt,null,i,null,pitcherAway,pitcherHome,pitcherAwayId,pitcherHomeId,bloquesSerie,rosterMap,catcherAwayId,catcherHomeId,umpireHomeHoy,lineaMercado,factorH); continue; }
         var condHoy=await jalarCondition(g.gamePk);
         var today={temperature_f:hit.temperature_f,windspeed_mph:hit.windspeed_mph,humidity_pct:hit.humidity_pct,precipitation_mm:hit.precipitation_mm,wind_dir:hit.wind_dir,venueName:venue,condition:condHoy};
         log("condition "+venue+": "+condHoy);
         var r=calcularCoincidencia(today);
-        html+=tarjeta(away,home,venue,r,i,today,pitcherAway,pitcherHome,pitcherAwayId,pitcherHomeId,bloquesSerie,rosterMap,catcherAwayId,catcherHomeId,umpireHomeHoy,lineaMercado,factorH);
+        html+=tarjeta(away,home,venue,horaTxt,r,i,today,pitcherAway,pitcherHome,pitcherAwayId,pitcherHomeId,bloquesSerie,rosterMap,catcherAwayId,catcherHomeId,umpireHomeHoy,lineaMercado,factorH);
       }
       listaEl.innerHTML=html;
       log("LISTO.");
@@ -529,7 +546,7 @@
     '</div>';
   }
 
-  function tarjeta(away,home,venue,r,idx,today,pitcherAway,pitcherHome,pitcherAwayId,pitcherHomeId,bloquesSerie,rosterMap,catcherAwayId,catcherHomeId,umpireHomeHoy,lineaMercado,factorH){
+  function tarjeta(away,home,venue,horaTxt,r,idx,today,pitcherAway,pitcherHome,pitcherAwayId,pitcherHomeId,bloquesSerie,rosterMap,catcherAwayId,catcherHomeId,umpireHomeHoy,lineaMercado,factorH){
     var sc=r&&r.top?r.top.score:null,cls=r?r.cls:"bad";
     var brisaInfo=(typeof BRISA_GEO_PARQUES_MLB_2026!=="undefined"&&BRISA_GEO_PARQUES_MLB_2026[venue])?BRISA_GEO_PARQUES_MLB_2026[venue]:null;
     var hoychips="";
@@ -639,7 +656,7 @@
 
     return '<div class="juego">'+
       '<div class="juego-cab" id="cab_'+idx+'" onclick="toggleJuego('+idx+')">'+
-        '<div><div class="matchup">'+away+' @ '+home+'</div><div class="estadio">'+(venue||"SIN PARQUE")+'</div></div>'+
+        '<div><div class="matchup">'+away+' @ '+home+'</div><div class="estadio">'+(venue||"SIN PARQUE")+(horaTxt?' · '+horaTxt:'')+'</div></div>'+
         '<div style="display:flex;align-items:center;gap:8px;">'+
           '<span class="coin-mini '+cls+'">'+coinTxt+'</span>'+
           '<span class="chev">▶</span>'+
