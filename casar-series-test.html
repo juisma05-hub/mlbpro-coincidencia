@@ -99,6 +99,11 @@
   // ── determina si el viento es favorable (empuja la bola hacia el
   // jardin) o desfavorable (entra desde el jardin hacia el plato), relativo
   // a la orientacion real del parque (hpACF).
+  // IMPORTANTE: windDir es "de donde viene" el viento (convencion
+  // meteorologica estandar, igual que en weather-direction.html). Por eso
+  // se compara contra el opuesto de hpACF (la direccion HACIA donde
+  // apunta el jardin central es hpACF; el viento FAVORECE cuando viene
+  // desde el lado contrario al jardin, es decir sopla HACIA el jardin).
   function vientoFavorable(windDir, hpACF) {
     var opuesto = (hpACF + 180) % 360;
     var diff = Math.abs(windDir - opuesto);
@@ -163,6 +168,14 @@
   // cardinales, diamante fijo mirando arriba, linea de orientacion de
   // grado a grado (naranja punteada, rota segun hpACF), flecha roja desde
   // segunda base con bolita atras (rota segun promDir del viento) ──
+  //
+  // FIX 2 jul 2026: promDir (g.wind_dir) es DE DONDE VIENE el viento
+  // (convencion meteorologica estandar, confirmado contra
+  // weather-direction.html). La flecha tiene que APUNTAR hacia donde el
+  // viento VA (promDir+180), con la bolita del lado de donde viene. Antes
+  // la flecha apuntaba directo a promDir, o sea señalaba "de donde viene"
+  // en vez de "hacia donde empuja la bola" — por eso podia decir
+  // FAVORABLE y la flecha apuntar para afuera del abanico del jardin.
   function svgBrujula(hpACF, promDir) {
     var cx=100, cy=100;
     var puntos16=[
@@ -177,6 +190,12 @@
       var gr = Math.round((p.g+ (p.g===0?0:0))); // grado mostrado
       degHtml+='<g transform="rotate('+p.g+' '+cx+' '+cy+')"><text x="'+cx+'" y="38" font-size="7" font-weight="700" fill="#fff" text-anchor="middle">'+Math.round(p.g)+'°</text></g>';
     });
+
+    // grado real HACIA donde va el viento (para dibujar la flecha) y
+    // el grado original de donde VIENE (para la etiqueta de texto).
+    var promDirVieneDe = ((Number(promDir)%360)+360)%360;
+    var promDirVaHacia = (promDirVieneDe + 180) % 360;
+
     return '<svg width="200" height="205" viewBox="0 0 200 205" style="display:block;margin:0 auto">'+
       '<circle cx="'+cx+'" cy="'+cy+'" r="95" fill="none" stroke="#333" stroke-width="1"/>'+
       '<circle cx="'+cx+'" cy="'+cy+'" r="68" fill="none" stroke="#333" stroke-width="1"/>'+
@@ -196,15 +215,17 @@
           '<circle cx="'+(cx-18)+'" cy="'+(cy+21)+'" r="2" fill="#c9a94d"/>'+
         '</g>'+
       '</g>'+
-      // flecha roja del viento, con su propio grado real, INDEPENDIENTE del parque (referencia = brujula fija)
-      '<g transform="rotate('+promDir+' '+cx+' '+cy+')">'+
+      // flecha roja del viento: LA PUNTA apunta hacia donde el viento VA
+      // (promDirVaHacia), la bolita queda del lado de donde VIENE.
+      // Independiente de la rotacion del parque (referencia = brujula fija).
+      '<g transform="rotate('+promDirVaHacia+' '+cx+' '+cy+')">'+
         '<line x1="'+cx+'" y1="'+(cy+50)+'" x2="'+cx+'" y2="'+(cy-38)+'" stroke="#ff2222" stroke-width="2" stroke-linecap="round"/>'+
         '<polygon points="'+cx+','+(cy-46)+' '+(cx-6)+','+(cy-32)+' '+(cx+6)+','+(cy-32)+'" fill="#ff2222"/>'+
         '<circle cx="'+cx+'" cy="'+(cy+50)+'" r="6" fill="#ff2222" stroke="#fff" stroke-width="1.5"/>'+
       '</g>'+
       '<circle cx="'+cx+'" cy="'+cy+'" r="3" fill="#ff2222" opacity="0.9"/>'+
       '<rect x="'+(cx-24)+'" y="'+(cy-6)+'" width="48" height="14" rx="3" fill="#0d1117" opacity="0.85"/>'+
-      '<text x="'+cx+'" y="'+(cy+4)+'" fill="#58a6ff" font-size="9" font-family="monospace" font-weight="700" text-anchor="middle">~'+Math.round(promDir)+'°</text>'+
+      '<text x="'+cx+'" y="'+(cy+4)+'" fill="#58a6ff" font-size="9" font-family="monospace" font-weight="700" text-anchor="middle">~'+Math.round(promDirVieneDe)+'°</text>'+
     '</svg>';
   }
 
@@ -297,15 +318,17 @@
 
         gs.sort(function(a,b){ return Number(a.wind_dir)-Number(b.wind_dir); });
 
-        var sumC=0,nC=0,sumT=0,nT=0,sumDir=0,nDir=0;
+        var sumC=0,nC=0,sumT=0,nT=0,sumDir=0,nDir=0,sumV=0,nV=0;
         for(var k=0;k<gs.length;k++){
           var gk=gs[k],c=carrerasDe(gk);
           if(c!==null){sumC+=c;nC++;}
           if(typeof gk.temperature_f==="number"){sumT+=gk.temperature_f;nT++;}
           if(!isNaN(Number(gk.wind_dir))){sumDir+=Number(gk.wind_dir);nDir++;}
+          if(typeof gk.windspeed_mph==="number"){sumV+=gk.windspeed_mph;nV++;}
         }
         var promC=nC>0?(sumC/nC).toFixed(1):"—";
         var promDir=nDir>0?sumDir/nDir:parseInt(lbl)+15;
+        var promV=nV>0?(sumV/nV):null;
 
         var colorCls="amarillo";
         if(nC>0){
@@ -329,7 +352,7 @@
                 '<div class="rv-fecha">'+fechaCorta(gk2.date)+'</div>'+
                 '<div class="rv-vs">vs '+visitante+'</div>'+
               '</div>'+
-              '<div class="rv-dir">'+gk2.wind_dir+'°</div>'+
+              '<div class="rv-dir">'+gk2.wind_dir+'°<div style="font-size:9px;color:#8b949e;font-weight:500;margin-top:1px;">'+(typeof gk2.windspeed_mph==="number"?gk2.windspeed_mph.toFixed(0)+' mph':'—')+'</div></div>'+
               '<div class="rv-temp">'+(typeof gk2.temperature_f==="number"?Math.round(gk2.temperature_f)+"°":"—")+'</div>'+
               '<div class="rv-marc">'+marc+(c2!==null?' <span class="rv-total">('+c2+')</span>':'')+'</div>'+
             '</div>';
@@ -341,9 +364,10 @@
               '<div class="rv-equipo">'+homeTeam+'</div>'+
               '<div class="rv-parque">'+venue+'</div>'+
               svgBrujula(hpACF, promDir)+
+              '<div style="text-align:center;font-size:12px;color:#8b949e;margin-top:2px;">viento promedio <b style="color:#58a6ff">'+(promV!==null?promV.toFixed(1)+' mph':'—')+'</b></div>'+
               '<div class="rv-rango">Viento '+lbl+'</div>'+
               favorHtml+
-              '<div class="rv-meta">'+gs.length+' juego(s) · prom <b style="color:#e6edf3">'+promC+'</b> carreras</div>'+
+              '<div class="rv-meta">'+gs.length+' juego(s) · viento avg <b style="color:#e6edf3">'+(promV!==null?promV.toFixed(1)+' mph':'—')+'</b> · prom <b style="color:#e6edf3">'+promC+'</b> carreras</div>'+
             '</div>'+
             filas+
           '</div>';
