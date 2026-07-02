@@ -159,66 +159,54 @@
     return meses[parseInt(p[1],10)-1]+" "+parseInt(p[2],10)+", "+p[0].slice(2);
   }
 
-  // ── SVG brújula con parque orientado ──
+  // ── SVG brújula APROBADA (copiada del boceto v3): 2 aros, 16 puntos
+  // cardinales, diamante fijo mirando arriba, linea de orientacion de
+  // grado a grado (naranja punteada, rota segun hpACF), flecha roja desde
+  // segunda base con bolita atras (rota segun promDir del viento) ──
   function svgBrujula(hpACF, promDir) {
-    var rotParque = hpACF;
-    var rotFlecha = promDir;
-    return '<svg width="160" height="160" viewBox="0 0 160 160" style="display:block;margin:0 auto">'+
-      '<circle cx="80" cy="80" r="76" fill="#0d1117" stroke="#30363d" stroke-width="1"/>'+
-      '<g stroke="#30363d" stroke-width="1">'+
-        '<line x1="80" y1="5" x2="80" y2="16"/>'+
-        '<line x1="118" y1="13" x2="112" y2="23"/>'+
-        '<line x1="147" y1="42" x2="137" y2="48"/>'+
-        '<line x1="155" y1="80" x2="144" y2="80"/>'+
-        '<line x1="147" y1="118" x2="137" y2="112"/>'+
-        '<line x1="118" y1="147" x2="112" y2="137"/>'+
-        '<line x1="80" y1="155" x2="80" y2="144"/>'+
-        '<line x1="42" y1="147" x2="48" y2="137"/>'+
-        '<line x1="13" y1="118" x2="23" y2="112"/>'+
-        '<line x1="5" y1="80" x2="16" y2="80"/>'+
-        '<line x1="13" y1="42" x2="23" y2="48"/>'+
-        '<line x1="42" y1="13" x2="48" y2="23"/>'+
+    var cx=100, cy=100;
+    var puntos16=[
+      {g:0,t:"N"},{g:22.5,t:"NNE"},{g:45,t:"NE"},{g:67.5,t:"ENE"},
+      {g:90,t:"E"},{g:112.5,t:"ESE"},{g:135,t:"SE"},{g:157.5,t:"SSE"},
+      {g:180,t:"S"},{g:202.5,t:"SSO"},{g:225,t:"SO"},{g:247.5,t:"OSO"},
+      {g:270,t:"O"},{g:292.5,t:"ONO"},{g:315,t:"NO"},{g:337.5,t:"NNO"}
+    ];
+    var cardHtml="", degHtml="";
+    puntos16.forEach(function(p){
+      cardHtml+='<g transform="rotate('+p.g+' '+cx+' '+cy+')"><text x="'+cx+'" y="14" font-size="9" font-weight="700" fill="#9b59ff" text-anchor="middle">'+p.t+'</text></g>';
+      var gr = Math.round((p.g+ (p.g===0?0:0))); // grado mostrado
+      degHtml+='<g transform="rotate('+p.g+' '+cx+' '+cy+')"><text x="'+cx+'" y="38" font-size="7" font-weight="700" fill="#fff" text-anchor="middle">'+Math.round(p.g)+'°</text></g>';
+    });
+    return '<svg width="200" height="205" viewBox="0 0 200 205" style="display:block;margin:0 auto">'+
+      '<circle cx="'+cx+'" cy="'+cy+'" r="95" fill="none" stroke="#333" stroke-width="1"/>'+
+      '<circle cx="'+cx+'" cy="'+cy+'" r="68" fill="none" stroke="#333" stroke-width="1"/>'+
+      '<circle cx="'+cx+'" cy="'+cy+'" r="66" fill="#0e1420" stroke="#222" stroke-width="1"/>'+
+      cardHtml + degHtml +
+      // linea de orientacion del parque, grado a grado, naranja punteada
+      '<g transform="rotate('+hpACF+' '+cx+' '+cy+')">'+
+        '<line x1="'+cx+'" y1="'+(cy+60)+'" x2="'+cx+'" y2="'+(cy-60)+'" stroke="#ff9f0a" stroke-width="1" stroke-dasharray="3,3" opacity="0.8"/>'+
       '</g>'+
-      '<g fill="#6e7681" font-size="8" font-family="monospace" text-anchor="middle">'+
-        '<text x="80" y="4">0°</text>'+
-        '<text x="121" y="11">30°</text>'+
-        '<text x="151" y="40">60°</text>'+
-        '<text x="159" y="83">90°</text>'+
-        '<text x="151" y="124">120°</text>'+
-        '<text x="121" y="153">150°</text>'+
-        '<text x="80" y="160">180°</text>'+
-        '<text x="39" y="153">210°</text>'+
-        '<text x="9" y="124">240°</text>'+
-        '<text x="1" y="83">270°</text>'+
-        '<text x="9" y="40">300°</text>'+
-        '<text x="39" y="11">330°</text>'+
+      // abanico verde del outfield + medialunas doradas del infield
+      '<path d="M '+cx+' '+(cy+42)+' L '+(cx-45)+' '+(cy-21)+' A 60 60 0 0 1 '+(cx+45)+' '+(cy-21)+' Z" fill="#1a4d2e" stroke="#2d7a4a" stroke-width="1" opacity="0.9"/>'+
+      '<path d="M '+(cx-21)+' '+(cy+42)+' Q '+cx+' '+(cy+18)+' '+(cx+21)+' '+(cy+42)+'" fill="none" stroke="#c9a94d" stroke-width="1" opacity="0.8"/>'+
+      '<path d="M '+(cx-27)+' '+(cy+42)+' Q '+cx+' '+(cy+9)+' '+(cx+27)+' '+(cy+42)+'" fill="none" stroke="#c9a94d" stroke-width="0.7" opacity="0.5"/>'+
+      // diamante, home abajo, segunda base = centro exacto (punto fijo)
+      '<g stroke="#c9a94d" stroke-width="1.5" fill="none">'+
+        '<polygon points="'+cx+','+cy+' '+(cx+18)+','+(cy+21)+' '+cx+','+(cy+42)+' '+(cx-18)+','+(cy+21)+'"/>'+
+        '<circle cx="'+cx+'" cy="'+cy+'" r="2.5" fill="#c9a94d"/>'+
+        '<circle cx="'+(cx+18)+'" cy="'+(cy+21)+'" r="2" fill="#c9a94d"/>'+
+        '<circle cx="'+cx+'" cy="'+(cy+42)+'" r="2" fill="#c9a94d"/>'+
+        '<circle cx="'+(cx-18)+'" cy="'+(cy+21)+'" r="2" fill="#c9a94d"/>'+
       '</g>'+
-      '<g fill="#8b949e" font-size="9" font-family="monospace" font-weight="700" text-anchor="middle">'+
-        '<text x="80" y="22">N</text>'+
-        '<text x="80" y="142">S</text>'+
-        '<text x="142" y="83">E</text>'+
-        '<text x="18" y="83">O</text>'+
+      // flecha roja del viento, nace/pasa por segunda base (punto fijo = centro), bolita atras = de donde viene
+      '<g transform="rotate('+promDir+' '+cx+' '+cy+')">'+
+        '<line x1="'+cx+'" y1="'+(cy+50)+'" x2="'+cx+'" y2="'+(cy-38)+'" stroke="#ff2222" stroke-width="2" stroke-linecap="round"/>'+
+        '<polygon points="'+cx+','+(cy-46)+' '+(cx-6)+','+(cy-32)+' '+(cx+6)+','+(cy-32)+'" fill="#ff2222"/>'+
+        '<circle cx="'+cx+'" cy="'+(cy+50)+'" r="6" fill="#ff2222" stroke="#fff" stroke-width="1.5"/>'+
       '</g>'+
-      '<g fill="#58a6ff" font-size="8" font-family="monospace" font-weight="700" text-anchor="middle">'+
-        '<text x="121" y="39">NE</text>'+
-        '<text x="121" y="121">SE</text>'+
-        '<text x="39" y="121">SO</text>'+
-        '<text x="39" y="39">NO</text>'+
-      '</g>'+
-      '<g transform="translate(80,80) rotate('+rotParque+')">'+
-        '<path d="M 0,28 L -24,-16 A 36,36 0 0,1 24,-16 Z" fill="#1e5c1e"/>'+
-        '<path d="M 0,28 L -16,-4 A 24,24 0 0,1 16,-4 Z" fill="#2a7a2a"/>'+
-        '<polygon points="0,-8 13,6 0,18 -13,6" fill="#8B6914"/>'+
-        '<line x1="0" y1="28" x2="-24" y2="-16" stroke="#fff" stroke-width="0.5" opacity="0.3"/>'+
-        '<line x1="0" y1="28" x2="24" y2="-16" stroke="#fff" stroke-width="0.5" opacity="0.3"/>'+
-        '<polygon points="0,24 -3,27 -3,32 3,32 3,27" fill="#fff"/>'+
-      '</g>'+
-      '<g transform="translate(80,80) rotate('+rotFlecha+')">'+
-        '<line x1="0" y1="8" x2="0" y2="-48" stroke="#58a6ff" stroke-width="2.5" stroke-linecap="round"/>'+
-        '<polygon points="0,-56 -4,-44 4,-44" fill="#58a6ff"/>'+
-      '</g>'+
-      '<rect x="58" y="62" width="44" height="16" rx="3" fill="#0d1117" opacity="0.85"/>'+
-      '<text x="80" y="74" fill="#58a6ff" font-size="10" font-family="monospace" font-weight="700" text-anchor="middle">~'+Math.round(promDir)+'°</text>'+
+      '<circle cx="'+cx+'" cy="'+cy+'" r="3" fill="#ff2222" opacity="0.9"/>'+
+      '<rect x="'+(cx-24)+'" y="'+(cy-6)+'" width="48" height="14" rx="3" fill="#0d1117" opacity="0.85"/>'+
+      '<text x="'+cx+'" y="'+(cy+4)+'" fill="#58a6ff" font-size="9" font-family="monospace" font-weight="700" text-anchor="middle">~'+Math.round(promDir)+'°</text>'+
     '</svg>';
   }
 
