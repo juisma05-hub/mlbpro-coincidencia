@@ -10,50 +10,88 @@
   body { margin:0; font-family:-apple-system,system-ui,sans-serif; background:#0d1117; color:#e6edf3; }
   header { padding:14px 16px; border-bottom:1px solid #30363d; }
   h1 { font-size:15px; margin:0; }
-  main { padding:12px; }
-  .filamin { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
-  .filamin label { font-size:12px; color:#8b949e; }
-  .filamin input { width:60px; padding:8px; font-size:14px; background:#161b22; color:#e6edf3; border:1px solid #30363d; border-radius:8px; text-align:center; }
-  .go { width:100%; border:0; border-radius:10px; padding:16px; font-size:16px; font-weight:800; color:#fff; background:#1f6feb; cursor:pointer; margin-bottom:6px; }
-  .leyenda { font-size:11px; color:#8b949e; text-align:center; margin-bottom:12px; }
+  main { padding:14px; max-width:600px; margin:0 auto; }
 
-  .cols { display:flex; gap:10px; }
-  .col { flex:1; min-width:0; }
-  .coltit { font-size:13px; font-weight:800; text-align:center; padding:8px; border-radius:8px; margin-bottom:8px; position:sticky; top:0; }
-  .costa { background:#0d2818; color:#3fb950; border:1px solid #238636; }
-  .adentro { background:#2d1e0d; color:#ffa657; border:1px solid #9e6a03; }
+  .oculto { display:none !important; }
 
-  .parque { background:#161b22; border:1px solid #30363d; border-radius:10px; padding:10px; margin-bottom:10px; }
-  .parque .pn { font-size:13px; font-weight:800; margin-bottom:2px; }
-  .parque .sub { font-size:10px; color:#8b949e; margin-bottom:6px; }
-  .nativo { font-size:11px; color:#d2a8ff; font-weight:700; margin-bottom:6px; }
-  .grad { font-size:11px; padding:4px 0; border-top:1px solid #21262d; display:flex; justify-content:space-between; gap:4px; align-items:center; }
-  .grad .rango { color:#79c0ff; font-weight:700; }
-  .grad .car { font-weight:800; }
-  .grad .n { color:#8b949e; font-size:10px; }
+  .volver { display:inline-flex; align-items:center; gap:6px; color:#58a6ff; font-size:15px; font-weight:700; margin-bottom:14px; background:none; border:0; padding:6px 0; cursor:pointer; }
+
+  .filamin { display:flex; gap:8px; align-items:center; margin-bottom:16px; }
+  .filamin label { font-size:13px; color:#8b949e; }
+  .filamin input { width:64px; padding:10px; font-size:15px; background:#161b22; color:#e6edf3; border:1px solid #30363d; border-radius:8px; text-align:center; }
+
+  .liga-btn { width:100%; border:0; border-radius:14px; padding:26px 16px; font-size:20px; font-weight:800; color:#fff; cursor:pointer; margin-bottom:14px; display:flex; align-items:center; justify-content:center; gap:10px; }
+  .liga-btn.al { background:#1f6feb; }
+  .liga-btn.nl { background:#c0392b; }
+  .liga-btn .sub { display:block; font-size:12px; font-weight:500; opacity:0.85; margin-top:4px; }
+
+  .equipo-btn { width:100%; text-align:left; border:1px solid #30363d; border-radius:12px; padding:16px; background:#161b22; color:#e6edf3; cursor:pointer; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center; }
+  .equipo-btn .nombre { font-size:16px; font-weight:800; }
+  .equipo-btn .parque { font-size:11px; color:#8b949e; margin-top:2px; }
+  .equipo-btn .badge { font-size:16px; }
+  .equipo-btn:active { background:#1c2530; }
+
+  .liga-titulo { font-size:20px; font-weight:800; margin-bottom:14px; }
+  .liga-titulo.al { color:#58a6ff; }
+  .liga-titulo.nl { color:#ff7b72; }
+
+  .detalle-cab { text-align:center; margin-bottom:18px; }
+  .detalle-cab .nombre { font-size:24px; font-weight:800; }
+  .detalle-cab .parque { font-size:14px; color:#8b949e; margin-top:4px; }
+  .detalle-cab .badge { display:inline-block; margin-top:8px; font-size:12px; font-weight:700; padding:5px 12px; border-radius:20px; }
+  .detalle-cab .badge.costa { background:#0d2818; color:#3fb950; border:1px solid #238636; }
+  .detalle-cab .badge.adentro { background:#2d1e0d; color:#ffa657; border:1px solid #9e6a03; }
+
+  .leyenda { font-size:12px; color:#8b949e; text-align:center; margin-bottom:16px; }
+
+  .grad-card { background:#161b22; border:1px solid #30363d; border-radius:14px; padding:16px 18px; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center; }
+  .grad-card .rango { font-size:18px; font-weight:800; color:#79c0ff; }
+  .grad-card .rango .estrella { margin-right:4px; }
+  .grad-card .datos { text-align:right; }
+  .grad-card .car { font-size:20px; font-weight:800; }
+  .grad-card .n { font-size:12px; color:#8b949e; margin-top:2px; }
   .car.alto { color:#ff7b72; }
   .car.bajo { color:#3fb950; }
   .car.medio { color:#d29922; }
-  .vacio { color:#8b949e; font-size:11px; padding:4px 0; }
-  .estrella { color:#ffd60a; }
+  .vacio { color:#8b949e; font-size:14px; padding:20px; text-align:center; }
 
-  #console { margin-top:12px; background:#010409; border:1px solid #30363d; border-radius:8px; padding:10px; min-height:40px; max-height:18vh; overflow:auto; font-family:ui-monospace,monospace; font-size:11px; white-space:pre-wrap; }
+  #console { margin-top:16px; background:#010409; border:1px solid #30363d; border-radius:8px; padding:10px; min-height:30px; max-height:16vh; overflow:auto; font-family:ui-monospace,monospace; font-size:11px; white-space:pre-wrap; }
 </style>
 </head>
 <body>
-<header><h1>MLBPro · VIENTO NATIVO (todos · mín ajustable)</h1></header>
+<header><h1>MLBPro · VIENTO NATIVO</h1></header>
 <main>
-  <div class="filamin">
-    <label for="minJuegos">Mínimo de juegos por rango:</label>
-    <input type="number" id="minJuegos" value="3" min="1" max="30" />
+
+  <!-- ── NIVEL 1: elegir liga ── -->
+  <div id="nivel1">
+    <div class="filamin">
+      <label for="minJuegos">Mínimo de juegos por rango:</label>
+      <input type="number" id="minJuegos" value="3" min="1" max="30" />
+    </div>
+    <div class="leyenda">🔴 over (9+) · 🟢 under (7-) · 🟡 limbo · ⭐ = viento nativo (más juegos)</div>
+    <button class="liga-btn al" id="btnAL">⚾ AMERICANA<span class="sub">15 equipos</span></button>
+    <button class="liga-btn nl" id="btnNL">⚾ NACIONAL<span class="sub">15 equipos</span></button>
   </div>
-  <button id="go" class="go">VER VIENTO NATIVO DE TODOS</button>
-  <div class="leyenda">🔴 over (9+) · 🟢 under (7-) · 🟡 limbo · ⭐ = viento nativo (más juegos)</div>
-  <div class="cols">
-    <div class="col"><div class="coltit costa">🌊 COSTA (mar)</div><div id="colCosta"></div></div>
-    <div class="col"><div class="coltit adentro">🏙️ ADENTRO</div><div id="colAdentro"></div></div>
+
+  <!-- ── NIVEL 2: lista de equipos de la liga elegida ── -->
+  <div id="nivel2" class="oculto">
+    <button class="volver" id="volverA1">← Volver a ligas</button>
+    <div class="liga-titulo" id="tituloLiga">Liga</div>
+    <div id="listaEquipos"></div>
   </div>
-  <div id="console">Pon el mínimo de juegos que quieres y pulsa el botón.</div>
+
+  <!-- ── NIVEL 3: pantalla completa del equipo elegido ── -->
+  <div id="nivel3" class="oculto">
+    <button class="volver" id="volverA2">← Volver a equipos</button>
+    <div class="detalle-cab">
+      <div class="nombre" id="detNombre">—</div>
+      <div class="parque" id="detParque">—</div>
+      <div class="badge" id="detBadge"></div>
+    </div>
+    <div id="detContenido"></div>
+  </div>
+
+  <div id="console">Elige liga, después equipo.</div>
 </main>
 
 <script src="mlb-routes.js"></script>
@@ -64,41 +102,46 @@
   var consoleEl = document.getElementById("console");
   function log(t){ var d=document.createElement("div"); d.textContent=t; consoleEl.appendChild(d); consoleEl.scrollTop=consoleEl.scrollHeight; }
 
-  // COSTA de mar de verdad (5)
-  var COSTA = [
-    { equipo:"San Francisco Giants", m:"oracle" },
-    { equipo:"Seattle Mariners",     m:"t-mobile" },
-    { equipo:"San Diego Padres",     m:"petco" },
-    { equipo:"New York Mets",        m:"citi field" },
-    { equipo:"Miami Marlins",        m:"loandepot" }
-  ];
-  // ADENTRO (el resto, incl. ríos como Pittsburgh y Washington)
-  var ADENTRO = [
-    { equipo:"Detroit Tigers",        m:"comerica" },
-    { equipo:"St. Louis Cardinals",   m:"busch" },
-    { equipo:"Texas Rangers",         m:"globe life" },
-    { equipo:"Houston Astros",        m:"daikin" },
-    { equipo:"Chicago Cubs",          m:"wrigley" },
-    { equipo:"Chicago White Sox",     m:"rate field" },
-    { equipo:"Milwaukee Brewers",     m:"american family" },
-    { equipo:"Minnesota Twins",       m:"target field" },
-    { equipo:"Kansas City Royals",    m:"kauffman" },
-    { equipo:"Cleveland Guardians",   m:"progressive" },
-    { equipo:"Cincinnati Reds",       m:"great american" },
-    { equipo:"Pittsburgh Pirates",    m:"pnc" },
-    { equipo:"Atlanta Braves",        m:"truist" },
-    { equipo:"Colorado Rockies",      m:"coors" },
-    { equipo:"Arizona Diamondbacks",  m:"chase field" },
-    { equipo:"Washington Nationals",  m:"nationals park" },
-    { equipo:"Philadelphia Phillies", m:"citizens bank" },
-    { equipo:"New York Yankees",      m:"yankee" },
-    { equipo:"Boston Red Sox",        m:"fenway" },
-    { equipo:"Baltimore Orioles",     m:"camden" },
-    { equipo:"Toronto Blue Jays",     m:"rogers" },
-    { equipo:"Tampa Bay Rays",        m:"tropicana" },
-    { equipo:"Los Angeles Dodgers",   m:"dodger" },
-    { equipo:"Los Angeles Angels",    m:"angel" },
-    { equipo:"Athletics",             m:"sutter" }
+  // ── los 30 equipos, con liga (AL/NL) y si el parque es costa de mar de
+  // verdad (mismos 5 que ya teniamos) o adentro. "m" es el texto que se
+  // busca dentro de g.venue en el cache. ──
+  var EQUIPOS = [
+    // AL East
+    { equipo:"Baltimore Orioles",     m:"camden",         liga:"AL", costa:false },
+    { equipo:"Boston Red Sox",        m:"fenway",         liga:"AL", costa:false },
+    { equipo:"New York Yankees",      m:"yankee",         liga:"AL", costa:false },
+    { equipo:"Tampa Bay Rays",        m:"tropicana",      liga:"AL", costa:false },
+    { equipo:"Toronto Blue Jays",     m:"rogers",         liga:"AL", costa:false },
+    // AL Central
+    { equipo:"Chicago White Sox",     m:"rate field",     liga:"AL", costa:false },
+    { equipo:"Cleveland Guardians",   m:"progressive",    liga:"AL", costa:false },
+    { equipo:"Detroit Tigers",        m:"comerica",       liga:"AL", costa:false },
+    { equipo:"Kansas City Royals",    m:"kauffman",       liga:"AL", costa:false },
+    { equipo:"Minnesota Twins",       m:"target field",   liga:"AL", costa:false },
+    // AL West
+    { equipo:"Houston Astros",        m:"daikin",         liga:"AL", costa:false },
+    { equipo:"Los Angeles Angels",    m:"angel",          liga:"AL", costa:false },
+    { equipo:"Athletics",             m:"sutter",         liga:"AL", costa:false },
+    { equipo:"Seattle Mariners",      m:"t-mobile",       liga:"AL", costa:true  },
+    { equipo:"Texas Rangers",         m:"globe life",     liga:"AL", costa:false },
+    // NL East
+    { equipo:"Atlanta Braves",        m:"truist",         liga:"NL", costa:false },
+    { equipo:"Miami Marlins",         m:"loandepot",      liga:"NL", costa:true  },
+    { equipo:"New York Mets",         m:"citi field",     liga:"NL", costa:true  },
+    { equipo:"Philadelphia Phillies", m:"citizens bank",  liga:"NL", costa:false },
+    { equipo:"Washington Nationals",  m:"nationals park", liga:"NL", costa:false },
+    // NL Central
+    { equipo:"Chicago Cubs",          m:"wrigley",        liga:"NL", costa:false },
+    { equipo:"Cincinnati Reds",       m:"great american", liga:"NL", costa:false },
+    { equipo:"Milwaukee Brewers",     m:"american family",liga:"NL", costa:false },
+    { equipo:"Pittsburgh Pirates",    m:"pnc",            liga:"NL", costa:false },
+    { equipo:"St. Louis Cardinals",   m:"busch",          liga:"NL", costa:false },
+    // NL West
+    { equipo:"Arizona Diamondbacks",  m:"chase field",    liga:"NL", costa:false },
+    { equipo:"Colorado Rockies",      m:"coors",          liga:"NL", costa:false },
+    { equipo:"Los Angeles Dodgers",   m:"dodger",         liga:"NL", costa:false },
+    { equipo:"San Diego Padres",      m:"petco",          liga:"NL", costa:true  },
+    { equipo:"San Francisco Giants",  m:"oracle",         liga:"NL", costa:true  }
   ];
 
   function carrerasDe(g){
@@ -129,55 +172,98 @@
     return { total: juegos.length, grupos: arr };
   }
 
-  function parqueCard(item, cache, minJuegos){
-    var res = agruparPorGrado(cache, item.m);
-    var fuertes = res.grupos.filter(function(g){ return g.n >= minJuegos; });
-    var maxN = 0;
-    for(var i=0;i<fuertes.length;i++){ if(fuertes[i].n>maxN) maxN=fuertes[i].n; }
-
-    var filas="";
-    if(res.total === 0){
-      filas = '<div class="vacio">Sin juegos con dir.</div>';
-    } else if(fuertes.length === 0){
-      filas = '<div class="vacio">Ningún rango llega a '+minJuegos+' juegos.</div>';
-    } else {
-      for(var j=0;j<fuertes.length;j++){
-        var gr=fuertes[j];
-        var pc=prom(gr.carreras);
-        var cls="medio";
-        if(pc!==null){ if(pc>=9) cls="alto"; else if(pc<=7) cls="bajo"; }
-        var esNativo = (gr.n === maxN);
-        filas += '<div class="grad">'+
-          '<span class="rango">'+(esNativo?'<span class="estrella">⭐</span> ':'')+gr.lo+'-'+gr.hi+'°</span>'+
-          '<span class="car '+cls+'">'+(pc!==null?pc.toFixed(1):"—")+'c</span>'+
-          '<span class="n">'+gr.n+'j</span>'+
-        '</div>';
-      }
-    }
-    return '<div class="parque">'+
-      '<div class="pn">'+item.equipo+'</div>'+
-      '<div class="sub">'+res.total+' juegos con dir</div>'+
-      filas+
-    '</div>';
+  // ── navegacion entre los 3 niveles ──
+  function mostrarNivel(n){
+    document.getElementById("nivel1").classList.toggle("oculto", n!==1);
+    document.getElementById("nivel2").classList.toggle("oculto", n!==2);
+    document.getElementById("nivel3").classList.toggle("oculto", n!==3);
+    window.scrollTo(0,0);
   }
 
-  document.getElementById("go").addEventListener("click", function(){
-    consoleEl.textContent="";
-    document.getElementById("colCosta").innerHTML="";
-    document.getElementById("colAdentro").innerHTML="";
+  var ligaActual = null;
+
+  function abrirLiga(liga){
+    ligaActual = liga;
+    var titulo = document.getElementById("tituloLiga");
+    titulo.textContent = liga==="AL" ? "Liga Americana" : "Liga Nacional";
+    titulo.className = "liga-titulo " + (liga==="AL"?"al":"nl");
+
+    var equipos = EQUIPOS.filter(function(e){ return e.liga===liga; });
+    var html = "";
+    equipos.forEach(function(e){
+      html += '<button class="equipo-btn" data-idx="'+EQUIPOS.indexOf(e)+'">'+
+        '<div><div class="nombre">'+e.equipo+'</div><div class="parque">'+e.m+'</div></div>'+
+        '<div class="badge">'+(e.costa?"🌊":"🏙️")+'</div>'+
+      '</button>';
+    });
+    document.getElementById("listaEquipos").innerHTML = html;
+
+    var botones = document.querySelectorAll("#listaEquipos .equipo-btn");
+    botones.forEach(function(b){
+      b.addEventListener("click", function(){
+        var idx = Number(this.getAttribute("data-idx"));
+        abrirEquipo(EQUIPOS[idx]);
+      });
+    });
+
+    mostrarNivel(2);
+  }
+
+  function abrirEquipo(item){
+    document.getElementById("detNombre").textContent = item.equipo;
+    document.getElementById("detParque").textContent = item.m;
+    var badge = document.getElementById("detBadge");
+    badge.className = "badge " + (item.costa?"costa":"adentro");
+    badge.textContent = item.costa ? "🌊 COSTA (mar)" : "🏙️ ADENTRO";
+
     try {
-      var minJuegos = parseInt(document.getElementById("minJuegos").value, 10) || 3;
       var cache = climaLeerCache();
-      if(!cache.length){ log("CACHE VACIO. Abre el index (Chrome normal, NO incógnito), pulsa COINCIDENCIA, vuelve."); return; }
-      log("Filas en cache: "+cache.length+" · Mínimo usado: "+minJuegos+" juegos");
-      var hc="", ha="";
-      for(var i=0;i<COSTA.length;i++)   hc += parqueCard(COSTA[i], cache, minJuegos);
-      for(var j=0;j<ADENTRO.length;j++) ha += parqueCard(ADENTRO[j], cache, minJuegos);
-      document.getElementById("colCosta").innerHTML = hc;
-      document.getElementById("colAdentro").innerHTML = ha;
-      log("LISTO. ⭐ = viento nativo de cada parque (rango con más juegos).");
-    } catch(e){ log("ERROR: "+e.message); }
-  });
+      var minJuegos = parseInt(document.getElementById("minJuegos").value, 10) || 3;
+      var res = agruparPorGrado(cache, item.m);
+      var fuertes = res.grupos.filter(function(g){ return g.n >= minJuegos; });
+      var maxN = 0;
+      for(var i=0;i<fuertes.length;i++){ if(fuertes[i].n>maxN) maxN=fuertes[i].n; }
+
+      var html="";
+      if(res.total === 0){
+        html = '<div class="vacio">Sin juegos con dirección de viento en cache para este parque.</div>';
+      } else if(fuertes.length === 0){
+        html = '<div class="vacio">Ningún rango llega a '+minJuegos+' juegos.<br>Total en cache: '+res.total+' juegos.</div>';
+      } else {
+        for(var j=0;j<fuertes.length;j++){
+          var gr=fuertes[j];
+          var pc=prom(gr.carreras);
+          var cls="medio";
+          if(pc!==null){ if(pc>=9) cls="alto"; else if(pc<=7) cls="bajo"; }
+          var esNativo = (gr.n === maxN);
+          html += '<div class="grad-card">'+
+            '<div class="rango">'+(esNativo?'<span class="estrella">⭐</span>':'')+gr.lo+'-'+gr.hi+'°</div>'+
+            '<div class="datos"><div class="car '+cls+'">'+(pc!==null?pc.toFixed(1):"—")+' carreras</div><div class="n">'+gr.n+' juego(s)</div></div>'+
+          '</div>';
+        }
+      }
+      document.getElementById("detContenido").innerHTML = html;
+      log(item.equipo+": "+res.total+" juegos con dirección de viento.");
+    } catch(e){
+      document.getElementById("detContenido").innerHTML = '<div class="vacio">ERROR: '+e.message+'</div>';
+      log("ERROR: "+e.message);
+    }
+
+    mostrarNivel(3);
+  }
+
+  document.getElementById("btnAL").addEventListener("click", function(){ abrirLiga("AL"); });
+  document.getElementById("btnNL").addEventListener("click", function(){ abrirLiga("NL"); });
+  document.getElementById("volverA1").addEventListener("click", function(){ mostrarNivel(1); });
+  document.getElementById("volverA2").addEventListener("click", function(){ abrirLiga(ligaActual); });
+
+  (function chequearCache(){
+    try {
+      var cache = climaLeerCache();
+      if(!cache.length){ log("AVISO: cache vacío. Abre el index, pulsa COINCIDENCIA, y vuelve."); }
+      else log("Filas en cache: "+cache.length+". Elige liga para empezar.");
+    } catch(e){ log("AVISO: "+e.message); }
+  })();
 </script>
 </body>
 </html>
