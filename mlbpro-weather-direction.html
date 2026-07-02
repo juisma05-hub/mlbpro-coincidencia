@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MLB Pro · Weather Direction</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap');
+
+  :root{
+    --bg: #0A0E12;
+    --panel: #10161C;
+    --panel-2: #151D25;
+    --line: #232C35;
+    --text: #E7ECEF;
+    --muted: #8A97A3;
+    --cyan: #4FD1C5;
+    --amber: #F2A93B;
+    --green: #3FB68B;
+    --red: #E5484D;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:
+      radial-gradient(1200px 600px at 50% -10%, #101820 0%, var(--bg) 60%);
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    min-height:100vh;
+    padding:20px 14px 60px;
+  }
+  .wrap{max-width:480px;margin:0 auto;}
+
+  header{margin-bottom:22px;}
+  .eyebrow{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    letter-spacing:.14em;
+    color:var(--cyan);
+    text-transform:uppercase;
+    margin-bottom:6px;
+  }
+  h1{
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:700;
+    font-size:28px;
+    line-height:1.1;
+    margin:0 0 4px;
+  }
+  .sub{color:var(--muted);font-size:13.5px;line-height:1.5;}
+
+  select{
+    width:100%;
+    margin-top:18px;
+    padding:14px 16px;
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:10px;
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    font-size:15px;
+    appearance:none;
+    -webkit-appearance:none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='9' viewBox='0 0 14 9'%3E%3Cpath d='M1 1l6 6 6-6' stroke='%238A97A3' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;
+    background-position:right 16px center;
+  }
+  select:focus{outline:2px solid var(--cyan);outline-offset:1px;}
+
+  .card{
+    margin-top:18px;
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:16px;
+    padding:22px 18px 24px;
+  }
+  .park-name{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:19px;}
+  .park-sub{color:var(--muted);font-size:12.5px;margin-top:2px;font-family:'IBM Plex Mono',monospace;}
+
+  .status{
+    margin-top:10px;font-size:13px;color:var(--muted);
+    font-family:'IBM Plex Mono',monospace;
+  }
+
+  /* Compass gauge */
+  .gauge-box{
+    position:relative;
+    width:100%;
+    max-width:320px;
+    aspect-ratio:1/1;
+    margin:26px auto 8px;
+  }
+  svg{width:100%;height:100%;display:block;}
+  .ring{fill:none;stroke:var(--line);stroke-width:1;}
+  .tick-major{stroke:#3A4652;stroke-width:1.4;}
+  .tick-minor{stroke:#232C35;stroke-width:1;}
+  .card-label{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    fill:var(--muted);
+    text-anchor:middle;
+  }
+  .card-label.strong{fill:var(--text);font-weight:600;font-size:12px;}
+  .center-readout{font-family:'Space Grotesk',sans-serif;}
+  .deg-value{font-size:30px;font-weight:700;fill:var(--text);text-anchor:middle;}
+  .deg-caption{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10px;fill:var(--muted);text-anchor:middle;letter-spacing:.08em;
+  }
+
+  .needle-from{stroke:var(--amber);stroke-width:2.5;stroke-dasharray:5 4;}
+  .needle-to{stroke:var(--cyan);stroke-width:3;}
+  .needle-cap{fill:var(--bg);stroke:var(--line);stroke-width:1;}
+
+  .legend{
+    display:flex;justify-content:center;gap:22px;
+    margin-top:6px;font-size:12px;color:var(--muted);
+    font-family:'IBM Plex Mono',monospace;
+  }
+  .legend span{display:inline-flex;align-items:center;gap:6px;}
+  .dot{width:10px;height:2.5px;border-radius:2px;}
+  .dot.from{background:repeating-linear-gradient(90deg,var(--amber) 0 4px, transparent 4px 7px);}
+  .dot.to{background:var(--cyan);}
+
+  .stats{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:1px;
+    margin-top:22px;
+    background:var(--line);
+    border-radius:12px;
+    overflow:hidden;
+  }
+  .stat{
+    background:var(--panel-2);
+    padding:14px 16px;
+  }
+  .stat-label{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10.5px;color:var(--muted);
+    text-transform:uppercase;letter-spacing:.08em;
+  }
+  .stat-value{
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:700;font-size:20px;margin-top:4px;
+  }
+  .stat-value.small{font-size:14px;font-weight:500;}
+
+  .interp{
+    margin-top:18px;
+    padding:14px 16px;
+    background:rgba(79,209,197,0.08);
+    border:1px solid rgba(79,209,197,0.25);
+    border-radius:10px;
+    font-size:13.5px;
+    line-height:1.55;
+  }
+  .interp b{color:var(--cyan);}
+
+  .updated{
+    margin-top:16px;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;color:var(--muted);
+    text-align:center;
+  }
+
+  .refresh-btn{
+    width:100%;
+    margin-top:14px;
+    padding:13px;
+    background:var(--panel-2);
+    border:1px solid var(--line);
+    border-radius:10px;
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    font-weight:600;
+    font-size:14px;
+    cursor:pointer;
+  }
+  .refresh-btn:active{background:#1A232C;}
+
+  .error{
+    margin-top:16px;color:var(--red);font-size:13px;
+    font-family:'IBM Plex Mono',monospace;
+  }
+
+  ::selection{background:var(--cyan);color:#001019;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">MLB Pro · Instrumento de viento</div>
+    <h1>Weather Direction</h1>
+    <div class="sub">Clima real de ahora mismo, por parque. Grado, punto cardinal, velocidad — y las dos flechas para que nunca más haya duda de hacia dónde sopla.</div>
+  </header>
+
+  <select id="parkSelect"></select>
+
+  <div class="card" id="card">
+    <div class="park-name" id="parkName">—</div>
+    <div class="park-sub" id="parkCoords">—</div>
+    <div class="status" id="status">Cargando clima…</div>
+
+    <div class="gauge-box">
+      <svg id="gauge" viewBox="0 0 300 300"></svg>
+    </div>
+
+    <div class="legend">
+      <span><i class="dot from"></i>de dónde viene</span>
+      <span><i class="dot to"></i>hacia dónde va</span>
+    </div>
+
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-label">Grado (viene de)</div>
+        <div class="stat-value" id="statDegFrom">—</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Punto cardinal</div>
+        <div class="stat-value" id="statCardinal">—</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Grado (va hacia)</div>
+        <div class="stat-value" id="statDegTo">—</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Velocidad</div>
+        <div class="stat-value" id="statSpeed">—</div>
+      </div>
+    </div>
+
+    <div class="interp" id="interp"></div>
+
+    <div class="error" id="error" style="display:none;"></div>
+    <div class="updated" id="updated"></div>
+  </div>
+
+  <button class="refresh-btn" id="refreshBtn">Actualizar clima</button>
+</div>
+
+<script>
+// Coordenadas aproximadas de home plate de los 30 parques MLB
+const PARKS = [
+  {team:"Arizona Diamondbacks", park:"Chase Field", lat:33.4455, lon:-112.0667},
+  {team:"Atlanta Braves", park:"Truist Park", lat:33.8907, lon:-84.4677},
+  {team:"Baltimore Orioles", park:"Oriole Park at Camden Yards", lat:39.2839, lon:-76.6217},
+  {team:"Boston Red Sox", park:"Fenway Park", lat:42.3467, lon:-71.0972},
+  {team:"Chicago Cubs", park:"Wrigley Field", lat:41.9484, lon:-87.6553},
+  {team:"Chicago White Sox", park:"Guaranteed Rate Field", lat:41.8299, lon:-87.6338},
+  {team:"Cincinnati Reds", park:"Great American Ball Park", lat:39.0979, lon:-84.5066},
+  {team:"Cleveland Guardians", park:"Progressive Field", lat:41.4962, lon:-81.6852},
+  {team:"Colorado Rockies", park:"Coors Field", lat:39.7559, lon:-104.9942},
+  {team:"Detroit Tigers", park:"Comerica Park", lat:42.3390, lon:-83.0485},
+  {team:"Houston Astros", park:"Daikin Park", lat:29.7573, lon:-95.3555},
+  {team:"Kansas City Royals", park:"Kauffman Stadium", lat:39.0517, lon:-94.4803},
+  {team:"Los Angeles Angels", park:"Angel Stadium", lat:33.8003, lon:-117.8827},
+  {team:"Los Angeles Dodgers", park:"Dodger Stadium", lat:34.0739, lon:-118.2400},
+  {team:"Miami Marlins", park:"loanDepot park", lat:25.7781, lon:-80.2196},
+  {team:"Milwaukee Brewers", park:"American Family Field", lat:43.0280, lon:-87.9712},
+  {team:"Minnesota Twins", park:"Target Field", lat:44.9817, lon:-93.2777},
+  {team:"New York Mets", park:"Citi Field", lat:40.7571, lon:-73.8458},
+  {team:"New York Yankees", park:"Yankee Stadium", lat:40.8296, lon:-73.9262},
+  {team:"Athletics", park:"Sutter Health Park", lat:38.5802, lon:-121.5138},
+  {team:"Philadelphia Phillies", park:"Citizens Bank Park", lat:39.9061, lon:-75.1665},
+  {team:"Pittsburgh Pirates", park:"PNC Park", lat:40.4469, lon:-80.0057},
+  {team:"San Diego Padres", park:"Petco Park", lat:32.7073, lon:-117.1566},
+  {team:"San Francisco Giants", park:"Oracle Park", lat:37.7786, lon:-122.3893},
+  {team:"Seattle Mariners", park:"T-Mobile Park", lat:47.5914, lon:-122.3325},
+  {team:"St. Louis Cardinals", park:"Busch Stadium", lat:38.6226, lon:-90.1928},
+  {team:"Tampa Bay Rays", park:"Tropicana Field", lat:27.7683, lon:-82.6534},
+  {team:"Texas Rangers", park:"Globe Life Field", lat:32.7473, lon:-97.0842},
+  {team:"Toronto Blue Jays", park:"Rogers Centre", lat:43.6414, lon:-79.3894},
+  {team:"Washington Nationals", park:"Nationals Park", lat:38.8730, lon:-77.0074}
+].sort((a,b)=>a.team.localeCompare(b.team));
+
+const CARDINALS = ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSO","SO","OSO","O","ONO","NO","NNO"];
+function toCardinal(deg){
+  const idx = Math.round(deg/22.5) % 16;
+  return CARDINALS[idx];
+}
+
+const select = document.getElementById('parkSelect');
+PARKS.forEach((p,i)=>{
+  const opt = document.createElement('option');
+  opt.value = i;
+  opt.textContent = `${p.team} · ${p.park}`;
+  select.appendChild(opt);
+});
+
+// Default: intenta detectar si hay un equipo guardado, si no usa el primero
+let savedIdx = 0;
+select.value = savedIdx;
+
+const els = {
+  parkName: document.getElementById('parkName'),
+  parkCoords: document.getElementById('parkCoords'),
+  status: document.getElementById('status'),
+  gauge: document.getElementById('gauge'),
+  statDegFrom: document.getElementById('statDegFrom'),
+  statDegTo: document.getElementById('statDegTo'),
+  statCardinal: document.getElementById('statCardinal'),
+  statSpeed: document.getElementById('statSpeed'),
+  interp: document.getElementById('interp'),
+  error: document.getElementById('error'),
+  updated: document.getElementById('updated'),
+};
+
+function polar(cx, cy, r, angleDeg){
+  // angleDeg: 0 = arriba (Norte), sentido horario
+  const rad = (angleDeg - 90) * Math.PI/180;
+  return { x: cx + r*Math.cos(rad), y: cy + r*Math.sin(rad) };
+}
+
+function drawGauge(fromDeg, toDeg, speed, unit){
+  const cx=150, cy=150, R=118;
+  let svg = `<circle class="ring" cx="${cx}" cy="${cy}" r="${R}"/>`;
+  svg += `<circle class="ring" cx="${cx}" cy="${cy}" r="${R-26}"/>`;
+
+  // ticks cada 10°, mayores cada 30°
+  for(let d=0; d<360; d+=10){
+    const isMajor = d % 30 === 0;
+    const p1 = polar(cx,cy,R, d);
+    const p2 = polar(cx,cy,R-(isMajor?10:6), d);
+    svg += `<line class="${isMajor?'tick-major':'tick-minor'}" x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}"/>`;
+  }
+
+  // etiquetas cardinales principales
+  const labels = [
+    {d:0,t:"N"},{d:90,t:"E"},{d:180,t:"S"},{d:270,t:"O"},
+    {d:45,t:"NE",minor:true},{d:135,t:"SE",minor:true},{d:225,t:"SO",minor:true},{d:315,t:"NO",minor:true}
+  ];
+  labels.forEach(l=>{
+    const p = polar(cx,cy,R+16,l.d);
+    svg += `<text class="card-label ${l.minor?'':'strong'}" x="${p.x}" y="${p.y+4}">${l.t}</text>`;
+  });
+
+  // needle "de donde viene" (punteada, apunta hacia el origen)
+  const fromTip = polar(cx,cy,R-30, fromDeg);
+  svg += `<line class="needle-from" x1="${cx}" y1="${cy}" x2="${fromTip.x}" y2="${fromTip.y}"/>`;
+
+  // needle "hacia donde va" (solida, con punta de flecha)
+  const toTip = polar(cx,cy,R-30, toDeg);
+  svg += `<line class="needle-to" x1="${cx}" y1="${cy}" x2="${toTip.x}" y2="${toTip.y}"/>`;
+  // punta de flecha
+  const arrowBack1 = polar(toTip.x, toTip.y, 10, toDeg+180+22);
+  const arrowBack2 = polar(toTip.x, toTip.y, 10, toDeg+180-22);
+  svg += `<polygon points="${toTip.x},${toTip.y} ${arrowBack1.x},${arrowBack1.y} ${arrowBack2.x},${arrowBack2.y}" fill="var(--cyan, #4FD1C5)"/>`;
+
+  svg += `<circle class="needle-cap" cx="${cx}" cy="${cy}" r="7"/>`;
+
+  svg += `<text class="center-readout deg-value" x="${cx}" y="${cy-56}">${Math.round(fromDeg)}°</text>`;
+  svg += `<text class="deg-caption" x="${cx}" y="${cy-42}">VIENE DE</text>`;
+
+  svg += `<text class="center-readout deg-value" x="${cx}" y="${cy+58}" style="font-size:22px;fill:var(--cyan,#4FD1C5);">${speed}</text>`;
+  svg += `<text class="deg-caption" x="${cx}" y="${cy+72}">${unit}</text>`;
+
+  els.gauge.innerHTML = svg;
+}
+
+async function loadWeather(){
+  const p = PARKS[select.value];
+  els.parkName.textContent = `${p.team}`;
+  els.parkCoords.textContent = `${p.park} · lat ${p.lat.toFixed(3)}, lon ${p.lon.toFixed(3)}`;
+  els.status.textContent = "Cargando clima…";
+  els.error.style.display = "none";
+  els.interp.textContent = "";
+
+  try{
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${p.lat}&longitude=${p.lon}&current=temperature_2m,wind_speed_10m,wind_direction_10m,wind_gusts_10m&wind_speed_unit=mph&temperature_unit=fahrenheit&timezone=auto`;
+    const res = await fetch(url);
+    if(!res.ok) throw new Error("No se pudo obtener el clima ("+res.status+")");
+    const data = await res.json();
+    const cur = data.current;
+
+    const degFrom = cur.wind_direction_10m;
+    const degTo = (degFrom + 180) % 360;
+    const speed = Math.round(cur.wind_speed_10m);
+    const gust = Math.round(cur.wind_gusts_10m);
+    const temp = Math.round(cur.temperature_2m);
+    const cardinal = toCardinal(degFrom);
+
+    drawGauge(degFrom, degTo, speed, "MPH");
+
+    els.statDegFrom.textContent = `${Math.round(degFrom)}°`;
+    els.statDegTo.textContent = `${Math.round(degTo)}°`;
+    els.statCardinal.textContent = cardinal;
+    els.statSpeed.textContent = `${speed} mph`;
+
+    els.interp.innerHTML = `El viento <b>viene desde ${cardinal} (${Math.round(degFrom)}°)</b> y <b>sopla hacia ${toCardinal(degTo)} (${Math.round(degTo)}°)</b>, a ${speed} mph (ráfagas hasta ${gust} mph). Temperatura actual: ${temp}°F.`;
+
+    els.status.textContent = `${p.park} — clima en vivo`;
+    const now = new Date();
+    els.updated.textContent = `Actualizado ${now.toLocaleTimeString('es', {hour:'2-digit', minute:'2-digit'})} · fuente: Open-Meteo`;
+  }catch(err){
+    els.status.textContent = "Error al cargar";
+    els.error.style.display = "block";
+    els.error.textContent = "⚠ " + err.message + ". Verifica tu conexión e intenta de nuevo.";
+  }
+}
+
+select.addEventListener('change', loadWeather);
+document.getElementById('refreshBtn').addEventListener('click', loadWeather);
+
+loadWeather();
+</script>
+</body>
+</html>
