@@ -81,9 +81,12 @@ var PARQUES_ALIAS = {
 // Busca la orientación (hpACF) de un parque por nombre de venue, con
 // coincidencia difusa (substring en cualquier dirección) porque el nombre
 // que llega del cache/API puede no ser idéntico letra por letra.
-// Devuelve el número de grados, o 45 (valor neutro) si no encuentra nada.
+// CORRECCION: antes devolvia 45 (valor inventado) en silencio cuando no
+// encontraba el parque. Ahora devuelve null explicito. El codigo que llama
+// a esta funcion debe verificar null y tratarlo como NO_CONFIRMADO, no
+// asumir un grado.
 function getOrientacionParque(venue) {
-  if (!venue) return 45;
+  if (!venue) return null;
   var v = venue.toLowerCase();
 
   // 1. match directo
@@ -110,7 +113,10 @@ function getOrientacionParque(venue) {
     }
   }
 
-  return 45; // no encontrado — valor neutro, no rompe el cálculo
+  // NO_CONFIRMADO: parque no encontrado. Antes esto devolvia 45 en
+  // silencio (valor inventado disfrazado de dato real). Se corrige aqui.
+  console.warn("getOrientacionParque: NO_CONFIRMADO, parque no encontrado -> " + venue);
+  return null;
 }
 
 // Devuelve el objeto completo de orientación (con roof, confianza, fuente),
