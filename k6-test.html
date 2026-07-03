@@ -27,6 +27,8 @@
   .brujula-full-wrap svg { width:170px; height:174px; display:block; margin:0 auto; }
   .brujula-full-wrap .viento-txt { font-size:12px; color:#7a8aa0; margin-top:2px; }
   .brujula-full-wrap .viento-txt b { color:#5b9fd8; }
+  .viento-va-chip { display:inline-block; background:#ff2222; color:#fff; font-weight:800; font-size:14px; padding:6px 16px; border-radius:8px; margin-top:6px; letter-spacing:0.5px; }
+  .viento-va-chip .flecha { font-size:15px; margin:0 4px; }
 
   .duo { display:flex; padding:0 8px 14px; gap:5px; flex-wrap:wrap; }
   .col-arsenal { width:50px; text-align:center; }
@@ -236,29 +238,29 @@
     ];
     var cardHtml="", degHtml="";
     puntos16.forEach(function(p){
-      cardHtml+='<g transform="rotate('+p.g+' '+cx+' '+cy+')"><text x="'+cx+'" y="14" font-size="9" font-weight="700" fill="#9b59ff" text-anchor="middle">'+p.t+'</text></g>';
-      degHtml+='<g transform="rotate('+p.g+' '+cx+' '+cy+')"><text x="'+cx+'" y="38" font-size="7" font-weight="700" fill="#fff" text-anchor="middle">'+Math.round(p.g)+'°</text></g>';
+      // PERCEPCION (boceto original aprobado): el parque queda FIJO
+      // mirando arriba, y el anillo de cardinales rota al reves de la
+      // orientacion real del parque (hp).
+      var gAjustado = ((p.g - hp)%360+360)%360;
+      cardHtml+='<g transform="rotate('+gAjustado+' '+cx+' '+cy+')"><text x="'+cx+'" y="14" font-size="9" font-weight="700" fill="#9b59ff" text-anchor="middle">'+p.t+'</text></g>';
+      degHtml+='<g transform="rotate('+gAjustado+' '+cx+' '+cy+')"><text x="'+cx+'" y="38" font-size="7" font-weight="700" fill="#fff" text-anchor="middle">'+Math.round(p.g)+'°</text></g>';
     });
 
     var flechaHtml = "";
-    var etiquetaHtml = "";
     var lecturaTxt = "N/C";
+    var vaTxt = null;
     if (ventDir !== null && ventDir !== undefined) {
       var vieneDe = ((Number(ventDir)%360)+360)%360;
       var vaHacia = (vieneDe + 180) % 360;
+      var vaHaciaAjustada = ((vaHacia - hp)%360+360)%360;
       flechaHtml =
-        '<g transform="rotate('+vaHacia+' '+cx+' '+cy+')">'+
+        '<g transform="rotate('+vaHaciaAjustada+' '+cx+' '+cy+')">'+
           '<line x1="'+cx+'" y1="'+(cy+50)+'" x2="'+cx+'" y2="'+(cy-38)+'" stroke="#ff2222" stroke-width="2" stroke-linecap="round"/>'+
           '<polygon points="'+cx+','+(cy-46)+' '+(cx-6)+','+(cy-32)+' '+(cx+6)+','+(cy-32)+'" fill="#ff2222"/>'+
           '<circle cx="'+cx+'" cy="'+(cy+50)+'" r="6" fill="#ff2222" stroke="#fff" stroke-width="1.5"/>'+
         '</g>';
-      // NUEVO: etiqueta "va -> XX°" en la punta de la flecha, horizontal.
-      var radVa2 = vaHacia * Math.PI/180;
-      var lxVa2 = cx + 58*Math.sin(radVa2), lyVa2 = cy - 58*Math.cos(radVa2);
-      etiquetaHtml =
-        '<rect x="'+(lxVa2-20)+'" y="'+(lyVa2-7)+'" width="40" height="14" rx="3" fill="#ff2222" opacity="0.92"/>'+
-        '<text x="'+lxVa2+'" y="'+(lyVa2+4)+'" fill="#fff" font-size="9" font-family="monospace" font-weight="800" text-anchor="middle">→'+Math.round(vaHacia)+'°</text>';
       lecturaTxt = Math.round(vieneDe)+"°";
+      vaTxt = Math.round(vaHacia)+"°";
     }
 
     return '<div class="brujula-full-wrap">'+
@@ -267,27 +269,25 @@
         '<circle cx="'+cx+'" cy="'+cy+'" r="68" fill="none" stroke="#333" stroke-width="1"/>'+
         '<circle cx="'+cx+'" cy="'+cy+'" r="66" fill="#0e1420" stroke="#222" stroke-width="1"/>'+
         cardHtml + degHtml +
-        '<g transform="rotate('+hp+' '+cx+' '+cy+')">'+
-          '<line x1="'+cx+'" y1="'+(cy+60)+'" x2="'+cx+'" y2="'+(cy-60)+'" stroke="#ff9f0a" stroke-width="1" stroke-dasharray="3,3" opacity="0.8"/>'+
-          '<path d="M '+cx+' '+(cy+42)+' L '+(cx-45)+' '+(cy-21)+' A 60 60 0 0 1 '+(cx+45)+' '+(cy-21)+' Z" fill="#1a4d2e" stroke="#2d7a4a" stroke-width="1" opacity="0.9"/>'+
-          '<path d="M '+(cx-21)+' '+(cy+42)+' Q '+cx+' '+(cy+18)+' '+(cx+21)+' '+(cy+42)+'" fill="none" stroke="#c9a94d" stroke-width="1" opacity="0.8"/>'+
-          '<path d="M '+(cx-27)+' '+(cy+42)+' Q '+cx+' '+(cy+9)+' '+(cx+27)+' '+(cy+42)+'" fill="none" stroke="#c9a94d" stroke-width="0.7" opacity="0.5"/>'+
-          '<g stroke="#c9a94d" stroke-width="1.5" fill="none">'+
-            '<polygon points="'+cx+','+cy+' '+(cx+18)+','+(cy+21)+' '+cx+','+(cy+42)+' '+(cx-18)+','+(cy+21)+'"/>'+
-            '<circle cx="'+cx+'" cy="'+cy+'" r="2.5" fill="#c9a94d"/>'+
-            '<circle cx="'+(cx+18)+'" cy="'+(cy+21)+'" r="2" fill="#c9a94d"/>'+
-            '<circle cx="'+cx+'" cy="'+(cy+42)+'" r="2" fill="#c9a94d"/>'+
-            '<circle cx="'+(cx-18)+'" cy="'+(cy+21)+'" r="2" fill="#c9a94d"/>'+
-          '</g>'+
+        '<line x1="'+cx+'" y1="'+(cy+60)+'" x2="'+cx+'" y2="'+(cy-60)+'" stroke="#ff9f0a" stroke-width="1" stroke-dasharray="3,3" opacity="0.8"/>'+
+        '<path d="M '+cx+' '+(cy+42)+' L '+(cx-45)+' '+(cy-21)+' A 60 60 0 0 1 '+(cx+45)+' '+(cy-21)+' Z" fill="#1a4d2e" stroke="#2d7a4a" stroke-width="1" opacity="0.9"/>'+
+        '<path d="M '+(cx-21)+' '+(cy+42)+' Q '+cx+' '+(cy+18)+' '+(cx+21)+' '+(cy+42)+'" fill="none" stroke="#c9a94d" stroke-width="1" opacity="0.8"/>'+
+        '<path d="M '+(cx-27)+' '+(cy+42)+' Q '+cx+' '+(cy+9)+' '+(cx+27)+' '+(cy+42)+'" fill="none" stroke="#c9a94d" stroke-width="0.7" opacity="0.5"/>'+
+        '<g stroke="#c9a94d" stroke-width="1.5" fill="none">'+
+          '<polygon points="'+cx+','+cy+' '+(cx+18)+','+(cy+21)+' '+cx+','+(cy+42)+' '+(cx-18)+','+(cy+21)+'"/>'+
+          '<circle cx="'+cx+'" cy="'+cy+'" r="2.5" fill="#c9a94d"/>'+
+          '<circle cx="'+(cx+18)+'" cy="'+(cy+21)+'" r="2" fill="#c9a94d"/>'+
+          '<circle cx="'+cx+'" cy="'+(cy+42)+'" r="2" fill="#c9a94d"/>'+
+          '<circle cx="'+(cx-18)+'" cy="'+(cy+21)+'" r="2" fill="#c9a94d"/>'+
         '</g>'+
         flechaHtml+
-        etiquetaHtml+
         '<circle cx="'+cx+'" cy="'+cy+'" r="3" fill="#ff2222" opacity="0.9"/>'+
         '<rect x="'+(cx-24)+'" y="'+(cy-6)+'" width="48" height="14" rx="3" fill="#0d1117" opacity="0.85"/>'+
         '<text x="'+cx+'" y="'+(cy+4)+'" fill="#58a6ff" font-size="9" font-family="monospace" font-weight="700" text-anchor="middle">~'+lecturaTxt+'</text>'+
       '</svg>'+
       '<div class="viento-txt">'+venue+' · viento <b>'+(ventDir!==null&&ventDir!==undefined?lecturaTxt:"N/C")+
         (ventVel!==null&&ventVel!==undefined?' · '+ventVel.toFixed(0)+' mph':'')+'</b></div>'+
+      (vaTxt ? '<div class="viento-va-chip">'+lecturaTxt+' <span class="flecha">➜</span> '+vaTxt+'</div>' : '')+
     '</div>';
   }
 
