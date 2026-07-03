@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>MLBPro · Torear el Ponche</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; font-family:-apple-system,system-ui,sans-serif; background:#0d1117; color:#e6edf3; }
+  header { padding:14px 16px; border-bottom:1px solid #30363d; }
+  h1 { font-size:16px; margin:0; }
+  main { padding:14px; max-width:900px; margin:0 auto; }
+  .go { width:100%; border:0; border-radius:10px; padding:16px; font-size:16px; font-weight:800; color:#fff; background:#5b3da8; cursor:pointer; margin-bottom:8px; }
+  .go:disabled { background:#30363d; color:#8b949e; }
+  .sub { font-size:12px; color:#8b949e; text-align:center; margin-bottom:14px; }
+
+  select { width:100%; padding:12px; font-size:15px; background:#161b22; color:#e6edf3; border:1px solid #30363d; border-radius:10px; margin-bottom:14px; }
+
+  .parque-bloque { background:#161b22; border:1px solid #30363d; border-radius:14px; padding:14px; margin-bottom:14px; }
+  .parque-titulo { font-size:16px; font-weight:800; margin-bottom:10px; }
+
+  .rango-fila { background:#0d1117; border:1px solid #21262d; border-radius:10px; padding:12px; margin-bottom:8px; }
+  .rango-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
+  .rango-deg { font-size:14px; font-weight:800; color:#79c0ff; }
+  .rango-n { font-size:11px; color:#6e7681; }
+  .rango-stats { display:flex; gap:8px; flex-wrap:wrap; }
+  .stat-chip { flex:1; min-width:80px; background:#161b22; border:1px solid #30363d; border-radius:8px; padding:8px; text-align:center; }
+  .stat-chip .l { font-size:9px; color:#8b949e; text-transform:uppercase; }
+  .stat-chip .v { font-size:16px; font-weight:800; margin-top:2px; }
+  .v-so { color:#d29922; }
+  .v-ip { color:#79c0ff; }
+  .v-pct.alto { color:#3fb950; }
+  .v-pct.bajo { color:#ff7b72; }
+  .v-pct.medio { color:#d29922; }
+  .v-vel { color:#58a6ff; }
+
+  #console { margin-top:16px; background:#010409; border:1px solid #30363d; border-radius:8px; padding:12px; min-height:50px; max-height:30vh; overflow:auto; font-family:ui-monospace,monospace; font-size:11px; white-space:pre-wrap; }
+</style>
+</head>
+<body>
+<header><h1>MLBPro · TOREAR EL PONCHE</h1></header>
+<main>
+  <a href="index.html" style="display:block; text-align:center; color:#5b9fd8; font-size:13px; padding:8px; text-decoration:none;">← Volver al inicio</a>
+
+  <div class="sub">Historial de abridores desde 26 mar 2026 · corte a 4.0 entradas · cruzado con el clima real de cada juego</div>
+
+  <button id="goJalar" class="go">JALAR PONCHES DE TODOS LOS ABRIDORES</button>
+
+  <select id="selParque" style="display:none;"><option value="">— elegir parque —</option></select>
+
+  <div id="resultado"></div>
+  <div id="console">Pulsa el botón (puede tardar, son ~150 pedidos, uno por pitcher).</div>
+</main>
+
+<script src="mlb-routes.js"></script>
+<script src="estadios.js"></script>
+<script src="clima-cache.js"></script>
+<script src="pitchers-master.js"></script>
+<script src="jalar-ponches.js"></script>
+
+<script>
+  var consoleEl = document.getElementById("console");
+  var resultadoEl = document.getElementById("resultado");
+  var selParque = document.getElementById("selParque");
+  function log(t){ var d=document.createElement("div"); d.textContent=t; consoleEl.appendChild(d); consoleEl.scrollTop=consoleEl.scrollHeight; }
+
+  var agrupadoGlobal = null;
+
+  function pctClase(pct){
+    if (pct === null) return "medio";
+    if (pct >= 70) return "alto";
+    if (pct <= 40) return "bajo";
+    return "medio";
+  }
+
+  function dibujarParque(venue, rangos){
+    var filas = "";
+    rangos.forEach(function(r){
+      filas += '<div class="rango-fila">'+
+        '<div class="rango-top">'+
+          '<span class="rango-deg">'+r.lo+'°–'+r.hi+'°</span>'+
+          '<span class="rango-n">'+r.n+' apertura(s)</span>'+
+        '</div>'+
+        '<div class="rango-stats">'+
+          '<div class="stat-chip"><div class="l">Ponches prom</div><div class="v v-so">'+(r.prom_so!==null?r.prom_so.toFixed(1):"—")+'</div></div>'+
+          '<div class="stat-chip"><div class="l">IP prom</div><div class="v v-ip">'+(r.prom_ip!==null?r.prom_ip.toFixed(1):"—")+'</div></div>'+
+          '<div class="stat-chip"><div class="l">Llegó a 4ta</div><div class="v v-pct '+pctClase(r.pct_llegaron_4ta)+'">'+(r.pct_llegaron_4ta!==null?r.pct_llegaron_4ta.toFixed(0)+"%":"—")+'</div></div>'+
+          '<div class="stat-chip"><div class="l">Viento avg</div><div class="v v-vel">'+(r.prom_windspeed!==null?r.prom_windspeed.toFixed(1)+" mph":"—")+'</div></div>'+
+        '</div>'+
+      '</div>';
+    });
+    return '<div class="parque-bloque"><div class="parque-titulo">'+venue+'</div>'+filas+'</div>';
+  }
+
+  document.getElementById("goJalar").addEventListener("click", async function(){
+    var btn = this; btn.disabled = true; btn.textContent = "JALANDO… (puede tardar varios minutos)";
+    consoleEl.textContent = ""; resultadoEl.innerHTML = "";
+    try {
+      if (typeof jalarClima === "function") {
+        log("Verificando cache de clima...");
+        await jalarClima(log);
+      } else {
+        log("AVISO: jalarClima no disponible, se usará el cache de clima que ya exista.");
+      }
+
+      var res = await jalarPonchesTodos(log);
+      log("Cruzando con el clima...");
+      var conClima = ponchesCruzarConClima(res.registros);
+      var conClimaValido = conClima.filter(function(r){ return r.tiene_clima && r.wind_dir !== null; });
+      log("Aperturas con clima confirmado: " + conClimaValido.length + " de " + conClima.length);
+
+      agrupadoGlobal = ponchesAgruparPorParqueYViento(conClimaValido);
+      var venues = Object.keys(agrupadoGlobal).sort();
+
+      selParque.innerHTML = '<option value="">— elegir parque —</option>';
+      venues.forEach(function(v){
+        var o = document.createElement("option"); o.value = v; o.textContent = v;
+        selParque.appendChild(o);
+      });
+      selParque.style.display = venues.length ? "block" : "none";
+
+      if (!venues.length) {
+        resultadoEl.innerHTML = '<div style="color:#8b949e;text-align:center;padding:20px;">Sin datos suficientes cruzados con clima todavía.</div>';
+      } else {
+        log("Elige un parque en el selector para ver el detalle.");
+      }
+    } catch(e) {
+      log("ERROR: " + (e && e.message ? e.message : e));
+    } finally {
+      btn.disabled = false; btn.textContent = "JALAR PONCHES DE TODOS LOS ABRIDORES";
+    }
+  });
+
+  selParque.addEventListener("change", function(){
+    resultadoEl.innerHTML = "";
+    var venue = this.value;
+    if (!venue || !agrupadoGlobal || !agrupadoGlobal[venue]) return;
+    resultadoEl.innerHTML = dibujarParque(venue, agrupadoGlobal[venue]);
+  });
+</script>
+</body>
+</html>
