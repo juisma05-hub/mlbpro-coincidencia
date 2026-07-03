@@ -363,7 +363,8 @@
         var promDirVaHaciaTxt = Math.round((Math.round(((Number(promDir)%360)+360)%360)+180)%360);
         var promDirVieneDeTxt = Math.round(((Number(promDir)%360)+360)%360);
 
-        var vaLo = (lo+180)%360, vaHi = (hi+180)%360;
+        var loBucket = r*30, hiBucket = loBucket+30;
+        var vaLo = (loBucket+180)%360, vaHi = (hiBucket+180)%360;
         var lblVa = vaLo+'°–'+vaHi+'°';
 
         html+=
