@@ -88,6 +88,8 @@
   .brujula-explorer-wrap svg { width:190px; height:194px; display:block; margin:0 auto; }
   .explorer-txt { font-size:12px; color:#8b949e; margin-top:3px; }
   .explorer-txt b { color:#58a6ff; }
+  .viento-va-chip { display:inline-block; background:#ff2222; color:#fff; font-weight:800; font-size:15px; padding:6px 18px; border-radius:8px; margin-top:6px; letter-spacing:0.5px; }
+  .viento-va-chip .flecha { font-size:16px; margin:0 4px; }
   .explorer-hint { font-size:10px; color:#6e7681; margin-top:6px; font-style:italic; }
 
   #portada {
@@ -237,7 +239,7 @@
     } catch(e) { return ""; }
   }
 
-  document.getElementById("goBrujula").addEventListener("click",function(){ location.href="casar-series.html"; });
+  document.getElementById("goBrujula").addEventListener("click",function(){ location.href="casar-series-test.html"; });
   document.getElementById("goVenideros").addEventListener("click",function(){ location.href="venideros-test.html"; });
   document.getElementById("goPasados").addEventListener("click",function(){ location.href="dia-pasado-test.html"; });
   document.getElementById("goHunter").addEventListener("click",function(){ location.href="dataprohunter.html"; });
@@ -263,56 +265,51 @@
     ];
     var cardHtml="", degHtml="";
     puntos16.forEach(function(p){
-      cardHtml+='<g transform="rotate('+p.g+' '+cx+' '+cy+')"><text x="'+cx+'" y="14" font-size="9" font-weight="700" fill="#9b59ff" text-anchor="middle">'+p.t+'</text></g>';
-      degHtml+='<g transform="rotate('+p.g+' '+cx+' '+cy+')"><text x="'+cx+'" y="38" font-size="7" font-weight="700" fill="#fff" text-anchor="middle">'+Math.round(p.g)+'°</text></g>';
+      // PERCEPCION (boceto original aprobado): el parque queda FIJO
+      // mirando arriba, y el anillo de cardinales rota al reves de la
+      // orientacion real del parque (hp).
+      var gAjustado = ((p.g - hp)%360+360)%360;
+      cardHtml+='<g transform="rotate('+gAjustado+' '+cx+' '+cy+')"><text x="'+cx+'" y="14" font-size="9" font-weight="700" fill="#9b59ff" text-anchor="middle">'+p.t+'</text></g>';
+      degHtml+='<g transform="rotate('+gAjustado+' '+cx+' '+cy+')"><text x="'+cx+'" y="38" font-size="7" font-weight="700" fill="#fff" text-anchor="middle">'+Math.round(p.g)+'°</text></g>';
     });
 
     var hoyFlechaHtml = "";
-    var hoyEtiquetaHtml = "";
     var hoyTxt = "N/C";
+    var hoyVaTxt = null;
     if (hoyDir !== null && hoyDir !== undefined && hoyDir !== "" && !isNaN(Number(hoyDir))) {
       var vieneDe = ((Number(hoyDir)%360)+360)%360;
       var vaHacia = (vieneDe+180)%360;
+      var vaHaciaAjustada = ((vaHacia - hp)%360+360)%360;
       hoyFlechaHtml =
-        '<g transform="rotate('+vaHacia+' '+cx+' '+cy+')">'+
+        '<g transform="rotate('+vaHaciaAjustada+' '+cx+' '+cy+')">'+
           '<line x1="'+cx+'" y1="'+(cy+50)+'" x2="'+cx+'" y2="'+(cy-38)+'" stroke="#ff2222" stroke-width="2" stroke-linecap="round"/>'+
           '<polygon points="'+cx+','+(cy-46)+' '+(cx-6)+','+(cy-32)+' '+(cx+6)+','+(cy-32)+'" fill="#ff2222"/>'+
           '<circle cx="'+cx+'" cy="'+(cy+50)+'" r="6" fill="#ff2222" stroke="#fff" stroke-width="1.5"/>'+
         '</g>';
-      // NUEVO: etiqueta "va -> XX°" en la punta de la flecha, siempre
-      // horizontal (calculada con trigonometria, no con rotate de SVG)
-      // para no tener que calcular de cabeza el opuesto del grado.
-      var radVa = vaHacia * Math.PI/180;
-      var lxVa = cx + 58*Math.sin(radVa), lyVa = cy - 58*Math.cos(radVa);
-      hoyEtiquetaHtml =
-        '<rect x="'+(lxVa-20)+'" y="'+(lyVa-7)+'" width="40" height="14" rx="3" fill="#ff2222" opacity="0.92"/>'+
-        '<text x="'+lxVa+'" y="'+(lyVa+4)+'" fill="#fff" font-size="9" font-family="monospace" font-weight="800" text-anchor="middle">→'+Math.round(vaHacia)+'°</text>';
       hoyTxt = Math.round(vieneDe)+"°";
+      hoyVaTxt = Math.round(vaHacia)+"°";
     }
 
     var venueEsc = String(venue||"").replace(/&/g,"&amp;").replace(/"/g,"&quot;");
 
-    return '<div class="brujula-explorer-wrap" data-idx="'+idx+'" data-venue="'+venueEsc+'">'+
+    return '<div class="brujula-explorer-wrap" data-idx="'+idx+'" data-venue="'+venueEsc+'" data-hp="'+hp+'">'+
       '<svg viewBox="0 0 200 205">'+
         '<circle cx="'+cx+'" cy="'+cy+'" r="95" fill="none" stroke="#333" stroke-width="1"/>'+
         '<circle cx="'+cx+'" cy="'+cy+'" r="68" fill="none" stroke="#333" stroke-width="1"/>'+
         '<circle cx="'+cx+'" cy="'+cy+'" r="66" fill="#0e1420" stroke="#222" stroke-width="1"/>'+
         cardHtml + degHtml +
-        '<g transform="rotate('+hp+' '+cx+' '+cy+')">'+
-          '<line x1="'+cx+'" y1="'+(cy+60)+'" x2="'+cx+'" y2="'+(cy-60)+'" stroke="#ff9f0a" stroke-width="1" stroke-dasharray="3,3" opacity="0.8"/>'+
-          '<path d="M '+cx+' '+(cy+42)+' L '+(cx-45)+' '+(cy-21)+' A 60 60 0 0 1 '+(cx+45)+' '+(cy-21)+' Z" fill="#1a4d2e" stroke="#2d7a4a" stroke-width="1" opacity="0.9"/>'+
-          '<path d="M '+(cx-21)+' '+(cy+42)+' Q '+cx+' '+(cy+18)+' '+(cx+21)+' '+(cy+42)+'" fill="none" stroke="#c9a94d" stroke-width="1" opacity="0.8"/>'+
-          '<path d="M '+(cx-27)+' '+(cy+42)+' Q '+cx+' '+(cy+9)+' '+(cx+27)+' '+(cy+42)+'" fill="none" stroke="#c9a94d" stroke-width="0.7" opacity="0.5"/>'+
-          '<g stroke="#c9a94d" stroke-width="1.5" fill="none">'+
-            '<polygon points="'+cx+','+cy+' '+(cx+18)+','+(cy+21)+' '+cx+','+(cy+42)+' '+(cx-18)+','+(cy+21)+'"/>'+
-            '<circle cx="'+cx+'" cy="'+cy+'" r="2.5" fill="#c9a94d"/>'+
-            '<circle cx="'+(cx+18)+'" cy="'+(cy+21)+'" r="2" fill="#c9a94d"/>'+
-            '<circle cx="'+cx+'" cy="'+(cy+42)+'" r="2" fill="#c9a94d"/>'+
-            '<circle cx="'+(cx-18)+'" cy="'+(cy+21)+'" r="2" fill="#c9a94d"/>'+
-          '</g>'+
+        '<line x1="'+cx+'" y1="'+(cy+60)+'" x2="'+cx+'" y2="'+(cy-60)+'" stroke="#ff9f0a" stroke-width="1" stroke-dasharray="3,3" opacity="0.8"/>'+
+        '<path d="M '+cx+' '+(cy+42)+' L '+(cx-45)+' '+(cy-21)+' A 60 60 0 0 1 '+(cx+45)+' '+(cy-21)+' Z" fill="#1a4d2e" stroke="#2d7a4a" stroke-width="1" opacity="0.9"/>'+
+        '<path d="M '+(cx-21)+' '+(cy+42)+' Q '+cx+' '+(cy+18)+' '+(cx+21)+' '+(cy+42)+'" fill="none" stroke="#c9a94d" stroke-width="1" opacity="0.8"/>'+
+        '<path d="M '+(cx-27)+' '+(cy+42)+' Q '+cx+' '+(cy+9)+' '+(cx+27)+' '+(cy+42)+'" fill="none" stroke="#c9a94d" stroke-width="0.7" opacity="0.5"/>'+
+        '<g stroke="#c9a94d" stroke-width="1.5" fill="none">'+
+          '<polygon points="'+cx+','+cy+' '+(cx+18)+','+(cy+21)+' '+cx+','+(cy+42)+' '+(cx-18)+','+(cy+21)+'"/>'+
+          '<circle cx="'+cx+'" cy="'+cy+'" r="2.5" fill="#c9a94d"/>'+
+          '<circle cx="'+(cx+18)+'" cy="'+(cy+21)+'" r="2" fill="#c9a94d"/>'+
+          '<circle cx="'+cx+'" cy="'+(cy+42)+'" r="2" fill="#c9a94d"/>'+
+          '<circle cx="'+(cx-18)+'" cy="'+(cy+21)+'" r="2" fill="#c9a94d"/>'+
         '</g>'+
         hoyFlechaHtml+
-        hoyEtiquetaHtml+
         '<g id="explorerArrow_'+idx+'" transform="rotate(0 '+cx+' '+cy+')">'+
           '<line x1="'+cx+'" y1="'+(cy+50)+'" x2="'+cx+'" y2="'+(cy-38)+'" stroke="#1f6feb" stroke-width="2" stroke-dasharray="4,3" stroke-linecap="round"/>'+
           '<polygon points="'+cx+','+(cy-46)+' '+(cx-6)+','+(cy-32)+' '+(cx+6)+','+(cy-32)+'" fill="#1f6feb"/>'+
@@ -320,6 +317,7 @@
         '<circle cx="'+cx+'" cy="'+cy+'" r="3" fill="#e6edf3" opacity="0.9"/>'+
       '</svg>'+
       '<div class="explorer-txt">🔴 viento de hoy: <b>'+hoyTxt+(hoyVel!==null&&hoyVel!==undefined&&typeof hoyVel==="number"?' · '+hoyVel.toFixed(0)+' mph':'')+'</b></div>'+
+      (hoyVaTxt ? '<div class="viento-va-chip">'+hoyTxt+' <span class="flecha">➜</span> '+hoyVaTxt+'</div>' : '')+
       '<div class="explorer-txt">🔵 explorando: <b id="explorerRango_'+idx+'">arrastra la flecha azul</b></div>'+
       '<div class="explorer-txt">históricamente: <b id="explorerCarr_'+idx+'">—</b></div>'+
       '<div class="explorer-hint">mové el dedo apretado sobre la brújula para ver otros rangos de viento</div>'+
@@ -335,7 +333,13 @@
   function actualizarExplorer(wrap, deg){
     var idx = wrap.getAttribute('data-idx');
     var venue = wrap.getAttribute('data-venue');
-    var lo = Math.floor(deg/30)*30, hi = lo+30;
+    var hp = Number(wrap.getAttribute('data-hp'))||45;
+    // deg es el angulo VISUAL (pantalla), pero como el parque ahora es
+    // el marco fijo (no el norte real), hay que sumarle hp para volver
+    // a tener el angulo REAL de viento y poder filtrar el cache
+    // correctamente (el cache guarda direcciones reales, no visuales).
+    var degReal = ((deg + hp)%360+360)%360;
+    var lo = Math.floor(degReal/30)*30, hi = lo+30;
     var arrow = document.getElementById('explorerArrow_'+idx);
     if(arrow) arrow.setAttribute('transform','rotate('+deg+' 100 100)');
     var rangoEl = document.getElementById('explorerRango_'+idx);
