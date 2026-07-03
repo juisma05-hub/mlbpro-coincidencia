@@ -7,6 +7,7 @@
 <style>
   :root { color-scheme: dark; }
   * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { touch-action: none; overscroll-behavior: none; overflow: hidden; height:100%; }
   body { margin:0; font-family:-apple-system,system-ui,sans-serif; background:#0d1117; color:#e6edf3; }
   header { padding:14px 16px; border-bottom:1px solid #30363d; }
   h1 { font-size:15px; margin:0; }
@@ -136,7 +137,7 @@
     {g:90,t:"E"},{g:112.5,t:"ESE"},{g:135,t:"SE"},{g:157.5,t:"SSE"},
     {g:180,t:"S"},{g:202.5,t:"SSO"},{g:225,t:"SO"},{g:247.5,t:"OSO"},
     {g:270,t:"O"},{g:292.5,t:"ONO"},{g:315,t:"NO"},{g:337.5,t:"NNO"}
-  ];
+  ]; // ya estaba correcto en este archivo — ver nota abajo
 
   var anilloDeg = 0;   // grado del anillo de letras (rotado por barra IZQUIERDA)
   var parqueDeg = 0;   // grado del dibujo del parque (rotado por barra DERECHA)
@@ -231,8 +232,6 @@
     wrap.addEventListener("pointerdown", function(e){
       arrastrando = true;
       try { wrap.setPointerCapture(e.pointerId); } catch(err){}
-      document.body.style.overflow = "hidden";
-      document.body.style.touchAction = "none";
       mover(e.clientY);
       e.preventDefault();
     });
@@ -243,15 +242,9 @@
     });
     wrap.addEventListener("pointerup", function(e){
       arrastrando = false;
-      document.body.style.overflow = "";
-      document.body.style.touchAction = "";
       try { wrap.releasePointerCapture(e.pointerId); } catch(err){}
     });
-    wrap.addEventListener("pointercancel", function(){
-      arrastrando = false;
-      document.body.style.overflow = "";
-      document.body.style.touchAction = "";
-    });
+    wrap.addEventListener("pointercancel", function(){ arrastrando = false; });
   }
 
   setupArrastre("barraIzqWrap", "svgIzq", geoIzq, function(deg){
