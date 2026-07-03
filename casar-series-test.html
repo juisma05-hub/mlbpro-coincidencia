@@ -373,9 +373,9 @@
               '<div class="rv-equipo">'+homeTeam+'</div>'+
               '<div class="rv-parque">'+venue+'</div>'+
               svgBrujula(hpACF, promDir)+
-              '<div class="viento-va-chip">'+promDirVieneDeTxt+'° <span class="flecha">➜</span> '+promDirVaHaciaTxt+'°</div>'+
+              '<div class="viento-va-chip">'+promDirVaHaciaTxt+'° <span style="font-size:11px;font-weight:600;opacity:0.75;">(viene de '+promDirVieneDeTxt+'°)</span></div>'+
               '<div style="text-align:center;font-size:12px;color:#8b949e;margin-top:2px;">viento promedio <b style="color:#58a6ff">'+(promV!==null?promV.toFixed(1)+' mph':'—')+'</b></div>'+
-              '<div class="rv-rango">Viento (viene de) '+lbl+' <span style="color:#6e7681;">→ va hacia '+lblVa+'</span></div>'+
+              '<div class="rv-rango">Viento va hacia '+lblVa+' <span style="color:#6e7681;">(viene de '+lbl+')</span></div>'+
               favorHtml+
               '<div class="rv-meta">'+gs.length+' juego(s) · viento avg <b style="color:#e6edf3">'+(promV!==null?promV.toFixed(1)+' mph':'—')+'</b> · prom <b style="color:#e6edf3">'+promC+'</b> carreras</div>'+
             '</div>'+
