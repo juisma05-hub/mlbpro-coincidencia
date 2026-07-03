@@ -180,6 +180,7 @@
   // FAVORABLE y la flecha apuntar para afuera del abanico del jardin.
   function svgBrujula(hpACF, promDir) {
     var cx=100, cy=100;
+    var hp = (hpACF!==null && hpACF!==undefined) ? hpACF : 45;
     var puntos16=[
       {g:0,t:"N"},{g:22.5,t:"NNE"},{g:45,t:"NE"},{g:67.5,t:"ENE"},
       {g:90,t:"E"},{g:112.5,t:"ESE"},{g:135,t:"SE"},{g:157.5,t:"SSE"},
@@ -188,39 +189,43 @@
     ];
     var cardHtml="", degHtml="";
     puntos16.forEach(function(p){
-      cardHtml+='<g transform="rotate('+p.g+' '+cx+' '+cy+')"><text x="'+cx+'" y="14" font-size="9" font-weight="700" fill="#9b59ff" text-anchor="middle">'+p.t+'</text></g>';
-      var gr = Math.round((p.g+ (p.g===0?0:0))); // grado mostrado
-      degHtml+='<g transform="rotate('+p.g+' '+cx+' '+cy+')"><text x="'+cx+'" y="38" font-size="7" font-weight="700" fill="#fff" text-anchor="middle">'+Math.round(p.g)+'°</text></g>';
+      // PERCEPCION (boceto original aprobado): el parque queda FIJO
+      // mirando arriba, y el anillo de cardinales rota al reves de la
+      // orientacion real del parque (hp) para que la lectura de "hacia
+      // donde mira el parque" siga siendo correcta.
+      var gAjustado = ((p.g - hp)%360+360)%360;
+      cardHtml+='<g transform="rotate('+gAjustado+' '+cx+' '+cy+')"><text x="'+cx+'" y="14" font-size="9" font-weight="700" fill="#9b59ff" text-anchor="middle">'+p.t+'</text></g>';
+      degHtml+='<g transform="rotate('+gAjustado+' '+cx+' '+cy+')"><text x="'+cx+'" y="38" font-size="7" font-weight="700" fill="#fff" text-anchor="middle">'+Math.round(p.g)+'°</text></g>';
     });
 
     // grado real HACIA donde va el viento (para dibujar la flecha) y
     // el grado original de donde VIENE (para la etiqueta de texto).
     var promDirVieneDe = ((Number(promDir)%360)+360)%360;
     var promDirVaHacia = (promDirVieneDe + 180) % 360;
+    var vaHaciaAjustada = ((promDirVaHacia - hp)%360+360)%360;
 
     return '<svg width="200" height="205" viewBox="0 0 200 205" style="display:block;margin:0 auto">'+
       '<circle cx="'+cx+'" cy="'+cy+'" r="95" fill="none" stroke="#333" stroke-width="1"/>'+
       '<circle cx="'+cx+'" cy="'+cy+'" r="68" fill="none" stroke="#333" stroke-width="1"/>'+
       '<circle cx="'+cx+'" cy="'+cy+'" r="66" fill="#0e1420" stroke="#222" stroke-width="1"/>'+
       cardHtml + degHtml +
-      // TODO EL PARQUE rota junto como una pieza: linea de orientacion + abanico + medialunas + diamante
-      '<g transform="rotate('+hpACF+' '+cx+' '+cy+')">'+
-        '<line x1="'+cx+'" y1="'+(cy+60)+'" x2="'+cx+'" y2="'+(cy-60)+'" stroke="#ff9f0a" stroke-width="1" stroke-dasharray="3,3" opacity="0.8"/>'+
-        '<path d="M '+cx+' '+(cy+42)+' L '+(cx-45)+' '+(cy-21)+' A 60 60 0 0 1 '+(cx+45)+' '+(cy-21)+' Z" fill="#1a4d2e" stroke="#2d7a4a" stroke-width="1" opacity="0.9"/>'+
-        '<path d="M '+(cx-21)+' '+(cy+42)+' Q '+cx+' '+(cy+18)+' '+(cx+21)+' '+(cy+42)+'" fill="none" stroke="#c9a94d" stroke-width="1" opacity="0.8"/>'+
-        '<path d="M '+(cx-27)+' '+(cy+42)+' Q '+cx+' '+(cy+9)+' '+(cx+27)+' '+(cy+42)+'" fill="none" stroke="#c9a94d" stroke-width="0.7" opacity="0.5"/>'+
-        '<g stroke="#c9a94d" stroke-width="1.5" fill="none">'+
-          '<polygon points="'+cx+','+cy+' '+(cx+18)+','+(cy+21)+' '+cx+','+(cy+42)+' '+(cx-18)+','+(cy+21)+'"/>'+
-          '<circle cx="'+cx+'" cy="'+cy+'" r="2.5" fill="#c9a94d"/>'+
-          '<circle cx="'+(cx+18)+'" cy="'+(cy+21)+'" r="2" fill="#c9a94d"/>'+
-          '<circle cx="'+cx+'" cy="'+(cy+42)+'" r="2" fill="#c9a94d"/>'+
-          '<circle cx="'+(cx-18)+'" cy="'+(cy+21)+'" r="2" fill="#c9a94d"/>'+
-        '</g>'+
+      // PARQUE FIJO: ya NO rota con hpACF. Siempre mira hacia arriba
+      // (home -> jardin central apuntando al "norte" de la pantalla).
+      '<line x1="'+cx+'" y1="'+(cy+60)+'" x2="'+cx+'" y2="'+(cy-60)+'" stroke="#ff9f0a" stroke-width="1" stroke-dasharray="3,3" opacity="0.8"/>'+
+      '<path d="M '+cx+' '+(cy+42)+' L '+(cx-45)+' '+(cy-21)+' A 60 60 0 0 1 '+(cx+45)+' '+(cy-21)+' Z" fill="#1a4d2e" stroke="#2d7a4a" stroke-width="1" opacity="0.9"/>'+
+      '<path d="M '+(cx-21)+' '+(cy+42)+' Q '+cx+' '+(cy+18)+' '+(cx+21)+' '+(cy+42)+'" fill="none" stroke="#c9a94d" stroke-width="1" opacity="0.8"/>'+
+      '<path d="M '+(cx-27)+' '+(cy+42)+' Q '+cx+' '+(cy+9)+' '+(cx+27)+' '+(cy+42)+'" fill="none" stroke="#c9a94d" stroke-width="0.7" opacity="0.5"/>'+
+      '<g stroke="#c9a94d" stroke-width="1.5" fill="none">'+
+        '<polygon points="'+cx+','+cy+' '+(cx+18)+','+(cy+21)+' '+cx+','+(cy+42)+' '+(cx-18)+','+(cy+21)+'"/>'+
+        '<circle cx="'+cx+'" cy="'+cy+'" r="2.5" fill="#c9a94d"/>'+
+        '<circle cx="'+(cx+18)+'" cy="'+(cy+21)+'" r="2" fill="#c9a94d"/>'+
+        '<circle cx="'+cx+'" cy="'+(cy+42)+'" r="2" fill="#c9a94d"/>'+
+        '<circle cx="'+(cx-18)+'" cy="'+(cy+21)+'" r="2" fill="#c9a94d"/>'+
       '</g>'+
-      // flecha roja del viento: LA PUNTA apunta hacia donde el viento VA
-      // (promDirVaHacia), la bolita queda del lado de donde VIENE.
-      // Independiente de la rotacion del parque (referencia = brujula fija).
-      '<g transform="rotate('+promDirVaHacia+' '+cx+' '+cy+')">'+
+      // flecha roja del viento: rota AJUSTADA al marco fijo del parque
+      // (vaHaciaAjustada), no el angulo real puro, porque ahora el
+      // parque es la referencia fija en vez del norte real.
+      '<g transform="rotate('+vaHaciaAjustada+' '+cx+' '+cy+')">'+
         '<line x1="'+cx+'" y1="'+(cy+50)+'" x2="'+cx+'" y2="'+(cy-38)+'" stroke="#ff2222" stroke-width="2" stroke-linecap="round"/>'+
         '<polygon points="'+cx+','+(cy-46)+' '+(cx-6)+','+(cy-32)+' '+(cx+6)+','+(cy-32)+'" fill="#ff2222"/>'+
         '<circle cx="'+cx+'" cy="'+(cy+50)+'" r="6" fill="#ff2222" stroke="#fff" stroke-width="1.5"/>'+
@@ -354,7 +359,7 @@
                 '<div class="rv-fecha">'+fechaCorta(gk2.date)+'</div>'+
                 '<div class="rv-vs">vs '+visitante+'</div>'+
               '</div>'+
-              '<div class="rv-dir">'+gk2.wind_dir+'°<div style="font-size:9px;color:#8b949e;font-weight:500;margin-top:1px;">'+(typeof gk2.windspeed_mph==="number"?gk2.windspeed_mph.toFixed(0)+' mph':'—')+'</div><div style="font-size:9px;color:#ff5252;font-weight:800;margin-top:1px;">➜'+Math.round((Number(gk2.wind_dir)+180)%360)+'°</div></div>'+
+              '<div class="rv-dir">'+Math.round((Number(gk2.wind_dir)+180)%360)+'°<div style="font-size:9px;color:#8b949e;font-weight:500;margin-top:1px;">'+(typeof gk2.windspeed_mph==="number"?gk2.windspeed_mph.toFixed(0)+' mph':'—')+'</div><div style="font-size:8px;color:#6e7681;font-weight:500;margin-top:1px;">sale de '+gk2.wind_dir+'°</div></div>'+
               '<div class="rv-temp">'+(typeof gk2.temperature_f==="number"?Math.round(gk2.temperature_f)+"°":"—")+'</div>'+
               '<div class="rv-marc">'+marc+(c2!==null?' <span class="rv-total">('+c2+')</span>':'')+'</div>'+
             '</div>';
@@ -373,9 +378,9 @@
               '<div class="rv-equipo">'+homeTeam+'</div>'+
               '<div class="rv-parque">'+venue+'</div>'+
               svgBrujula(hpACF, promDir)+
-              '<div class="viento-va-chip">'+promDirVaHaciaTxt+'° <span style="font-size:11px;font-weight:600;opacity:0.75;">(viene de '+promDirVieneDeTxt+'°)</span></div>'+
+              '<div class="viento-va-chip">'+promDirVieneDeTxt+'° <span class="flecha">➜</span> '+promDirVaHaciaTxt+'°</div>'+
               '<div style="text-align:center;font-size:12px;color:#8b949e;margin-top:2px;">viento promedio <b style="color:#58a6ff">'+(promV!==null?promV.toFixed(1)+' mph':'—')+'</b></div>'+
-              '<div class="rv-rango">Viento va hacia '+lblVa+' <span style="color:#6e7681;">(viene de '+lbl+')</span></div>'+
+              '<div class="rv-rango">Viento (viene de) '+lbl+' <span style="color:#6e7681;">→ va hacia '+lblVa+'</span></div>'+
               favorHtml+
               '<div class="rv-meta">'+gs.length+' juego(s) · viento avg <b style="color:#e6edf3">'+(promV!==null?promV.toFixed(1)+' mph':'—')+'</b> · prom <b style="color:#e6edf3">'+promC+'</b> carreras</div>'+
             '</div>'+
