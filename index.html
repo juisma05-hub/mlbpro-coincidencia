@@ -175,6 +175,7 @@
 <header><h1>DataPro · Coincidencia</h1></header>
 <main>
   <button id="goBrujula" class="go-brujula">🧭 BRÚJULA DEL VIENTO POR PARQUE<span class="sub2">Ver rango de viento favorable/desfavorable de cualquier parque</span></button>
+  <button id="goMedirOrientacion" class="go-brujula" style="background:linear-gradient(180deg,#ffd580,#c98f1f);">📐 MEDIR ORIENTACIÓN (herramienta)<span class="sub2">Calibrar a mano la orientación real de cada parque</span></button>
 
   <button id="go" class="go">COINCIDENCIA DATAPRO<span class="sub2">Money Line · clima de hoy vs histórico</span></button>
   <button id="goVenideros" class="go-venideros">SERIES VENIDERAS (7 días)</button>
@@ -240,6 +241,7 @@
   }
 
   document.getElementById("goBrujula").addEventListener("click",function(){ location.href="casar-series-test.html"; });
+  document.getElementById("goMedirOrientacion").addEventListener("click",function(){ location.href="medir-orientacion.html"; });
   document.getElementById("goVenideros").addEventListener("click",function(){ location.href="venideros-test.html"; });
   document.getElementById("goPasados").addEventListener("click",function(){ location.href="dia-pasado-test.html"; });
   document.getElementById("goHunter").addEventListener("click",function(){ location.href="dataprohunter.html"; });
