@@ -32,6 +32,7 @@
   .rv-bloque.verde   { border-color:#3fb950; }
   .rv-bloque.amarillo{ border-color:#d29922; }
   .rv-bloque.rojo    { border-color:#f85149; }
+  .rv-bloque.gris    { border-color:#484f58; }
 
   .rv-cab {
     background:#161b22;
@@ -46,6 +47,7 @@
   .rv-favor  { font-size:11px; font-weight:800; padding:3px 10px; border-radius:6px; margin-top:4px; }
   .rv-favor.si  { color:#3fb950; background:#1a2f1e; border:1px solid #3fb950; }
   .rv-favor.no  { color:#f85149; background:#2f1a1a; border:1px solid #f85149; }
+  .rv-favor.nc  { color:#8b949e; background:#21262d; border:1px solid #484f58; }
   .viento-va-chip { display:block; text-align:center; background:#ff2222; color:#fff; font-weight:800; font-size:15px; padding:6px 14px; border-radius:8px; margin-top:6px; letter-spacing:0.5px; }
   .viento-va-chip .flecha { font-size:16px; margin:0 4px; }
 
@@ -107,7 +109,11 @@
   // se compara contra el opuesto de hpACF (la direccion HACIA donde
   // apunta el jardin central es hpACF; el viento FAVORECE cuando viene
   // desde el lado contrario al jardin, es decir sopla HACIA el jardin).
+  // CORRECCION: si hpACF es null (parque sin orientacion confirmada), ya
+  // NO se calcula un favorable/desfavorable falso — se devuelve null y
+  // el llamador debe mostrar NO_CONFIRMADO.
   function vientoFavorable(windDir, hpACF) {
+    if (hpACF===null || hpACF===undefined) return null;
     var opuesto = (hpACF + 180) % 360;
     var diff = Math.abs(windDir - opuesto);
     if (diff > 180) diff = 360 - diff;
@@ -175,13 +181,20 @@
   // FIX 2 jul 2026: promDir (g.wind_dir) es DE DONDE VIENE el viento
   // (convencion meteorologica estandar, confirmado contra
   // weather-direction.html). La flecha tiene que APUNTAR hacia donde el
-  // viento VA (promDir+180), con la bolita del lado de donde viene. Antes
-  // la flecha apuntaba directo a promDir, o sea señalaba "de donde viene"
-  // en vez de "hacia donde empuja la bola" — por eso podia decir
-  // FAVORABLE y la flecha apuntar para afuera del abanico del jardin.
+  // viento VA (promDir+180), con la bolita del lado de donde viene.
+  //
+  // FIX (esta sesion): si hpACF es null (parque sin orientacion
+  // confirmada), YA NO se dibuja la brujula con un 45 grados inventado.
+  // Se devuelve un SVG simple diciendo NO_CONFIRMADO.
   function svgBrujula(hpACF, promDir) {
     var cx=100, cy=100;
-    var hp = (hpACF!==null && hpACF!==undefined) ? hpACF : 45;
+    if (hpACF===null || hpACF===undefined) {
+      return '<svg width="200" height="205" viewBox="0 0 200 205" style="display:block;margin:0 auto">'+
+        '<circle cx="'+cx+'" cy="'+cy+'" r="95" fill="none" stroke="#333" stroke-width="1"/>'+
+        '<text x="'+cx+'" y="'+cy+'" fill="#8b949e" font-size="13" font-weight="700" text-anchor="middle">NO_CONFIRMADO</text>'+
+      '</svg>';
+    }
+    var hp = hpACF;
     var puntos16=[
       {g:0,t:"N"},{g:22.5,t:"NNE"},{g:45,t:"NE"},{g:67.5,t:"ENE"},
       {g:90,t:"E"},{g:112.5,t:"ESE"},{g:135,t:"SE"},{g:157.5,t:"SSE"},
@@ -291,7 +304,7 @@
     if(!venue){ log("Elige un parque."); return; }
     try {
       var cache=climaLeerCache();
-      var hpACF=(typeof getOrientacionParque==="function")?getOrientacionParque(venue):45;
+      var hpACF=(typeof getOrientacionParque==="function")?getOrientacionParque(venue):null;
 
       var homeTeam="";
       for(var ii=0;ii<cache.length;ii++){
@@ -305,6 +318,7 @@
       });
       log("Juegos con dirección de viento: "+juegos.length);
       if(!juegos.length){ log("Sin juegos con dirección de viento para este parque."); return; }
+      if(hpACF===null){ log("AVISO: orientación de "+venue+" NO_CONFIRMADO — se muestra el viento pero sin FAVORABLE/DESFAVORABLE."); }
 
       var etiquetas=[
         "0°–30°","30°–60°","60°–90°","90°–120°","120°–150°","150°–180°",
@@ -345,9 +359,15 @@
         }
 
         var esFavor = vientoFavorable(promDir, hpACF);
-        var favorHtml = '<div class="rv-favor '+(esFavor?"si":"no")+'">'+
-          (esFavor ? "FAVORABLE (empuja la bola)" : "DESFAVORABLE (frena la bola)")+
-          '</div>';
+        var favorHtml;
+        if (esFavor===null) {
+          favorHtml = '<div class="rv-favor nc">NO_CONFIRMADO (orientación de parque sin medir)</div>';
+          colorCls = "gris";
+        } else {
+          favorHtml = '<div class="rv-favor '+(esFavor?"si":"no")+'">'+
+            (esFavor ? "FAVORABLE (empuja la bola)" : "DESFAVORABLE (frena la bola)")+
+            '</div>';
+        }
 
         var filas="";
         for(var k2=0;k2<gs.length;k2++){
