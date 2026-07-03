@@ -18,14 +18,18 @@
   select { width:100%; padding:12px; font-size:15px; background:#161b22; color:#e6edf3; border:1px solid #30363d; border-radius:10px; margin-bottom:14px; }
 
   .parque-bloque { background:#161b22; border:1px solid #30363d; border-radius:14px; padding:14px; margin-bottom:14px; }
-  .parque-titulo { font-size:16px; font-weight:800; margin-bottom:10px; }
+  .parque-titulo { font-size:16px; font-weight:800; margin-bottom:6px; text-align:center; }
 
-  .rango-fila { background:#0d1117; border:1px solid #21262d; border-radius:10px; padding:12px; margin-bottom:8px; }
-  .rango-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
-  .rango-deg { font-size:14px; font-weight:800; color:#79c0ff; }
-  .rango-n { font-size:11px; color:#6e7681; }
-  .rango-stats { display:flex; gap:8px; flex-wrap:wrap; }
-  .stat-chip { flex:1; min-width:80px; background:#161b22; border:1px solid #30363d; border-radius:8px; padding:8px; text-align:center; }
+  .brujula-wrap { text-align:center; padding:8px 0 6px; margin-bottom:10px; touch-action:none; cursor:grab; }
+  .brujula-wrap:active { cursor:grabbing; }
+  .brujula-wrap svg { width:190px; height:194px; display:block; margin:0 auto; }
+  .brujula-txt { font-size:12px; color:#8b949e; margin-top:3px; }
+  .brujula-txt b { color:#58a6ff; }
+  .viento-va-chip { display:inline-block; background:#ff2222; color:#fff; font-weight:800; font-size:15px; padding:6px 18px; border-radius:8px; margin-top:6px; letter-spacing:0.5px; }
+  .brujula-hint { font-size:10px; color:#6e7681; margin-top:6px; font-style:italic; }
+
+  .stat-row { display:flex; gap:8px; flex-wrap:wrap; margin:10px 0; }
+  .stat-chip { flex:1; min-width:80px; background:#0d1117; border:1px solid #30363d; border-radius:8px; padding:8px; text-align:center; }
   .stat-chip .l { font-size:9px; color:#8b949e; text-transform:uppercase; }
   .stat-chip .v { font-size:16px; font-weight:800; margin-top:2px; }
   .v-so { color:#d29922; }
@@ -34,6 +38,14 @@
   .v-pct.bajo { color:#ff7b72; }
   .v-pct.medio { color:#d29922; }
   .v-vel { color:#58a6ff; }
+
+  .pitcher-lista-hdr { font-size:11px; color:#8b949e; font-weight:700; letter-spacing:0.5px; margin:12px 0 6px; text-transform:uppercase; }
+  .pitcher-fila { background:#0d1117; border:1px solid #21262d; border-radius:8px; padding:8px 10px; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .pitcher-fila .nom { font-size:13px; font-weight:700; flex:1; }
+  .pitcher-fila .det { font-size:10px; color:#8b949e; margin-top:2px; }
+  .pitcher-fila .badge { font-size:10px; font-weight:800; padding:3px 8px; border-radius:6px; flex-shrink:0; }
+  .badge.llego { color:#3fb950; background:#0d2818; }
+  .badge.apaleado { color:#ff453a; background:#2d0d0d; }
 
   #console { margin-top:16px; background:#010409; border:1px solid #30363d; border-radius:8px; padding:12px; min-height:50px; max-height:30vh; overflow:auto; font-family:ui-monospace,monospace; font-size:11px; white-space:pre-wrap; }
 </style>
@@ -56,6 +68,7 @@
 <script src="mlb-routes.js"></script>
 <script src="estadios.js"></script>
 <script src="clima-cache.js"></script>
+<script src="parques-orientacion.js"></script>
 <script src="pitchers-master.js"></script>
 <script src="jalar-ponches.js"></script>
 
@@ -65,7 +78,7 @@
   var selParque = document.getElementById("selParque");
   function log(t){ var d=document.createElement("div"); d.textContent=t; consoleEl.appendChild(d); consoleEl.scrollTop=consoleEl.scrollHeight; }
 
-  var agrupadoGlobal = null;
+  var registrosGlobal = null;
 
   function pctClase(pct){
     if (pct === null) return "medio";
@@ -74,23 +87,164 @@
     return "medio";
   }
 
-  function dibujarParque(venue, rangos){
-    var filas = "";
-    rangos.forEach(function(r){
-      filas += '<div class="rango-fila">'+
-        '<div class="rango-top">'+
-          '<span class="rango-deg">'+r.lo+'°–'+r.hi+'°</span>'+
-          '<span class="rango-n">'+r.n+' apertura(s)</span>'+
-        '</div>'+
-        '<div class="rango-stats">'+
-          '<div class="stat-chip"><div class="l">Ponches prom</div><div class="v v-so">'+(r.prom_so!==null?r.prom_so.toFixed(1):"—")+'</div></div>'+
-          '<div class="stat-chip"><div class="l">IP prom</div><div class="v v-ip">'+(r.prom_ip!==null?r.prom_ip.toFixed(1):"—")+'</div></div>'+
-          '<div class="stat-chip"><div class="l">Llegó a 4ta</div><div class="v v-pct '+pctClase(r.pct_llegaron_4ta)+'">'+(r.pct_llegaron_4ta!==null?r.pct_llegaron_4ta.toFixed(0)+"%":"—")+'</div></div>'+
-          '<div class="stat-chip"><div class="l">Viento avg</div><div class="v v-vel">'+(r.prom_windspeed!==null?r.prom_windspeed.toFixed(1)+" mph":"—")+'</div></div>'+
-        '</div>'+
-      '</div>';
+  function dibujarBrujula(venue, hp){
+    var cx=100, cy=100;
+    var puntos16=[
+      {g:0,t:"N"},{g:22.5,t:"NNE"},{g:45,t:"NE"},{g:67.5,t:"ENE"},
+      {g:90,t:"E"},{g:112.5,t:"ESE"},{g:135,t:"SE"},{g:157.5,t:"SSE"},
+      {g:180,t:"S"},{g:202.5,t:"SSW"},{g:225,t:"SW"},{g:247.5,t:"WSW"},
+      {g:270,t:"W"},{g:292.5,t:"WNW"},{g:315,t:"NW"},{g:337.5,t:"NNW"}
+    ];
+    var cardHtml="", degHtml="";
+    puntos16.forEach(function(p){
+      var gAjustado = ((p.g - hp)%360+360)%360;
+      cardHtml+='<g transform="rotate('+gAjustado+' '+cx+' '+cy+')"><text x="'+cx+'" y="14" font-size="9" font-weight="700" fill="#9b59ff" text-anchor="middle">'+p.t+'</text></g>';
+      degHtml+='<g transform="rotate('+gAjustado+' '+cx+' '+cy+')"><text x="'+cx+'" y="38" font-size="7" font-weight="700" fill="#fff" text-anchor="middle">'+Math.round(p.g)+'°</text></g>';
     });
-    return '<div class="parque-bloque"><div class="parque-titulo">'+venue+'</div>'+filas+'</div>';
+
+    var venueEsc = String(venue||"").replace(/&/g,"&amp;").replace(/"/g,"&quot;");
+
+    return '<div class="brujula-wrap" data-venue="'+venueEsc+'" data-hp="'+hp+'">'+
+      '<svg viewBox="0 0 200 205">'+
+        '<circle cx="'+cx+'" cy="'+cy+'" r="95" fill="none" stroke="#333" stroke-width="1"/>'+
+        '<circle cx="'+cx+'" cy="'+cy+'" r="68" fill="none" stroke="#333" stroke-width="1"/>'+
+        '<circle cx="'+cx+'" cy="'+cy+'" r="66" fill="#0e1420" stroke="#222" stroke-width="1"/>'+
+        cardHtml + degHtml +
+        '<line x1="'+cx+'" y1="'+(cy+60)+'" x2="'+cx+'" y2="'+(cy-60)+'" stroke="#ff9f0a" stroke-width="1" stroke-dasharray="3,3" opacity="0.8"/>'+
+        '<path d="M '+cx+' '+(cy+42)+' L '+(cx-45)+' '+(cy-21)+' A 60 60 0 0 1 '+(cx+45)+' '+(cy-21)+' Z" fill="#1a4d2e" stroke="#2d7a4a" stroke-width="1" opacity="0.9"/>'+
+        '<path d="M '+(cx-21)+' '+(cy+42)+' Q '+cx+' '+(cy+18)+' '+(cx+21)+' '+(cy+42)+'" fill="none" stroke="#c9a94d" stroke-width="1" opacity="0.8"/>'+
+        '<path d="M '+(cx-27)+' '+(cy+42)+' Q '+cx+' '+(cy+9)+' '+(cx+27)+' '+(cy+42)+'" fill="none" stroke="#c9a94d" stroke-width="0.7" opacity="0.5"/>'+
+        '<g stroke="#c9a94d" stroke-width="1.5" fill="none">'+
+          '<polygon points="'+cx+','+cy+' '+(cx+18)+','+(cy+21)+' '+cx+','+(cy+42)+' '+(cx-18)+','+(cy+21)+'"/>'+
+          '<circle cx="'+cx+'" cy="'+cy+'" r="2.5" fill="#c9a94d"/>'+
+          '<circle cx="'+(cx+18)+'" cy="'+(cy+21)+'" r="2" fill="#c9a94d"/>'+
+          '<circle cx="'+cx+'" cy="'+(cy+42)+'" r="2" fill="#c9a94d"/>'+
+          '<circle cx="'+(cx-18)+'" cy="'+(cy+21)+'" r="2" fill="#c9a94d"/>'+
+        '</g>'+
+        '<g id="flechaBrujula" transform="rotate(0 '+cx+' '+cy+')">'+
+          '<line x1="'+cx+'" y1="'+(cy+50)+'" x2="'+cx+'" y2="'+(cy-38)+'" stroke="#1f6feb" stroke-width="2" stroke-linecap="round"/>'+
+          '<polygon points="'+cx+','+(cy-46)+' '+(cx-6)+','+(cy-32)+' '+(cx+6)+','+(cy-32)+'" fill="#1f6feb"/>'+
+          '<circle cx="'+cx+'" cy="'+(cy+50)+'" r="6" fill="#1f6feb" stroke="#fff" stroke-width="1.5"/>'+
+        '</g>'+
+        '<circle cx="'+cx+'" cy="'+cy+'" r="3" fill="#e6edf3" opacity="0.9"/>'+
+      '</svg>'+
+      '<div class="viento-va-chip" id="brujulaVaChip">arrastra la flecha</div>'+
+      '<div class="brujula-hint">mové el dedo apretado para explorar otros rangos de viento</div>'+
+    '</div>';
+  }
+
+  function turnoTxt(turno){
+    if (turno === "day") return "☀️ Día";
+    if (turno === "night") return "🌙 Noche";
+    return "N/C";
+  }
+
+  function pitcherFilaHtml(r){
+    var badgeCls = r.llego_4ta ? "llego" : "apaleado";
+    var badgeTxt = r.llego_4ta ? "LLEGÓ A 4TA" : "APALEADO";
+    return '<div class="pitcher-fila">'+
+      '<div>'+
+        '<div class="nom">'+r.pitcher+'</div>'+
+        '<div class="det">'+r.fecha+' · '+turnoTxt(r.turno)+' · vs '+(r.rival||"?")+' · IP '+(r.ip!==null?r.ip.toFixed(1):"—")+' · SO '+(r.so!==null?r.so:"—")+' · '+(r.windspeed_mph!==null&&r.windspeed_mph!==undefined?r.windspeed_mph.toFixed(0)+' mph':"—")+'</div>'+
+      '</div>'+
+      '<div class="badge '+badgeCls+'">'+badgeTxt+'</div>'+
+    '</div>';
+  }
+
+  function actualizarBrujula(wrap, degVisual){
+    var venue = wrap.getAttribute('data-venue');
+    var hp = Number(wrap.getAttribute('data-hp'))||45;
+    var degReal = ((degVisual + hp)%360+360)%360;
+    var lo = Math.floor(degReal/30)*30, hi = lo+30;
+    var vaHacia = (degReal+180)%360;
+
+    var flecha = document.getElementById('flechaBrujula');
+    if (flecha) flecha.setAttribute('transform','rotate('+degVisual+' 100 100)');
+    var chip = document.getElementById('brujulaVaChip');
+    if (chip) chip.textContent = Math.round(vaHacia)+'° (sale de '+Math.round(degReal)+'°)';
+
+    if (!registrosGlobal) return;
+    var enRango = registrosGlobal.filter(function(r){
+      return r.venue === venue && r.wind_dir !== null && r.wind_dir !== undefined &&
+             (Number(r.wind_dir)%360) >= lo && (Number(r.wind_dir)%360) < hi;
+    });
+    enRango.sort(function(a,b){ return a.fecha < b.fecha ? 1 : -1; });
+
+    var n = enRango.length;
+    var sumSO=0,nSO=0,sumIP=0,nIP=0,llegaron4=0,conDato4=0,sumVel=0,nVel=0;
+    enRango.forEach(function(r){
+      if (r.so !== null) { sumSO += r.so; nSO++; }
+      if (r.ip !== null) { sumIP += r.ip; nIP++; }
+      if (r.llego_4ta !== null) { conDato4++; if (r.llego_4ta) llegaron4++; }
+      if (typeof r.windspeed_mph === "number") { sumVel += r.windspeed_mph; nVel++; }
+    });
+    var promSO = nSO ? (sumSO/nSO) : null;
+    var promIP = nIP ? (sumIP/nIP) : null;
+    var pct4 = conDato4 ? (llegaron4/conDato4*100) : null;
+    var promVel = nVel ? (sumVel/nVel) : null;
+
+    var statsHtml = '<div class="stat-row">'+
+      '<div class="stat-chip"><div class="l">Ponches prom</div><div class="v v-so">'+(promSO!==null?promSO.toFixed(1):"—")+'</div></div>'+
+      '<div class="stat-chip"><div class="l">IP prom</div><div class="v v-ip">'+(promIP!==null?promIP.toFixed(1):"—")+'</div></div>'+
+      '<div class="stat-chip"><div class="l">Llegó a 4ta</div><div class="v v-pct '+pctClase(pct4)+'">'+(pct4!==null?pct4.toFixed(0)+"%":"—")+'</div></div>'+
+      '<div class="stat-chip"><div class="l">Viento avg</div><div class="v v-vel">'+(promVel!==null?promVel.toFixed(1)+" mph":"—")+'</div></div>'+
+    '</div>';
+
+    var listaHtml = '<div class="pitcher-lista-hdr">'+lo+'°–'+hi+'° (viene de) · '+n+' apertura(s)</div>';
+    if (!n) {
+      listaHtml += '<div style="color:#6e7681;font-size:12px;text-align:center;padding:10px;">Sin aperturas en este rango.</div>';
+    } else {
+      enRango.forEach(function(r){ listaHtml += pitcherFilaHtml(r); });
+    }
+
+    var statsBox = document.getElementById('statsBrujula');
+    var listaBox = document.getElementById('listaBrujula');
+    if (statsBox) statsBox.innerHTML = statsHtml;
+    if (listaBox) listaBox.innerHTML = listaHtml;
+  }
+
+  function clienteASvgPoint(svg, clientX, clientY){
+    var pt = svg.createSVGPoint();
+    pt.x=clientX; pt.y=clientY;
+    var ctm = svg.getScreenCTM();
+    if(!ctm) return {x:100,y:100};
+    return pt.matrixTransform(ctm.inverse());
+  }
+  function degDesdeEvento(wrap, clientX, clientY){
+    var svg = wrap.querySelector('svg');
+    var p = clienteASvgPoint(svg, clientX, clientY);
+    var dx = p.x-100, dy = p.y-100;
+    var deg = Math.atan2(dx, -dy)*180/Math.PI;
+    if(deg<0) deg+=360;
+    return deg;
+  }
+
+  var dragging = false;
+  resultadoEl.addEventListener('pointerdown', function(e){
+    var wrap = e.target.closest ? e.target.closest('.brujula-wrap') : null;
+    if(!wrap) return;
+    dragging = true;
+    actualizarBrujula(wrap, degDesdeEvento(wrap, e.clientX, e.clientY));
+    e.preventDefault();
+  });
+  resultadoEl.addEventListener('pointermove', function(e){
+    if(!dragging) return;
+    var wrap = e.target.closest ? e.target.closest('.brujula-wrap') : null;
+    if(!wrap) return;
+    actualizarBrujula(wrap, degDesdeEvento(wrap, e.clientX, e.clientY));
+    e.preventDefault();
+  });
+  resultadoEl.addEventListener('pointerup', function(){ dragging = false; });
+  resultadoEl.addEventListener('pointercancel', function(){ dragging = false; });
+
+  function dibujarParque(venue){
+    var hp = (typeof getOrientacionParque === "function") ? getOrientacionParque(venue) : 45;
+    return '<div class="parque-bloque">'+
+      '<div class="parque-titulo">'+venue+'</div>'+
+      dibujarBrujula(venue, hp)+
+      '<div id="statsBrujula"></div>'+
+      '<div id="listaBrujula"></div>'+
+    '</div>';
   }
 
   document.getElementById("goJalar").addEventListener("click", async function(){
@@ -110,17 +264,20 @@
       var conClimaValido = conClima.filter(function(r){ return r.tiene_clima && r.wind_dir !== null; });
       log("Aperturas con clima confirmado: " + conClimaValido.length + " de " + conClima.length);
 
-      agrupadoGlobal = ponchesAgruparPorParqueYViento(conClimaValido);
-      var venues = Object.keys(agrupadoGlobal).sort();
+      registrosGlobal = conClimaValido;
+
+      var venues = {};
+      conClimaValido.forEach(function(r){ if (r.venue) venues[r.venue] = true; });
+      var venuesList = Object.keys(venues).sort();
 
       selParque.innerHTML = '<option value="">— elegir parque —</option>';
-      venues.forEach(function(v){
+      venuesList.forEach(function(v){
         var o = document.createElement("option"); o.value = v; o.textContent = v;
         selParque.appendChild(o);
       });
-      selParque.style.display = venues.length ? "block" : "none";
+      selParque.style.display = venuesList.length ? "block" : "none";
 
-      if (!venues.length) {
+      if (!venuesList.length) {
         resultadoEl.innerHTML = '<div style="color:#8b949e;text-align:center;padding:20px;">Sin datos suficientes cruzados con clima todavía.</div>';
       } else {
         log("Elige un parque en el selector para ver el detalle.");
@@ -135,8 +292,10 @@
   selParque.addEventListener("change", function(){
     resultadoEl.innerHTML = "";
     var venue = this.value;
-    if (!venue || !agrupadoGlobal || !agrupadoGlobal[venue]) return;
-    resultadoEl.innerHTML = dibujarParque(venue, agrupadoGlobal[venue]);
+    if (!venue) return;
+    resultadoEl.innerHTML = dibujarParque(venue);
+    var wrap = resultadoEl.querySelector('.brujula-wrap');
+    if (wrap) actualizarBrujula(wrap, 0);
   });
 </script>
 </body>
