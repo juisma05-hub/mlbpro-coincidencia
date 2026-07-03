@@ -131,6 +131,14 @@ async function jalarPonchesTodos(logFn, hoyISOStr) {
         var so = (sp.stat && sp.stat.strikeOuts !== undefined) ? Number(sp.stat.strikeOuts) : null;
         var er = (sp.stat && sp.stat.earnedRuns !== undefined) ? Number(sp.stat.earnedRuns) : null;
 
+        // NUEVO: turno dia/noche, si el gameLog lo trae (a veces viene en
+        // sp.game.dayNight, a veces en sp.dayNight directo segun la version
+        // del endpoint). Si no viene, queda null y se muestra "N/C" — no
+        // se inventa el dato.
+        var turno = null;
+        if (sp.game && sp.game.dayNight) turno = sp.game.dayNight;
+        else if (sp.dayNight) turno = sp.dayNight;
+
         registros.push({
           pitcher_id: pid,
           pitcher: nombrePitcher,
@@ -142,6 +150,7 @@ async function jalarPonchesTodos(logFn, hoyISOStr) {
           ip: ip,
           so: so,
           er: er,
+          turno: turno,
           llego_4ta: (ip !== null) ? (ip >= PONCHES_IP_CORTE) : null
         });
       }
@@ -183,6 +192,7 @@ function ponchesCruzarConClima(registrosPonches) {
       ip: r.ip,
       so: r.so,
       er: r.er,
+      turno: r.turno,
       llego_4ta: r.llego_4ta,
       wind_dir: clima ? clima.wind_dir : null,
       windspeed_mph: clima ? clima.windspeed_mph : null,
