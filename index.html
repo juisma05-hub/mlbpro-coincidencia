@@ -176,6 +176,7 @@
 <main>
   <button id="goBrujula" class="go-brujula">🧭 BRÚJULA DEL VIENTO POR PARQUE<span class="sub2">Ver rango de viento favorable/desfavorable de cualquier parque</span></button>
   <button id="goMedirOrientacion" class="go-brujula" style="background:linear-gradient(180deg,#ffd580,#c98f1f);">📐 MEDIR ORIENTACIÓN (herramienta)<span class="sub2">Calibrar a mano la orientación real de cada parque</span></button>
+  <button id="goTorearPonches" class="go-brujula" style="background:linear-gradient(180deg,#ff9d9d,#c0392b);">🔥 TOREAR EL PONCHE<span class="sub2">Historial de ponches de abridores según el viento de cada parque</span></button>
 
   <button id="go" class="go">COINCIDENCIA DATAPRO<span class="sub2">Money Line · clima de hoy vs histórico</span></button>
   <button id="goVenideros" class="go-venideros">SERIES VENIDERAS (7 días)</button>
@@ -242,6 +243,7 @@
 
   document.getElementById("goBrujula").addEventListener("click",function(){ location.href="casar-series-test.html"; });
   document.getElementById("goMedirOrientacion").addEventListener("click",function(){ location.href="medir-orientacion.html"; });
+  document.getElementById("goTorearPonches").addEventListener("click",function(){ location.href="torear-ponches-test.html"; });
   document.getElementById("goVenideros").addEventListener("click",function(){ location.href="venideros-test.html"; });
   document.getElementById("goPasados").addEventListener("click",function(){ location.href="dia-pasado-test.html"; });
   document.getElementById("goHunter").addEventListener("click",function(){ location.href="dataprohunter.html"; });
@@ -319,7 +321,7 @@
         '<circle cx="'+cx+'" cy="'+cy+'" r="3" fill="#e6edf3" opacity="0.9"/>'+
       '</svg>'+
       '<div class="explorer-txt">🔴 viento de hoy: <b>'+hoyTxt+(hoyVel!==null&&hoyVel!==undefined&&typeof hoyVel==="number"?' · '+hoyVel.toFixed(0)+' mph':'')+'</b></div>'+
-      (hoyVaTxt ? '<div class="viento-va-chip">'+hoyVaTxt+' <span style="font-size:11px;font-weight:600;opacity:0.75;">(sale de '+hoyTxt+')</span></div>' : '')+
+      (hoyVaTxt ? '<div class="viento-va-chip">'+hoyTxt+' <span class="flecha">➜</span> '+hoyVaTxt+'</div>' : '')+
       '<div class="explorer-txt">🔵 explorando: <b id="explorerRango_'+idx+'">arrastra la flecha azul</b></div>'+
       '<div class="explorer-txt">históricamente: <b id="explorerCarr_'+idx+'">—</b></div>'+
       '<div class="explorer-hint">mové el dedo apretado sobre la brújula para ver otros rangos de viento</div>'+
