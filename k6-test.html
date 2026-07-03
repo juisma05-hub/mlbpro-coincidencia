@@ -225,10 +225,24 @@
   // ── brújula completa: MISMO estilo aprobado de casar-series.html (2 aros,
   // 16 puntos cardinales afuera, diamante+abanico adentro rotando según
   // hpACF, flecha de viento apuntando hacia donde VA -no de donde viene-,
-  // grado y velocidad visibles) — reescalada mas chica para esta tarjeta. ──
+  // grado y velocidad visibles) — reescalada mas chica para esta tarjeta.
+  //
+  // FIX (esta sesion): si hpACF es null (parque sin orientacion
+  // confirmada), YA NO se dibuja un 45 grados inventado. Se muestra
+  // NO_CONFIRMADO en vez de una brujula falsa. ──
   function brujulaCompleta(venue, hpACF, ventDir, ventVel){
     var cx=100, cy=100;
-    var hp = (hpACF!==null && hpACF!==undefined) ? hpACF : 45;
+
+    if (hpACF===null || hpACF===undefined) {
+      return '<div class="brujula-full-wrap">'+
+        '<svg viewBox="0 0 200 205">'+
+          '<circle cx="'+cx+'" cy="'+cy+'" r="95" fill="none" stroke="#333" stroke-width="1"/>'+
+          '<text x="'+cx+'" y="'+cy+'" fill="#7a8aa0" font-size="12" font-weight="700" text-anchor="middle">NO_CONFIRMADO</text>'+
+        '</svg>'+
+        '<div class="viento-txt">'+venue+' · orientación de parque sin medir</div>'+
+      '</div>';
+    }
+    var hp = hpACF;
 
     var puntos16=[
       {g:0,t:"N"},{g:22.5,t:"NNE"},{g:45,t:"NE"},{g:67.5,t:"ENE"},
