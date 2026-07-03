@@ -241,6 +241,7 @@
     });
 
     var flechaHtml = "";
+    var etiquetaHtml = "";
     var lecturaTxt = "N/C";
     if (ventDir !== null && ventDir !== undefined) {
       var vieneDe = ((Number(ventDir)%360)+360)%360;
@@ -251,6 +252,12 @@
           '<polygon points="'+cx+','+(cy-46)+' '+(cx-6)+','+(cy-32)+' '+(cx+6)+','+(cy-32)+'" fill="#ff2222"/>'+
           '<circle cx="'+cx+'" cy="'+(cy+50)+'" r="6" fill="#ff2222" stroke="#fff" stroke-width="1.5"/>'+
         '</g>';
+      // NUEVO: etiqueta "va -> XX°" en la punta de la flecha, horizontal.
+      var radVa2 = vaHacia * Math.PI/180;
+      var lxVa2 = cx + 58*Math.sin(radVa2), lyVa2 = cy - 58*Math.cos(radVa2);
+      etiquetaHtml =
+        '<rect x="'+(lxVa2-20)+'" y="'+(lyVa2-7)+'" width="40" height="14" rx="3" fill="#ff2222" opacity="0.92"/>'+
+        '<text x="'+lxVa2+'" y="'+(lyVa2+4)+'" fill="#fff" font-size="9" font-family="monospace" font-weight="800" text-anchor="middle">→'+Math.round(vaHacia)+'°</text>';
       lecturaTxt = Math.round(vieneDe)+"°";
     }
 
@@ -274,6 +281,7 @@
           '</g>'+
         '</g>'+
         flechaHtml+
+        etiquetaHtml+
         '<circle cx="'+cx+'" cy="'+cy+'" r="3" fill="#ff2222" opacity="0.9"/>'+
         '<rect x="'+(cx-24)+'" y="'+(cy-6)+'" width="48" height="14" rx="3" fill="#0d1117" opacity="0.85"/>'+
         '<text x="'+cx+'" y="'+(cy+4)+'" fill="#58a6ff" font-size="9" font-family="monospace" font-weight="700" text-anchor="middle">~'+lecturaTxt+'</text>'+
