@@ -317,7 +317,7 @@
         '<circle cx="'+cx+'" cy="'+cy+'" r="3" fill="#e6edf3" opacity="0.9"/>'+
       '</svg>'+
       '<div class="explorer-txt">🔴 viento de hoy: <b>'+hoyTxt+(hoyVel!==null&&hoyVel!==undefined&&typeof hoyVel==="number"?' · '+hoyVel.toFixed(0)+' mph':'')+'</b></div>'+
-      (hoyVaTxt ? '<div class="viento-va-chip">'+hoyTxt+' <span class="flecha">➜</span> '+hoyVaTxt+'</div>' : '')+
+      (hoyVaTxt ? '<div class="viento-va-chip">'+hoyVaTxt+' <span style="font-size:11px;font-weight:600;opacity:0.75;">(sale de '+hoyTxt+')</span></div>' : '')+
       '<div class="explorer-txt">🔵 explorando: <b id="explorerRango_'+idx+'">arrastra la flecha azul</b></div>'+
       '<div class="explorer-txt">históricamente: <b id="explorerCarr_'+idx+'">—</b></div>'+
       '<div class="explorer-hint">mové el dedo apretado sobre la brújula para ver otros rangos de viento</div>'+
