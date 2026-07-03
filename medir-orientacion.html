@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>MLBPro · Medir Orientación (herramienta)</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; font-family:-apple-system,system-ui,sans-serif; background:#0d1117; color:#e6edf3; }
+  header { padding:14px 16px; border-bottom:1px solid #30363d; }
+  h1 { font-size:15px; margin:0; }
+  main { padding:14px; max-width:480px; margin:0 auto; }
+
+  label { font-size:12px; color:#8b949e; display:block; margin:10px 0 4px; }
+  select { width:100%; padding:12px; font-size:15px; background:#161b22; color:#e6edf3; border:1px solid #30363d; border-radius:10px; }
+
+  .caja { background:#161b22; border:1px solid #30363d; border-radius:14px; padding:16px; margin-top:14px; }
+  .fila { display:flex; gap:14px; justify-content:center; align-items:center; }
+
+  /* barras verticales arrastrables, touch-action:none evita scroll de pagina */
+  .barra-wrap { position:relative; width:70px; height:380px; flex-shrink:0; touch-action:none; cursor:grab; }
+  .barra-wrap:active { cursor:grabbing; }
+  .barra-wrap svg { width:100%; height:100%; display:block; }
+  .barra-lbl { text-align:center; font-size:10px; color:#8b949e; margin-top:6px; letter-spacing:0.3px; }
+
+  .compass-wrap { position:relative; width:220px; height:220px; flex-shrink:0; }
+  .compass-wrap svg { width:100%; height:100%; display:block; }
+
+  .lecturas { margin-top:14px; display:flex; gap:8px; }
+  .lbox { flex:1; background:#0d1117; border:1px solid #30363d; border-radius:10px; padding:10px; text-align:center; }
+  .lbox .lbl { font-size:9px; color:#8b949e; letter-spacing:0.3px; }
+  .lbox .val { font-size:20px; font-weight:800; margin-top:2px; color:#79c0ff; }
+
+  .btn-guardar { width:100%; border:0; border-radius:10px; padding:14px; font-size:15px; font-weight:800; color:#fff; background:#238636; cursor:pointer; margin-top:14px; }
+  .btn-guardar.congelado { background:#8957e5; }
+
+  .copia-box { margin-top:10px; background:#0d1117; border:1px solid #30363d; border-radius:8px; padding:10px; font-family:ui-monospace,monospace; font-size:12px; color:#c9d1d9; word-break:break-all; }
+
+  #console { margin-top:14px; background:#010409; border:1px solid #30363d; border-radius:8px; padding:10px; min-height:20px; font-family:ui-monospace,monospace; font-size:11px; white-space:pre-wrap; }
+</style>
+</head>
+<body>
+<header><h1>MLBPro · MEDIR ORIENTACIÓN (herramienta suelta, no toca la app)</h1></header>
+<main>
+
+  <label>Parque a medir:</label>
+  <select id="parqueSel">
+    <option value="">— elegir —</option>
+    <option value="Rogers Centre">Toronto Blue Jays · Rogers Centre</option>
+    <option value="Tropicana Field">Tampa Bay Rays · Tropicana Field</option>
+    <option value="Kauffman Stadium">Kansas City Royals · Kauffman Stadium</option>
+    <option value="Target Field">Minnesota Twins · Target Field</option>
+    <option value="Daikin Park">Houston Astros · Daikin Park</option>
+    <option value="Angel Stadium">Los Angeles Angels · Angel Stadium</option>
+    <option value="Sutter Health Park">Athletics · Sutter Health Park</option>
+    <option value="T-Mobile Park">Seattle Mariners · T-Mobile Park</option>
+    <option value="Globe Life Field">Texas Rangers · Globe Life Field</option>
+    <option value="Truist Park">Atlanta Braves · Truist Park</option>
+    <option value="loanDepot Park">Miami Marlins · loanDepot Park</option>
+    <option value="Great American Ball Park">Cincinnati Reds · Great American Ball Park</option>
+    <option value="American Family Field">Milwaukee Brewers · American Family Field</option>
+    <option value="Busch Stadium">St. Louis Cardinals · Busch Stadium</option>
+    <option value="Chase Field">Arizona Diamondbacks · Chase Field</option>
+    <option value="Coors Field">Colorado Rockies · Coors Field</option>
+    <option value="Comerica Park">Detroit Tigers · Comerica Park</option>
+    <option value="Oracle Park">San Francisco Giants · Oracle Park</option>
+    <option value="Yankee Stadium">New York Yankees · Yankee Stadium</option>
+    <option value="PNC Park">Pittsburgh Pirates · PNC Park</option>
+    <option value="Progressive Field">Cleveland Guardians · Progressive Field</option>
+    <option value="Citi Field">New York Mets · Citi Field</option>
+    <option value="Citizens Bank Park">Philadelphia Phillies · Citizens Bank Park</option>
+    <option value="Dodger Stadium">Los Angeles Dodgers · Dodger Stadium</option>
+    <option value="Rate Field">Chicago White Sox · Rate Field</option>
+    <option value="Nationals Park">Washington Nationals · Nationals Park</option>
+    <option value="Petco Park">San Diego Padres · Petco Park</option>
+    <option value="Wrigley Field">Chicago Cubs · Wrigley Field</option>
+    <option value="Fenway Park">Boston Red Sox · Fenway Park</option>
+    <option value="Oriole Park at Camden Yards">Baltimore Orioles · Oriole Park at Camden Yards</option>
+  </select>
+
+  <div class="caja">
+    <div class="fila">
+      <div class="barra-wrap" id="barraIzqWrap">
+        <svg id="svgIzq" viewBox="0 0 70 380"></svg>
+      </div>
+
+      <div class="compass-wrap">
+        <svg id="compassSvg" viewBox="0 0 220 220">
+          <circle cx="110" cy="110" r="95" fill="#0d1117" stroke="#30363d" stroke-width="2"/>
+          <g id="compassMarcas"></g>
+          <g id="compassParque">
+            <path d="M 110,152 L 65,79 A 60,60 0 0 1 155,79 Z" fill="#1a4d2e" stroke="#2d7a4a" stroke-width="1" opacity="0.9"/>
+            <g stroke="#c9a94d" stroke-width="1.5" fill="none">
+              <polygon points="110,110 128,131 110,152 92,131"/>
+              <circle cx="110" cy="110" r="3" fill="#c9a94d"/>
+              <circle cx="128" cy="131" r="2.5" fill="#c9a94d"/>
+              <circle cx="110" cy="152" r="2.5" fill="#c9a94d"/>
+              <circle cx="92" cy="131" r="2.5" fill="#c9a94d"/>
+            </g>
+            <!-- linea home -> segunda -> jardin central, cruza por encima del anillo -->
+            <line x1="110" y1="152" x2="110" y2="15" stroke="#ff2222" stroke-width="2" stroke-dasharray="5,3"/>
+          </g>
+          <circle cx="110" cy="110" r="4" fill="#e6edf3"/>
+        </svg>
+      </div>
+
+      <div class="barra-wrap" id="barraDerWrap">
+        <svg id="svgDer" viewBox="0 0 70 380"></svg>
+      </div>
+    </div>
+    <div class="fila" style="margin-top:4px;">
+      <div style="width:70px;"></div>
+      <div class="barra-lbl" style="flex:1;">◀ IZQ: gira la BRÚJULA (letras) &nbsp;·&nbsp; DER: gira el PARQUE ▶</div>
+      <div style="width:70px;"></div>
+    </div>
+
+    <div class="lecturas">
+      <div class="lbox"><div class="lbl">GRADO BRÚJULA (anillo)</div><div class="val" id="lecAnillo">0°</div></div>
+      <div class="lbox"><div class="lbl">GRADO RESULTANTE (línea del parque)</div><div class="val" id="lecResultado">0°</div></div>
+    </div>
+
+    <button class="btn-guardar" id="btnGuardar">CONGELAR LECTURA (para hacer captura)</button>
+    <div class="copia-box" id="copiaBox" style="display:none;"></div>
+  </div>
+
+  <div id="console">Elegí un parque, movés la barra izquierda para girar la brújula y la barra derecha para girar el parque, hasta que coincida con la fuente que encontraste. Congelá y hacé tu captura de pantalla.</div>
+</main>
+
+<script>
+  var consoleEl = document.getElementById("console");
+  function log(t){ var d=document.createElement("div"); d.textContent=t; consoleEl.appendChild(d); consoleEl.scrollTop=consoleEl.scrollHeight; }
+
+  var puntos16 = [
+    {g:0,t:"N"},{g:22.5,t:"NNE"},{g:45,t:"NE"},{g:67.5,t:"ENE"},
+    {g:90,t:"E"},{g:112.5,t:"ESE"},{g:135,t:"SE"},{g:157.5,t:"SSE"},
+    {g:180,t:"S"},{g:202.5,t:"SSO"},{g:225,t:"SO"},{g:247.5,t:"OSO"},
+    {g:270,t:"O"},{g:292.5,t:"ONO"},{g:315,t:"NO"},{g:337.5,t:"NNO"}
+  ];
+
+  var anilloDeg = 0;   // grado del anillo de letras (rotado por barra IZQUIERDA)
+  var parqueDeg = 0;   // grado del dibujo del parque (rotado por barra DERECHA)
+
+  function pintarAnillo(){
+    var cx=110, cy=110, r=95;
+    var html = "";
+    puntos16.forEach(function(p){
+      var gAjustado = ((p.g + anilloDeg)%360+360)%360;
+      var rad = gAjustado * Math.PI/180;
+      var esMayor = (p.g % 90 === 0);
+      var rTxt = r - (esMayor?16:12);
+      var x = cx + rTxt*Math.sin(rad), y = cy - rTxt*Math.cos(rad);
+      html += '<text x="'+x+'" y="'+(y+4)+'" fill="'+(esMayor?"#79c0ff":"#8b949e")+'" font-size="'+(esMayor?13:9)+'" font-weight="'+(esMayor?800:600)+'" text-anchor="middle">'+p.t+'</text>';
+      var p1x = cx + r*Math.sin(rad), p1y = cy - r*Math.cos(rad);
+      var p2x = cx + (r-6)*Math.sin(rad), p2y = cy - (r-6)*Math.cos(rad);
+      html += '<line x1="'+p1x+'" y1="'+p1y+'" x2="'+p2x+'" y2="'+p2y+'" stroke="'+(esMayor?"#e6edf3":"#484f58")+'" stroke-width="'+(esMayor?2:1)+'"/>';
+    });
+    document.getElementById("compassMarcas").innerHTML = html;
+  }
+
+  function pintarParque(){
+    document.getElementById("compassParque").setAttribute("transform","rotate("+parqueDeg+" 110 110)");
+  }
+
+  function actualizarLecturas(){
+    document.getElementById("lecAnillo").textContent = Math.round(((anilloDeg%360)+360)%360)+"°";
+    // grado resultante: hacia donde apunta la linea del parque (home->2da->jardin)
+    // respecto al anillo de cardinales. La linea del parque esta fija apuntando
+    // "arriba" (0 visual) antes de rotar por parqueDeg; el anillo tiene su propio
+    // offset anilloDeg. El grado real donde CAE la linea sobre la escala del
+    // anillo es la resta entre ambos.
+    var resultado = ((parqueDeg - anilloDeg)%360+360)%360;
+    document.getElementById("lecResultado").textContent = Math.round(resultado)+"°";
+  }
+
+  function construirBarra(svgId){
+    var svg = document.getElementById(svgId);
+    var topY=20, bottomY=360, tuboX=24, tuboW=22;
+    var partes = [];
+    partes.push('<rect x="'+tuboX+'" y="'+(topY-15)+'" width="'+tuboW+'" height="'+(bottomY-topY+30)+'" rx="'+(tuboW/2)+'" fill="#0d1117" stroke="#30363d" stroke-width="2"/>');
+    for (var g=0; g<=359; g+=15){
+      var y = topY + (g/359)*(bottomY-topY);
+      var esMayor = (g % 90 === 0);
+      var largo = esMayor?12:6;
+      partes.push('<line x1="'+(tuboX+tuboW+2)+'" y1="'+y+'" x2="'+(tuboX+tuboW+2+largo)+'" y2="'+y+'" stroke="'+(esMayor?"#e6edf3":"#6e7681")+'" stroke-width="'+(esMayor?2:1)+'"/>');
+    }
+    svg.innerHTML = partes.join("");
+    return {topY:topY, bottomY:bottomY, tuboX:tuboX, tuboW:tuboW};
+  }
+
+  function dibujarKnob(svgId, geo, deg){
+    var svg = document.getElementById(svgId);
+    var y = geo.topY + (deg/359)*(geo.bottomY-geo.topY);
+    var cx = geo.tuboX + geo.tuboW/2;
+    var existente = svg.querySelector("#knobMovil");
+    if (existente) existente.remove();
+    var g = document.createElementNS("http://www.w3.org/2000/svg","g");
+    g.setAttribute("id","knobMovil");
+    g.innerHTML = '<circle cx="'+cx+'" cy="'+y+'" r="15" fill="#1f6feb" stroke="#e6edf3" stroke-width="2.5"/>';
+    svg.appendChild(g);
+  }
+
+  var geoIzq = construirBarra("svgIzq");
+  var geoDer = construirBarra("svgDer");
+  dibujarKnob("svgIzq", geoIzq, 0);
+  dibujarKnob("svgDer", geoDer, 0);
+
+  function gradoParaY(geo, y){
+    var clamped = Math.max(geo.topY, Math.min(geo.bottomY, y));
+    return Math.round((clamped-geo.topY)/(geo.bottomY-geo.topY)*359);
+  }
+
+  function clienteAY(svgId, clientY){
+    var svg = document.getElementById(svgId);
+    var pt = svg.createSVGPoint();
+    pt.x = 0; pt.y = clientY;
+    var ctm = svg.getScreenCTM();
+    if (!ctm) return 0;
+    return pt.matrixTransform(ctm.inverse()).y;
+  }
+
+  function setupArrastre(wrapId, svgId, geo, onChange){
+    var wrap = document.getElementById(wrapId);
+    var arrastrando = false;
+    function mover(clientY){
+      var y = clienteAY(svgId, clientY);
+      var deg = gradoParaY(geo, y);
+      dibujarKnob(svgId, geo, deg);
+      onChange(deg);
+    }
+    wrap.addEventListener("pointerdown", function(e){
+      arrastrando = true;
+      try { wrap.setPointerCapture(e.pointerId); } catch(err){}
+      document.body.style.overflow = "hidden";
+      document.body.style.touchAction = "none";
+      mover(e.clientY);
+      e.preventDefault();
+    });
+    wrap.addEventListener("pointermove", function(e){
+      if (!arrastrando) return;
+      mover(e.clientY);
+      e.preventDefault();
+    });
+    wrap.addEventListener("pointerup", function(e){
+      arrastrando = false;
+      document.body.style.overflow = "";
+      document.body.style.touchAction = "";
+      try { wrap.releasePointerCapture(e.pointerId); } catch(err){}
+    });
+    wrap.addEventListener("pointercancel", function(){
+      arrastrando = false;
+      document.body.style.overflow = "";
+      document.body.style.touchAction = "";
+    });
+  }
+
+  setupArrastre("barraIzqWrap", "svgIzq", geoIzq, function(deg){
+    anilloDeg = deg;
+    pintarAnillo();
+    actualizarLecturas();
+  });
+  setupArrastre("barraDerWrap", "svgDer", geoDer, function(deg){
+    parqueDeg = deg;
+    pintarParque();
+    actualizarLecturas();
+  });
+
+  pintarAnillo();
+  pintarParque();
+  actualizarLecturas();
+
+  var congelado = false;
+  document.getElementById("btnGuardar").addEventListener("click", function(){
+    congelado = !congelado;
+    var btn = document.getElementById("btnGuardar");
+    var caja = document.getElementById("copiaBox");
+    var parque = document.getElementById("parqueSel").value;
+    if (congelado){
+      btn.textContent = "LECTURA CONGELADA — hacé tu captura ahora";
+      btn.classList.add("congelado");
+      var resultado = document.getElementById("lecResultado").textContent;
+      caja.style.display = "block";
+      caja.textContent = (parque || "PARQUE_NO_ELEGIDO") + ": " + resultado + " (medido a mano, pendiente de cotejar con fuente)";
+      log("Lectura congelada: " + caja.textContent);
+    } else {
+      btn.textContent = "CONGELAR LECTURA (para hacer captura)";
+      btn.classList.remove("congelado");
+      caja.style.display = "none";
+    }
+  });
+</script>
+</body>
+</html>
