@@ -688,10 +688,17 @@
   }
 </script>
 <script>
-  document.getElementById("btnEntrar").addEventListener("click", function(){
+  // NUEVO: si ya entraste una vez en esta pestana/sesion, no mostrar la
+  // portada de nuevo al volver con el boton atras del navegador.
+  function entrarApp(){
     document.getElementById("portada").style.display = "none";
     document.getElementById("appContenido").style.display = "block";
-  });
+    try { sessionStorage.setItem("mlbpro_ya_entro", "1"); } catch(e){}
+  }
+  document.getElementById("btnEntrar").addEventListener("click", entrarApp);
+  try {
+    if (sessionStorage.getItem("mlbpro_ya_entro") === "1") entrarApp();
+  } catch(e){}
 </script>
 </div>
 </body>
