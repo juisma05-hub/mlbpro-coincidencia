@@ -268,6 +268,7 @@
     });
 
     var hoyFlechaHtml = "";
+    var hoyEtiquetaHtml = "";
     var hoyTxt = "N/C";
     if (hoyDir !== null && hoyDir !== undefined && hoyDir !== "" && !isNaN(Number(hoyDir))) {
       var vieneDe = ((Number(hoyDir)%360)+360)%360;
@@ -278,6 +279,14 @@
           '<polygon points="'+cx+','+(cy-46)+' '+(cx-6)+','+(cy-32)+' '+(cx+6)+','+(cy-32)+'" fill="#ff2222"/>'+
           '<circle cx="'+cx+'" cy="'+(cy+50)+'" r="6" fill="#ff2222" stroke="#fff" stroke-width="1.5"/>'+
         '</g>';
+      // NUEVO: etiqueta "va -> XX°" en la punta de la flecha, siempre
+      // horizontal (calculada con trigonometria, no con rotate de SVG)
+      // para no tener que calcular de cabeza el opuesto del grado.
+      var radVa = vaHacia * Math.PI/180;
+      var lxVa = cx + 58*Math.sin(radVa), lyVa = cy - 58*Math.cos(radVa);
+      hoyEtiquetaHtml =
+        '<rect x="'+(lxVa-20)+'" y="'+(lyVa-7)+'" width="40" height="14" rx="3" fill="#ff2222" opacity="0.92"/>'+
+        '<text x="'+lxVa+'" y="'+(lyVa+4)+'" fill="#fff" font-size="9" font-family="monospace" font-weight="800" text-anchor="middle">→'+Math.round(vaHacia)+'°</text>';
       hoyTxt = Math.round(vieneDe)+"°";
     }
 
@@ -303,6 +312,7 @@
           '</g>'+
         '</g>'+
         hoyFlechaHtml+
+        hoyEtiquetaHtml+
         '<g id="explorerArrow_'+idx+'" transform="rotate(0 '+cx+' '+cy+')">'+
           '<line x1="'+cx+'" y1="'+(cy+50)+'" x2="'+cx+'" y2="'+(cy-38)+'" stroke="#1f6feb" stroke-width="2" stroke-dasharray="4,3" stroke-linecap="round"/>'+
           '<polygon points="'+cx+','+(cy-46)+' '+(cx-6)+','+(cy-32)+' '+(cx+6)+','+(cy-32)+'" fill="#1f6feb"/>'+
@@ -647,9 +657,9 @@
         }
       }
     }else{ det5='<div class="sub">Sin históricos para mostrar.</div>'; }
-    var fold5='<div class="serieparque"><div class="sphdr">5 PARECIDOS · CLIMA EN ESTE PARQUE</div>'+det5+'</div>';
+    var fold5='<details class="fold"><summary>Clima en este parque (5 juegos parecidos)</summary><div class="serieparque">'+det5+'</div></details>';
 
-    var serieHtml='<details class="fold" open><summary>Serie en este parque (por si ya jugaron en escena parecida)</summary>'+serieParqueHtml(venue,bloquesSerie,rosterMap)+'</details>';
+    var serieHtml='<details class="fold"><summary>Serie en este parque (por si ya jugaron en escena parecida)</summary>'+serieParqueHtml(venue,bloquesSerie,rosterMap)+'</details>';
 
     var hpACFCard = (venue && typeof getOrientacionParque==="function") ? getOrientacionParque(venue) : 45;
     var brujulaHoy = venue ? svgBrujulaJuego(idx, venue, hpACFCard, today?today.wind_dir:null, today?today.windspeed_mph:null) : '';
@@ -664,9 +674,10 @@
       '</div>'+
       '<div class="juego-cuerpo" id="cuerpo_'+idx+'">'+
         hoychips+
+        panel+lineas+
         brujulaHoy+
+        fold5+
         serieHtml+
-        panel+lineas+fold5+
         foldHoy+
       '</div>'+
     '</div>';
