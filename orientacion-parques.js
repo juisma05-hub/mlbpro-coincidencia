@@ -82,9 +82,9 @@ const ORIENTACION_PARQUES_2026 = {
     confirmado: true
   },
   "Kauffman Stadium": {
-    direccion_texto: "sureste (SE)",
-    grado_aproximado: 147,
-    fuente: "Medicion propia por coordenadas, recalculado (primer intento dio 327 grados, error de formula propio)",
+    direccion_texto: "noreste (NE)",
+    grado_aproximado: 45,
+    fuente: "Medicion propia por coordenadas (jardin central 39.052026,-94.479846 / segunda base 39.051486,-94.480493 / home plate 39.051246,-94.480821) - remedido, distancia home-segunda verificada casi exacta (38.96m vs 38.8m real). Reemplaza valor anterior de 147 grados (ese fue el error de formula ya marcado como sospechoso en el checkpoint original)",
     confirmado: true
   },
   "PNC Park": {
@@ -114,7 +114,7 @@ const ORIENTACION_PARQUES_2026 = {
   "Coors Field": {
     direccion_texto: "norte",
     grado_aproximado: 4.5,
-    fuente: "Medicion propia por coordenadas; reemplaza propuesta vieja de Shadium (40 grados NNE)",
+    fuente: "Medicion propia por coordenadas (jardin central 39.756783,-104.994139 / segunda base 39.756071,-104.994158 / home plate 39.755694,-104.994199) - distancia home-segunda verificada (42.1m vs 38.8m real, ~8.5% de margen). Confirma el valor previo de 4.5 grados; contradice y reemplaza la fuente de texto (Wikipedia/The Shadium/TickPick que daba 40 grados NNE)",
     confirmado: true
   },
   "Fenway Park": {
