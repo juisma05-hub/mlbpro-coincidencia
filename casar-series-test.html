@@ -223,6 +223,17 @@
         '<polygon points="'+cx+','+(cy-46)+' '+(cx-6)+','+(cy-32)+' '+(cx+6)+','+(cy-32)+'" fill="#ff2222"/>'+
         '<circle cx="'+cx+'" cy="'+(cy+50)+'" r="6" fill="#ff2222" stroke="#fff" stroke-width="1.5"/>'+
       '</g>'+
+      (function(){
+        // NUEVO: etiqueta "va -> XX°" pegada a la punta de la flecha,
+        // SIEMPRE horizontal (no rota con la flecha) para que se pueda
+        // leer sin tener que calcular de cabeza el opuesto del grado
+        // "viene de". Calculada con trigonometria directa, sin usar
+        // rotate() de SVG, para que el texto nunca quede de cabeza.
+        var rad = promDirVaHacia * Math.PI/180;
+        var lx = cx + 58*Math.sin(rad), ly = cy - 58*Math.cos(rad);
+        return '<rect x="'+(lx-20)+'" y="'+(ly-7)+'" width="40" height="14" rx="3" fill="#ff2222" opacity="0.92"/>'+
+               '<text x="'+lx+'" y="'+(ly+4)+'" fill="#fff" font-size="9" font-family="monospace" font-weight="800" text-anchor="middle">→'+Math.round(promDirVaHacia)+'°</text>';
+      })()+
       '<circle cx="'+cx+'" cy="'+cy+'" r="3" fill="#ff2222" opacity="0.9"/>'+
       '<rect x="'+(cx-24)+'" y="'+(cy-6)+'" width="48" height="14" rx="3" fill="#0d1117" opacity="0.85"/>'+
       '<text x="'+cx+'" y="'+(cy+4)+'" fill="#58a6ff" font-size="9" font-family="monospace" font-weight="700" text-anchor="middle">~'+Math.round(promDirVieneDe)+'°</text>'+
