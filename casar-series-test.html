@@ -46,6 +46,8 @@
   .rv-favor  { font-size:11px; font-weight:800; padding:3px 10px; border-radius:6px; margin-top:4px; }
   .rv-favor.si  { color:#3fb950; background:#1a2f1e; border:1px solid #3fb950; }
   .rv-favor.no  { color:#f85149; background:#2f1a1a; border:1px solid #f85149; }
+  .viento-va-chip { display:block; text-align:center; background:#ff2222; color:#fff; font-weight:800; font-size:15px; padding:6px 14px; border-radius:8px; margin-top:6px; letter-spacing:0.5px; }
+  .viento-va-chip .flecha { font-size:16px; margin:0 4px; }
 
   .rv-fila {
     background:#161b22;
@@ -223,17 +225,6 @@
         '<polygon points="'+cx+','+(cy-46)+' '+(cx-6)+','+(cy-32)+' '+(cx+6)+','+(cy-32)+'" fill="#ff2222"/>'+
         '<circle cx="'+cx+'" cy="'+(cy+50)+'" r="6" fill="#ff2222" stroke="#fff" stroke-width="1.5"/>'+
       '</g>'+
-      (function(){
-        // NUEVO: etiqueta "va -> XX°" pegada a la punta de la flecha,
-        // SIEMPRE horizontal (no rota con la flecha) para que se pueda
-        // leer sin tener que calcular de cabeza el opuesto del grado
-        // "viene de". Calculada con trigonometria directa, sin usar
-        // rotate() de SVG, para que el texto nunca quede de cabeza.
-        var rad = promDirVaHacia * Math.PI/180;
-        var lx = cx + 58*Math.sin(rad), ly = cy - 58*Math.cos(rad);
-        return '<rect x="'+(lx-20)+'" y="'+(ly-7)+'" width="40" height="14" rx="3" fill="#ff2222" opacity="0.92"/>'+
-               '<text x="'+lx+'" y="'+(ly+4)+'" fill="#fff" font-size="9" font-family="monospace" font-weight="800" text-anchor="middle">→'+Math.round(promDirVaHacia)+'°</text>';
-      })()+
       '<circle cx="'+cx+'" cy="'+cy+'" r="3" fill="#ff2222" opacity="0.9"/>'+
       '<rect x="'+(cx-24)+'" y="'+(cy-6)+'" width="48" height="14" rx="3" fill="#0d1117" opacity="0.85"/>'+
       '<text x="'+cx+'" y="'+(cy+4)+'" fill="#58a6ff" font-size="9" font-family="monospace" font-weight="700" text-anchor="middle">~'+Math.round(promDirVieneDe)+'°</text>'+
@@ -363,11 +354,17 @@
                 '<div class="rv-fecha">'+fechaCorta(gk2.date)+'</div>'+
                 '<div class="rv-vs">vs '+visitante+'</div>'+
               '</div>'+
-              '<div class="rv-dir">'+gk2.wind_dir+'°<div style="font-size:9px;color:#8b949e;font-weight:500;margin-top:1px;">'+(typeof gk2.windspeed_mph==="number"?gk2.windspeed_mph.toFixed(0)+' mph':'—')+'</div></div>'+
+              '<div class="rv-dir">'+gk2.wind_dir+'°<div style="font-size:9px;color:#8b949e;font-weight:500;margin-top:1px;">'+(typeof gk2.windspeed_mph==="number"?gk2.windspeed_mph.toFixed(0)+' mph':'—')+'</div><div style="font-size:9px;color:#ff5252;font-weight:800;margin-top:1px;">➜'+Math.round((Number(gk2.wind_dir)+180)%360)+'°</div></div>'+
               '<div class="rv-temp">'+(typeof gk2.temperature_f==="number"?Math.round(gk2.temperature_f)+"°":"—")+'</div>'+
               '<div class="rv-marc">'+marc+(c2!==null?' <span class="rv-total">('+c2+')</span>':'')+'</div>'+
             '</div>';
         }
+
+        var promDirVaHaciaTxt = Math.round((Math.round(((Number(promDir)%360)+360)%360)+180)%360);
+        var promDirVieneDeTxt = Math.round(((Number(promDir)%360)+360)%360);
+
+        var vaLo = (lo+180)%360, vaHi = (hi+180)%360;
+        var lblVa = vaLo+'°–'+vaHi+'°';
 
         html+=
           '<div class="rv-bloque '+colorCls+'">'+
@@ -375,8 +372,9 @@
               '<div class="rv-equipo">'+homeTeam+'</div>'+
               '<div class="rv-parque">'+venue+'</div>'+
               svgBrujula(hpACF, promDir)+
+              '<div class="viento-va-chip">'+promDirVieneDeTxt+'° <span class="flecha">➜</span> '+promDirVaHaciaTxt+'°</div>'+
               '<div style="text-align:center;font-size:12px;color:#8b949e;margin-top:2px;">viento promedio <b style="color:#58a6ff">'+(promV!==null?promV.toFixed(1)+' mph':'—')+'</b></div>'+
-              '<div class="rv-rango">Viento '+lbl+'</div>'+
+              '<div class="rv-rango">Viento (viene de) '+lbl+' <span style="color:#6e7681;">→ va hacia '+lblVa+'</span></div>'+
               favorHtml+
               '<div class="rv-meta">'+gs.length+' juego(s) · viento avg <b style="color:#e6edf3">'+(promV!==null?promV.toFixed(1)+' mph':'—')+'</b> · prom <b style="color:#e6edf3">'+promC+'</b> carreras</div>'+
             '</div>'+
