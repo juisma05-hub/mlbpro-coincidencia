@@ -121,6 +121,8 @@ async function jalarHistorialCompletoPitcher(pitcherId, season) {
 
   return { nombre: nombre, mano: mano, starts: starts };
 }
+
+async function jalarPonchesTodos(logFn, hoyISOStr) {
   function log(t) { if (typeof logFn === "function") logFn(t); }
 
   var hoy = hoyISOStr || (function(){
