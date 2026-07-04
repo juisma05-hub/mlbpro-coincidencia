@@ -142,9 +142,10 @@
   function pitcherFilaHtml(r){
     var badgeCls = r.llego_4ta ? "llego" : "apaleado";
     var badgeTxt = r.llego_4ta ? "LLEGÓ A 4TA" : "APALEADO";
+    var manoTxt = (r.mano && r.mano !== "N/C") ? " (" + r.mano + ")" : "";
     return '<div class="pitcher-fila">'+
       '<div>'+
-        '<div class="nom">'+r.pitcher+'</div>'+
+        '<div class="nom">'+r.pitcher+manoTxt+'</div>'+
         '<div class="det">'+r.fecha+' · '+turnoTxt(r.turno)+' · vs '+(r.rival||"?")+' · IP '+(r.ip!==null?r.ip.toFixed(1):"—")+' · SO '+(r.so!==null?r.so:"—")+' · '+(r.windspeed_mph!==null&&r.windspeed_mph!==undefined?r.windspeed_mph.toFixed(0)+' mph':"—")+'</div>'+
       '</div>'+
       '<div class="badge '+badgeCls+'">'+badgeTxt+'</div>'+
@@ -239,8 +240,9 @@
 
   function dibujarParque(venue){
     var hp = (typeof getOrientacionParque === "function") ? getOrientacionParque(venue) : 45;
+    var equipo = (window.__venueEquipoMap && window.__venueEquipoMap[venue]) ? window.__venueEquipoMap[venue] : "";
     return '<div class="parque-bloque">'+
-      '<div class="parque-titulo">'+venue+'</div>'+
+      '<div class="parque-titulo">'+(equipo?equipo+' · ':'')+venue+'</div>'+
       dibujarBrujula(venue, hp)+
       '<div id="statsBrujula"></div>'+
       '<div id="listaBrujula"></div>'+
@@ -266,13 +268,26 @@
 
       registrosGlobal = conClimaValido;
 
+      // REGLA: siempre mostrar "Equipo · Parque". El equipo sale del
+      // cache de clima (mismo dato que ya usa el resto de la app), no
+      // hay que inventar una lista nueva.
+      var venueEquipoMap = {};
+      try {
+        var climaCacheParaEquipos = (typeof climaLeerCache === "function") ? climaLeerCache() : [];
+        climaCacheParaEquipos.forEach(function(c){
+          if (c && c.venue && c.home_team && !venueEquipoMap[c.venue]) venueEquipoMap[c.venue] = c.home_team;
+        });
+      } catch(eq) {}
+      window.__venueEquipoMap = venueEquipoMap;
+
       var venues = {};
       conClimaValido.forEach(function(r){ if (r.venue) venues[r.venue] = true; });
       var venuesList = Object.keys(venues).sort();
 
       selParque.innerHTML = '<option value="">— elegir parque —</option>';
       venuesList.forEach(function(v){
-        var o = document.createElement("option"); o.value = v; o.textContent = v;
+        var o = document.createElement("option"); o.value = v;
+        o.textContent = (venueEquipoMap[v] ? venueEquipoMap[v]+" · " : "") + v;
         selParque.appendChild(o);
       });
       selParque.style.display = venuesList.length ? "block" : "none";
