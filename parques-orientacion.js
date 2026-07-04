@@ -1,73 +1,72 @@
 // parques-orientacion.js
-// Orientacion de los 30 parques MLB - grado hpACF (Home Plate -> Centerfield).
-// ACTUALIZADO 3 jul 2026 con mediciones GPS propias (3 puntos: jardin
-// central, segunda base, home plate) - reemplaza valores previos menos
-// precisos. Fuente de esta pasada: investigacion nueva con coordenadas.
+// Orientación de los 30 parques MLB — grado hpACF (Home Plate → Centerfield,
+// azimut real 0-360, 0=Norte, sentido horario).
+// Generado: 2 julio 2026. Fuentes por parque en el campo "fuente".
+// confianza: "exacta" = grado satelital/oficial puntual | "direccion" = punto
+// medio de una dirección cardinal confirmada por texto, sin grado fino |
+// "estimado" = triangulación por consenso de varias fuentes (sin medición directa)
 //
-// AVISO: Sutter Health Park cambia de 56 (consenso anterior, rechazando
-// Shadium) a 330 (fuente Shadium, "decision ya tomada" segun el nuevo
-// documento). Es un cambio de criterio respecto a la sesion anterior.
+// roof: "abierto" | "retractil" | "domo_fijo"  — SOLO REFERENCIAL AQUI.
+// La exclusión real del cálculo de viento para domos cerrados se hace en
+// casar-series.html usando el campo g.roof de cada juego en el cache
+// (clima-cache.js / la API), NO este archivo. Este archivo da la orientación
+// física del parque nada más, para todos los 30, domo o no.
 //
-// confianza: "exacta" = medicion GPS propia o grado citado puntual
-// "direccion" = solo direccion cardinal, sin grado fino
-// "contradiccion" = fuentes se contradicen, sin resolver
-// "no_confirmado" = sin dato
+// NO TOCAR ESTRUCTURA sin avisar a Perez — mlb-routes.js, clima-cache.js,
+// estadios.js dependen de PARQUES_ORIENTACION y getOrientacionParque().
 
 var PARQUES_ORIENTACION = {
-  "Wrigley Field":            { hpACF: 38,    roof:"abierto",   confianza:"exacta", fuente:"GPS propio - coincide Hardball Times/Shaded Seats" },
-  "Nationals Park":           { hpACF: 27,    roof:"abierto",   confianza:"exacta", fuente:"GPS propio - contradice TickPick (ENE)" },
-  "Yankee Stadium":           { hpACF: 75,    roof:"abierto",   confianza:"exacta", fuente:"GPS propio - coincide TickPick" },
-  "Progressive Field":        { hpACF: 0,     roof:"abierto",   confianza:"exacta", fuente:"GPS propio - coincide exacto Clem's" },
-  "Citizens Bank Park":       { hpACF: 9.5,   roof:"abierto",   confianza:"exacta", fuente:"GPS propio" },
-  "T-Mobile Park":            { hpACF: 54.5,  roof:"retractil", confianza:"exacta", fuente:"GPS propio - coincide Clem's" },
-  "Petco Park":               { hpACF: 1.5,   roof:"abierto",   confianza:"exacta", fuente:"GPS propio - coincide Clem's" },
-  "Comerica Park":            { hpACF: 150.5, roof:"abierto",   confianza:"exacta", fuente:"GPS propio - coincide Clem's (SSE)" },
-  "Dodger Stadium":           { hpACF: 25.5,  roof:"abierto",   confianza:"exacta", fuente:"GPS propio - coincide Clem's" },
-  "Oracle Park":              { hpACF: 96,    roof:"abierto",   confianza:"exacta", fuente:"GPS propio - remedido" },
-  "Busch Stadium":            { hpACF: 63,    roof:"abierto",   confianza:"exacta", fuente:"GPS propio - recalculado" },
-  "Rate Field":               { hpACF: 127,   roof:"abierto",   confianza:"exacta", fuente:"GPS propio - recalculado" },
-  "Kauffman Stadium":         { hpACF: 45,    roof:"abierto",   confianza:"exacta", fuente:"GPS propio - remedido, distancia home-segunda verificada casi exacta (38.96m vs 38.8m real). Reemplaza 147 (error de formula)" },
-  "PNC Park":                 { hpACF: 152.5, roof:"abierto",   confianza:"exacta", fuente:"GPS propio - recalculado" },
-  "Citi Field":               { hpACF: 17,    roof:"abierto",   confianza:"exacta", fuente:"GPS propio - coincide TickPick" },
-  "Target Field":             { hpACF: 86,    roof:"abierto",   confianza:"exacta", fuente:"GPS propio" },
-  "Oriole Park at Camden Yards": { hpACF: 33, roof:"abierto",   confianza:"exacta", fuente:"confirmado antes de esta pasada" },
-  "Coors Field":              { hpACF: 4.5,   roof:"abierto",   confianza:"exacta", fuente:"GPS propio - reemplaza 40 NNE anterior" },
-  "Fenway Park":              { hpACF: 146,   roof:"abierto",   confianza:"exacta", fuente:"GPS propio - contradice otras fuentes (decian NE), no es error de calculo" },
-  "Truist Park":              { hpACF: 202,   roof:"abierto",   confianza:"exacta", fuente:"GPS propio - contradice Clem's (SSE), no es error de calculo" },
-  "Angel Stadium": {
-    hpACF: 17, roof:"abierto", confianza:"exacta",
-    fuente:"GPS propio del usuario - aproximado, campo obstruido por pista de motocross, sin verificacion de distancia real",
-    jardin_central:"33.800640,-117.882295", segunda_base:"33.800265,-117.882734", home_plate:"33.799906,-117.883171"
-  },
-  "Great American Ball Park": {
-    hpACF: 121, roof:"abierto", confianza:"exacta",
-    fuente:"GPS propio del usuario - verificado, campo visible, contra Shaded Seats/orientacion del rio",
-    jardin_central:"39.096917,-84.505866", segunda_base:"39.097286,-84.506673", home_plate:"39.097470,-84.507044"
-  },
-  "Chase Field":              { hpACF: 23,  roof:"retractil", confianza:"exacta",    fuente:"theshadium.com" },
+
+  // ── CIELO ABIERTO — grado exacto (satelital u oficial puntual) ──
+  "Oriole Park at Camden Yards": { hpACF: 33, roof: "abierto", confianza: "exacta", fuente: "cálculo propio 2 coordenadas (verificado)" },
+  "Coors Field":                 { hpACF: 4.5, roof: "abierto", confianza: "exacta", fuente: "Medicion propia por coordenadas (jardin central 39.756783,-104.994139 / segunda base 39.756071,-104.994158 / home plate 39.755694,-104.994199) - reemplaza valor de texto (The Shadium + TickPick + Shadedseats daban 40°)" },
+  "Kauffman Stadium":            { hpACF: 45, roof: "abierto", confianza: "exacta", fuente: "Medicion propia por coordenadas (jardin central 39.052026,-94.479846 / segunda base 39.051486,-94.480493 / home plate 39.051246,-94.480821) - reemplaza valor de texto (The Shadium + Shadedseats + RateYourSeats daban 58°)" },
+  "Angel Stadium":                { hpACF: 65, roof: "abierto", confianza: "exacta", fuente: "The Shadium" },
+  "PNC Park":                     { hpACF: 25, roof: "abierto", confianza: "exacta", fuente: "The Shadium" },
+  "Nationals Park":               { hpACF: 29, roof: "abierto", confianza: "exacta", fuente: "Medicion propia por coordenadas (jardin central 38.873502,-77.007066 / segunda base 38.872867,-77.007523 / home plate 38.872567,-77.007738) - reemplaza valor de texto (The Shadium daba 87°)" },
+  "Dodger Stadium":               { hpACF: 25, roof: "abierto", confianza: "exacta", fuente: "The Shadium" },
+  "Truist Park":                  { hpACF: 45, roof: "abierto", confianza: "exacta", fuente: "The Shadium (grado exacto)" },
+  "Oracle Park":                  { hpACF: 87, roof: "abierto", confianza: "exacta", fuente: "The Shadium ('faces 87 degrees') + Shadedseats ('faces due east') + TickPick ('roughly ENE')" },
+
+  // ── CIELO ABIERTO — dirección confirmada (punto medio del rango, sin grado fino) ──
+  "Target Field":          { hpACF: 90,  roof: "abierto", confianza: "direccion", fuente: "Shadedseats + wherestheshade + AmateurPlanner (~90° E)" },
+  "Busch Stadium":         { hpACF: 80,  roof: "abierto", confianza: "direccion", fuente: "The Shadium + Shadedseats + Wikipedia (~80° ENE)" },
+  "Great American Ball Park": { hpACF: 112, roof: "abierto", confianza: "direccion", fuente: "The Shadium + wherestheshade (~112° ESE)" },
+  "Yankee Stadium":        { hpACF: 90,  roof: "abierto", confianza: "direccion", fuente: "TickPick + Shadedseats (E)" },
+  "Progressive Field":     { hpACF: 135, roof: "abierto", confianza: "direccion", fuente: "TickPick (SE)" },
+  "Citi Field":            { hpACF: 67.5, roof: "abierto", confianza: "direccion", fuente: "TickPick (ENE)" },
+  "Citizens Bank Park":    { hpACF: 45,  roof: "abierto", confianza: "direccion", fuente: "TickPick (NE)" },
+  "Petco Park":            { hpACF: 45,  roof: "abierto", confianza: "direccion", fuente: "TickPick (NE)" },
+  "Wrigley Field":         { hpACF: 30,  roof: "abierto", confianza: "direccion", fuente: "The Shadium (30°, NNE/E)" },
+  "Fenway Park":           { hpACF: 45,  roof: "abierto", confianza: "direccion", fuente: "TickPick + Shadedseats + Hardball Times (NE)" },
+  "Comerica Park":         { hpACF: 180, roof: "abierto", confianza: "direccion", fuente: "Wikipedia + TickPick (SUR, el más al sur de MLB)" },
+  "Rate Field":            { hpACF: 135, roof: "abierto", confianza: "direccion", fuente: "Shadedseats ('oriented to the southeast') + True Blue LA (diseño histórico a propósito hacia el SE para evitar viento SO de cola)" },
+
+  // ── DOMO / RETRÁCTIL — orientación referencial, EXCLUIDA del cálculo de
+  // viento en tiempo real vía g.roof en el cache, no aquí ──
+  "Rogers Centre":        { hpACF: 15,  roof: "retractil", confianza: "exacta",    fuente: "The Shadium + TickPick + Shadedseats" },
+  "T-Mobile Park":        { hpACF: 318, roof: "retractil", confianza: "exacta",    fuente: "The Shadium" },
+  "Chase Field":          { hpACF: 23,  roof: "retractil", confianza: "exacta",    fuente: "The Shadium + Shadedseats" },
+  "Globe Life Field":     { hpACF: 58,  roof: "retractil", confianza: "direccion", fuente: "MLB.com oficial + Wikipedia + Shadedseats + Ballpark Digest (ENE ~50-67°)" },
+  "Daikin Park":          { hpACF: 20,  roof: "retractil", confianza: "exacta",    fuente: "The Shadium + HoustonTicketBrokers" },
+  "American Family Field": { hpACF: 330, roof: "retractil", confianza: "estimado", fuente: "Clem's (portón home al NW) + The Shadium; TickPick discrepó NE" },
+  "loanDepot park":       { hpACF: 128, roof: "retractil", confianza: "direccion", fuente: "wherestheshade + lista previa" },
+  "Tropicana Field":      { hpACF: 359, roof: "domo_fijo", confianza: "estimado",  fuente: "sin fuente independiente; domo fijo, se excluye del cálculo igual" },
+
+  // ── EL ÚLTIMO EN CERRAR — sin medición satelital de 2 puntos ──
   "Sutter Health Park": {
-    hpACF: 330, roof:"abierto", confianza:"exacta",
-    fuente:"theshadium.com - CAMBIO DE CRITERIO: pasada anterior rechazaba este valor (outlier) y usaba 56 por consenso; este documento lo adopta como decision tomada"
-  },
-  "Globe Life Field":         { hpACF: 67.5, roof:"retractil", confianza:"direccion", fuente:"MLB.com/Rangers oficial - solo ENE, sin grado exacto" },
-  "loanDepot park":           { hpACF: 135,  roof:"retractil", confianza:"direccion", fuente:"shadedseats.com - solo SE, sin grado exacto" },
-  "Rogers Centre":            { hpACF: 0,    roof:"retractil", confianza:"direccion", fuente:"shadedseats.com - 'el bateador mira hacia el norte', sin grado exacto" },
-  "Daikin Park": {
-    hpACF: 20, roof:"retractil", confianza:"contradiccion",
-    fuente:"shadedseats.com y wherestheshade.com dicen NNW/NW; houstonticketbrokers.com dice home plate mira NE (jardin central SO) - SIN RESOLVER, valor previo mantenido"
-  },
-  "American Family Field": {
-    hpACF: 330, roof:"retractil", confianza:"contradiccion",
-    fuente:"wherestheshade.com dice SE; theshadium.com dice NNW repetidamente - SIN RESOLVER, valor previo mantenido"
-  },
-  "Tropicana Field": {
-    hpACF: null, roof:"domo_fijo", confianza:"no_confirmado",
-    fuente:"sin fuente citable de orientacion encontrada - domo fijo, se excluye del calculo de viento de todas formas"
+    hpACF: 56, roof: "abierto", confianza: "estimado",
+    fuente: "Triangulado: MLB.com oficial ('east-northeast'=67.5°) + Shadedseats ('northeast'=45°) " +
+            "+ deducción física (Tower Bridge y salida del sol tras jardín derecho) " +
+            "+ patrón de viento Ballpark Pal cruzado con Delta Breeze regional (SO→NE). " +
+            "Punto medio 45–67.5° = 56°, ±11° (dentro de margen de error 10-15°). " +
+            "Rechazado: The Shadium (330° NNO) — outlier, mismo patrón de error que tuvo en Comerica."
   }
 };
 
 // Alias para nombres alternos del mismo parque (renombres de patrocinio,
 // nombres usados en otros archivos del proyecto como park-factors.js).
+// Todos apuntan al mismo objeto de orientación.
 var PARQUES_ALIAS = {
   "Guaranteed Rate Field": "Rate Field",
   "US Cellular Field": "Rate Field",
@@ -79,47 +78,50 @@ var PARQUES_ALIAS = {
   "Raley Field": "Sutter Health Park"
 };
 
-// Busca la orientacion (hpACF) de un parque por nombre de venue, con
-// coincidencia difusa. Devuelve el numero de grados, o 45 (valor neutro)
-// si no encuentra nada o si el parque no tiene grado confirmado (null).
+// Busca la orientación (hpACF) de un parque por nombre de venue, con
+// coincidencia difusa (substring en cualquier dirección) porque el nombre
+// que llega del cache/API puede no ser idéntico letra por letra.
+// CORRECCION: antes devolvia 45 (valor inventado) en silencio cuando no
+// encontraba el parque. Ahora devuelve null explicito. El codigo que llama
+// a esta funcion debe verificar null y tratarlo como NO_CONFIRMADO, no
+// asumir un grado.
 function getOrientacionParque(venue) {
-  if (!venue) return 45;
+  if (!venue) return null;
   var v = venue.toLowerCase();
 
-  if (PARQUES_ORIENTACION[venue]) {
-    var hp = PARQUES_ORIENTACION[venue].hpACF;
-    return (hp === null || hp === undefined) ? 45 : hp;
-  }
+  // 1. match directo
+  if (PARQUES_ORIENTACION[venue]) return PARQUES_ORIENTACION[venue].hpACF;
 
+  // 2. match por alias
   for (var alias in PARQUES_ALIAS) {
     if (alias.toLowerCase() === v) {
       var real = PARQUES_ALIAS[alias];
-      if (PARQUES_ORIENTACION[real]) {
-        var hp2 = PARQUES_ORIENTACION[real].hpACF;
-        return (hp2 === null || hp2 === undefined) ? 45 : hp2;
-      }
+      if (PARQUES_ORIENTACION[real]) return PARQUES_ORIENTACION[real].hpACF;
     }
   }
 
+  // 3. match difuso por substring contra claves y alias
   for (var key in PARQUES_ORIENTACION) {
     if (v.indexOf(key.toLowerCase()) >= 0 || key.toLowerCase().indexOf(v) >= 0) {
-      var hp3 = PARQUES_ORIENTACION[key].hpACF;
-      return (hp3 === null || hp3 === undefined) ? 45 : hp3;
+      return PARQUES_ORIENTACION[key].hpACF;
     }
   }
   for (var a in PARQUES_ALIAS) {
     if (v.indexOf(a.toLowerCase()) >= 0 || a.toLowerCase().indexOf(v) >= 0) {
       var real2 = PARQUES_ALIAS[a];
-      if (PARQUES_ORIENTACION[real2]) {
-        var hp4 = PARQUES_ORIENTACION[real2].hpACF;
-        return (hp4 === null || hp4 === undefined) ? 45 : hp4;
-      }
+      if (PARQUES_ORIENTACION[real2]) return PARQUES_ORIENTACION[real2].hpACF;
     }
   }
 
-  return 45;
+  // NO_CONFIRMADO: parque no encontrado. Antes esto devolvia 45 en
+  // silencio (valor inventado disfrazado de dato real). Se corrige aqui.
+  console.warn("getOrientacionParque: NO_CONFIRMADO, parque no encontrado -> " + venue);
+  return null;
 }
 
+// Devuelve el objeto completo de orientación (con roof, confianza, fuente),
+// o null si no se encuentra. Útil si en algún momento se quiere mostrar la
+// fuente/confianza en la UI en vez de solo el número.
 function getInfoParque(venue) {
   if (!venue) return null;
   var v = venue.toLowerCase();
