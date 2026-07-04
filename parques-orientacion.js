@@ -32,7 +32,7 @@ var PARQUES_ORIENTACION = {
   "Target Field":          { hpACF: 90,  roof: "abierto", confianza: "direccion", fuente: "Shadedseats + wherestheshade + AmateurPlanner (~90° E)" },
   "Busch Stadium":         { hpACF: 80,  roof: "abierto", confianza: "direccion", fuente: "The Shadium + Shadedseats + Wikipedia (~80° ENE)" },
   "Great American Ball Park": { hpACF: 112, roof: "abierto", confianza: "direccion", fuente: "The Shadium + wherestheshade (~112° ESE)" },
-  "Yankee Stadium":        { hpACF: 90,  roof: "abierto", confianza: "direccion", fuente: "TickPick + Shadedseats (E)" },
+  "Yankee Stadium":        { hpACF: 75, roof: "abierto", confianza: "exacta", fuente: "Medicion propia por coordenadas (home plate 40.829490,-73.926948 / jardin central 40.829757,-73.925560) - confirma 75°" },
   "Progressive Field":     { hpACF: 135, roof: "abierto", confianza: "direccion", fuente: "TickPick (SE)" },
   "Citi Field":            { hpACF: 67.5, roof: "abierto", confianza: "direccion", fuente: "TickPick (ENE)" },
   "Citizens Bank Park":    { hpACF: 45,  roof: "abierto", confianza: "direccion", fuente: "TickPick (NE)" },
@@ -55,12 +55,8 @@ var PARQUES_ORIENTACION = {
 
   // ── EL ÚLTIMO EN CERRAR — sin medición satelital de 2 puntos ──
   "Sutter Health Park": {
-    hpACF: 56, roof: "abierto", confianza: "estimado",
-    fuente: "Triangulado: MLB.com oficial ('east-northeast'=67.5°) + Shadedseats ('northeast'=45°) " +
-            "+ deducción física (Tower Bridge y salida del sol tras jardín derecho) " +
-            "+ patrón de viento Ballpark Pal cruzado con Delta Breeze regional (SO→NE). " +
-            "Punto medio 45–67.5° = 56°, ±11° (dentro de margen de error 10-15°). " +
-            "Rechazado: The Shadium (330° NNO) — outlier, mismo patrón de error que tuvo en Comerica."
+    hpACF: 43, roof: "abierto", confianza: "exacta",
+    fuente: "Medición propia por coordenadas (home plate 38.580978,-121.513142 / montículo 38.580205,-121.514066)"
   }
 };
 
