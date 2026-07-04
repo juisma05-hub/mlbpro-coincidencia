@@ -77,7 +77,50 @@ function ipADecimal(ipTxt) {
   return enteras + (outs === 1 ? (1/3) : outs === 2 ? (2/3) : 0);
 }
 
-async function jalarPonchesTodos(logFn, hoyISOStr) {
+// ── NUEVO: trae nombre real, mano (derecho/zurdo) y TODO el historial de
+// aperturas de UN pitcher especifico, directo de MLB (no depende de
+// PITCHERS_MASTER_2026, que puede venir incompleto). Para usar en K6:
+// promedio contra un rival puntual + lista de ultimos 5 juegos reales.
+async function jalarHistorialCompletoPitcher(pitcherId, season) {
+  var nombre = "ID " + pitcherId;
+  var mano = "N/C";
+  try {
+    var urlPersona = "https://statsapi.mlb.com/api/v1/people/" + pitcherId;
+    var respPersona = await fetch(MLB_ROUTES.WORKER_BASE + encodeURIComponent(urlPersona));
+    if (respPersona.ok) {
+      var dataPersona = await respPersona.json();
+      var persona = (dataPersona.people && dataPersona.people[0]) ? dataPersona.people[0] : null;
+      if (persona) {
+        if (persona.fullName) nombre = persona.fullName;
+        if (persona.pitchHand && persona.pitchHand.code) mano = persona.pitchHand.code === "L" ? "Zurdo" : "Derecho";
+      }
+    }
+  } catch (ePersona) {}
+
+  var starts = [];
+  try {
+    var url = "https://statsapi.mlb.com/api/v1/people/" + pitcherId + "/stats?stats=gameLog&group=pitching&season=" + (season || 2026);
+    var resp = await fetch(MLB_ROUTES.WORKER_BASE + encodeURIComponent(url));
+    if (resp.ok) {
+      var data = await resp.json();
+      var splits = (data.stats && data.stats[0] && data.stats[0].splits) ? data.stats[0].splits : [];
+      for (var j = 0; j < splits.length; j++) {
+        var sp = splits[j];
+        var esAbridor = sp.stat && (sp.stat.gamesStarted === 1 || sp.stat.gamesStarted === "1");
+        if (!esAbridor) continue;
+        starts.push({
+          fecha: sp.date,
+          rival: sp.opponent ? sp.opponent.name : "?",
+          ip: ipADecimal(sp.stat ? sp.stat.inningsPitched : null),
+          so: (sp.stat && sp.stat.strikeOuts !== undefined) ? Number(sp.stat.strikeOuts) : null
+        });
+      }
+      starts.sort(function(a, b) { return a.fecha < b.fecha ? 1 : -1; });
+    }
+  } catch (eLog) {}
+
+  return { nombre: nombre, mano: mano, starts: starts };
+}
   function log(t) { if (typeof logFn === "function") logFn(t); }
 
   var hoy = hoyISOStr || (function(){
@@ -104,7 +147,28 @@ async function jalarPonchesTodos(logFn, hoyISOStr) {
   for (var i = 0; i < pitcherIds.length; i++) {
     var pid = pitcherIds[i];
     var pInfo = PITCHERS_MASTER_2026[pid] || {};
-    var nombrePitcher = pInfo.nombre || pInfo.fullName || ("ID " + pid);
+    var nombrePitcher = pInfo.nombre || pInfo.fullName || null;
+    var manoPitcher = pInfo.mano || null;
+
+    // FIX: si la lista maestra no trae el nombre, se pide directo a MLB
+    // (solo para los que hagan falta, no a los 370, para no duplicar
+    // trabajo innecesario).
+    if (!nombrePitcher) {
+      try {
+        var urlPersona = "https://statsapi.mlb.com/api/v1/people/" + pid;
+        var respPersona = await fetch(MLB_ROUTES.WORKER_BASE + encodeURIComponent(urlPersona));
+        if (respPersona.ok) {
+          var dataPersona = await respPersona.json();
+          var persona = (dataPersona.people && dataPersona.people[0]) ? dataPersona.people[0] : null;
+          if (persona) {
+            if (persona.fullName) nombrePitcher = persona.fullName;
+            if (persona.pitchHand && persona.pitchHand.code) manoPitcher = persona.pitchHand.code === "L" ? "Zurdo" : "Derecho";
+          }
+        }
+      } catch (ePersona) {}
+      if (!nombrePitcher) nombrePitcher = "ID " + pid;
+    }
+
     try {
       var url = "https://statsapi.mlb.com/api/v1/people/" + pid + "/stats?stats=gameLog&group=pitching&season=2026";
       var proxyUrl = MLB_ROUTES.WORKER_BASE + encodeURIComponent(url);
@@ -142,6 +206,7 @@ async function jalarPonchesTodos(logFn, hoyISOStr) {
         registros.push({
           pitcher_id: pid,
           pitcher: nombrePitcher,
+          mano: manoPitcher,
           fecha: fecha,
           venue: venue,
           equipo: equipoPropio,
@@ -185,6 +250,7 @@ function ponchesCruzarConClima(registrosPonches) {
     return {
       pitcher: r.pitcher,
       pitcher_id: r.pitcher_id,
+      mano: r.mano,
       fecha: r.fecha,
       venue: r.venue,
       equipo: r.equipo,
