@@ -265,12 +265,13 @@
     if (ventDir !== null && ventDir !== undefined) {
       var vieneDe = ((Number(ventDir)%360)+360)%360;
       var vaHacia = (vieneDe + 180) % 360;
-      // ahora usa el grado real absoluto directo (anillo fijo)
+      // FIX (arreglo confirmado): la flecha apunta directo al grado
+      // reportado (vieneDe), sin sumar 180, y acortada.
       flechaHtml =
-        '<g transform="rotate('+vaHacia+' '+cx+' '+cy+')">'+
-          '<line x1="'+cx+'" y1="'+(cy+50)+'" x2="'+cx+'" y2="'+(cy-38)+'" stroke="#ff2222" stroke-width="2" stroke-linecap="round"/>'+
-          '<polygon points="'+cx+','+(cy-46)+' '+(cx-6)+','+(cy-32)+' '+(cx+6)+','+(cy-32)+'" fill="#ff2222"/>'+
-          '<circle cx="'+cx+'" cy="'+(cy+50)+'" r="6" fill="#ff2222" stroke="#fff" stroke-width="1.5"/>'+
+        '<g transform="rotate('+vieneDe+' '+cx+' '+cy+')">'+
+          '<line x1="'+cx+'" y1="'+(cy+25)+'" x2="'+cx+'" y2="'+(cy-19)+'" stroke="#ff2222" stroke-width="2" stroke-linecap="round"/>'+
+          '<polygon points="'+cx+','+(cy-23)+' '+(cx-6)+','+(cy-9)+' '+(cx+6)+','+(cy-9)+'" fill="#ff2222"/>'+
+          '<circle cx="'+cx+'" cy="'+(cy+25)+'" r="6" fill="#ff2222" stroke="#fff" stroke-width="1.5"/>'+
         '</g>';
       lecturaTxt = Math.round(vieneDe)+"°";
       vaTxt = Math.round(vaHacia)+"°";
