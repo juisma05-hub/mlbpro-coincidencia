@@ -284,10 +284,9 @@
     ];
     var cardHtml="", degHtml="";
     puntos16.forEach(function(p){
-      // PERCEPCION (boceto original aprobado): el parque queda FIJO
-      // mirando arriba, y el anillo de cardinales rota al reves de la
-      // orientacion real del parque (hp).
-      var gAjustado = ((p.g - hp)%360+360)%360;
+      // FIX (arreglo confirmado): el anillo queda FIJO en su posicion
+      // real (0°=arriba siempre). Ya no rota segun hp.
+      var gAjustado = p.g;
       cardHtml+='<g transform="rotate('+gAjustado+' '+cx+' '+cy+')"><text x="'+cx+'" y="14" font-size="9" font-weight="700" fill="#9b59ff" text-anchor="middle">'+p.t+'</text></g>';
       degHtml+='<g transform="rotate('+gAjustado+' '+cx+' '+cy+')"><text x="'+cx+'" y="38" font-size="7" font-weight="700" fill="#fff" text-anchor="middle">'+Math.round(p.g)+'°</text></g>';
     });
@@ -298,9 +297,9 @@
     if (hoyDir !== null && hoyDir !== undefined && hoyDir !== "" && !isNaN(Number(hoyDir))) {
       var vieneDe = ((Number(hoyDir)%360)+360)%360;
       var vaHacia = (vieneDe+180)%360;
-      var vaHaciaAjustada = ((vaHacia - hp)%360+360)%360;
+      // ahora usa el grado real absoluto directo (anillo fijo)
       hoyFlechaHtml =
-        '<g transform="rotate('+vaHaciaAjustada+' '+cx+' '+cy+')">'+
+        '<g transform="rotate('+vaHacia+' '+cx+' '+cy+')">'+
           '<line x1="'+cx+'" y1="'+(cy+50)+'" x2="'+cx+'" y2="'+(cy-38)+'" stroke="#ff2222" stroke-width="2" stroke-linecap="round"/>'+
           '<polygon points="'+cx+','+(cy-46)+' '+(cx-6)+','+(cy-32)+' '+(cx+6)+','+(cy-32)+'" fill="#ff2222"/>'+
           '<circle cx="'+cx+'" cy="'+(cy+50)+'" r="6" fill="#ff2222" stroke="#fff" stroke-width="1.5"/>'+
@@ -317,16 +316,20 @@
         '<circle cx="'+cx+'" cy="'+cy+'" r="68" fill="none" stroke="#333" stroke-width="1"/>'+
         '<circle cx="'+cx+'" cy="'+cy+'" r="66" fill="#0e1420" stroke="#222" stroke-width="1"/>'+
         cardHtml + degHtml +
-        '<line x1="'+cx+'" y1="'+(cy+60)+'" x2="'+cx+'" y2="'+(cy-60)+'" stroke="#ff9f0a" stroke-width="1" stroke-dasharray="3,3" opacity="0.8"/>'+
-        '<path d="M '+cx+' '+(cy+42)+' L '+(cx-45)+' '+(cy-21)+' A 60 60 0 0 1 '+(cx+45)+' '+(cy-21)+' Z" fill="#1a4d2e" stroke="#2d7a4a" stroke-width="1" opacity="0.9"/>'+
-        '<path d="M '+(cx-21)+' '+(cy+42)+' Q '+cx+' '+(cy+18)+' '+(cx+21)+' '+(cy+42)+'" fill="none" stroke="#c9a94d" stroke-width="1" opacity="0.8"/>'+
-        '<path d="M '+(cx-27)+' '+(cy+42)+' Q '+cx+' '+(cy+9)+' '+(cx+27)+' '+(cy+42)+'" fill="none" stroke="#c9a94d" stroke-width="0.7" opacity="0.5"/>'+
-        '<g stroke="#c9a94d" stroke-width="1.5" fill="none">'+
-          '<polygon points="'+cx+','+cy+' '+(cx+18)+','+(cy+21)+' '+cx+','+(cy+42)+' '+(cx-18)+','+(cy+21)+'"/>'+
-          '<circle cx="'+cx+'" cy="'+cy+'" r="2.5" fill="#c9a94d"/>'+
-          '<circle cx="'+(cx+18)+'" cy="'+(cy+21)+'" r="2" fill="#c9a94d"/>'+
-          '<circle cx="'+cx+'" cy="'+(cy+42)+'" r="2" fill="#c9a94d"/>'+
-          '<circle cx="'+(cx-18)+'" cy="'+(cy+21)+'" r="2" fill="#c9a94d"/>'+
+        // FIX (arreglo confirmado): el parque AHORA SI rota segun hp,
+        // para apuntar al grado real en el anillo fijo.
+        '<g transform="rotate('+hp+' '+cx+' '+cy+')">'+
+          '<line x1="'+cx+'" y1="'+(cy+60)+'" x2="'+cx+'" y2="'+(cy-60)+'" stroke="#ff9f0a" stroke-width="1" stroke-dasharray="3,3" opacity="0.8"/>'+
+          '<path d="M '+cx+' '+(cy+42)+' L '+(cx-45)+' '+(cy-21)+' A 60 60 0 0 1 '+(cx+45)+' '+(cy-21)+' Z" fill="#1a4d2e" stroke="#2d7a4a" stroke-width="1" opacity="0.9"/>'+
+          '<path d="M '+(cx-21)+' '+(cy+42)+' Q '+cx+' '+(cy+18)+' '+(cx+21)+' '+(cy+42)+'" fill="none" stroke="#c9a94d" stroke-width="1" opacity="0.8"/>'+
+          '<path d="M '+(cx-27)+' '+(cy+42)+' Q '+cx+' '+(cy+9)+' '+(cx+27)+' '+(cy+42)+'" fill="none" stroke="#c9a94d" stroke-width="0.7" opacity="0.5"/>'+
+          '<g stroke="#c9a94d" stroke-width="1.5" fill="none">'+
+            '<polygon points="'+cx+','+cy+' '+(cx+18)+','+(cy+21)+' '+cx+','+(cy+42)+' '+(cx-18)+','+(cy+21)+'"/>'+
+            '<circle cx="'+cx+'" cy="'+cy+'" r="2.5" fill="#c9a94d"/>'+
+            '<circle cx="'+(cx+18)+'" cy="'+(cy+21)+'" r="2" fill="#c9a94d"/>'+
+            '<circle cx="'+cx+'" cy="'+(cy+42)+'" r="2" fill="#c9a94d"/>'+
+            '<circle cx="'+(cx-18)+'" cy="'+(cy+21)+'" r="2" fill="#c9a94d"/>'+
+          '</g>'+
         '</g>'+
         hoyFlechaHtml+
         '<g id="explorerArrow_'+idx+'" transform="rotate(0 '+cx+' '+cy+')">'+
@@ -352,12 +355,9 @@
   function actualizarExplorer(wrap, deg){
     var idx = wrap.getAttribute('data-idx');
     var venue = wrap.getAttribute('data-venue');
-    var hp = Number(wrap.getAttribute('data-hp'))||0;
-    // deg es el angulo VISUAL (pantalla), pero como el parque ahora es
-    // el marco fijo (no el norte real), hay que sumarle hp para volver
-    // a tener el angulo REAL de viento y poder filtrar el cache
-    // correctamente (el cache guarda direcciones reales, no visuales).
-    var degReal = ((deg + hp)%360+360)%360;
+    // FIX (arreglo confirmado): el anillo ahora es absoluto/fijo, asi que
+    // el angulo visual YA ES el angulo real. Ya no se suma hp.
+    var degReal = ((deg%360)+360)%360;
     var lo = Math.floor(degReal/30)*30, hi = lo+30;
     var arrow = document.getElementById('explorerArrow_'+idx);
     if(arrow) arrow.setAttribute('transform','rotate('+deg+' 100 100)');
