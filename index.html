@@ -318,7 +318,7 @@
         cardHtml + degHtml +
         // FIX (arreglo confirmado): el parque AHORA SI rota segun hp,
         // para apuntar al grado real en el anillo fijo.
-        '<g transform="rotate('+hp+' '+cx+' '+cy+')">'+
+        '<g transform="rotate('+((hp+180)%360)+' '+cx+' '+cy+')">'+
           '<line x1="'+cx+'" y1="'+(cy+60)+'" x2="'+cx+'" y2="'+(cy-60)+'" stroke="#ff9f0a" stroke-width="1" stroke-dasharray="3,3" opacity="0.8"/>'+
           '<path d="M '+cx+' '+(cy+42)+' L '+(cx-45)+' '+(cy-21)+' A 60 60 0 0 1 '+(cx+45)+' '+(cy-21)+' Z" fill="#1a4d2e" stroke="#2d7a4a" stroke-width="1" opacity="0.9"/>'+
           '<path d="M '+(cx-21)+' '+(cy+42)+' Q '+cx+' '+(cy+18)+' '+(cx+21)+' '+(cy+42)+'" fill="none" stroke="#c9a94d" stroke-width="1" opacity="0.8"/>'+
