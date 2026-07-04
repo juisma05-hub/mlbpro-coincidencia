@@ -212,8 +212,8 @@
 
     // grado real HACIA donde va el viento (para dibujar la flecha) y
     // el grado original de donde VIENE (para la etiqueta de texto).
-    // Como el anillo ahora es absoluto/fijo, la flecha usa el grado real
-    // sin ajuste (ya no se resta hp).
+    // FIX (arreglo confirmado): la flecha ahora apunta directo al grado
+    // reportado (vieneDe), sin sumarle 180, y se acorta la linea.
     var promDirVieneDe = ((Number(promDir)%360)+360)%360;
     var promDirVaHacia = (promDirVieneDe + 180) % 360;
 
@@ -237,12 +237,13 @@
           '<circle cx="'+(cx-18)+'" cy="'+(cy+21)+'" r="2" fill="#c9a94d"/>'+
         '</g>'+
       '</g>'+
-      // flecha roja del viento: ahora usa el grado real absoluto directo,
-      // porque el anillo ya es el marco fijo/absoluto.
-      '<g transform="rotate('+promDirVaHacia+' '+cx+' '+cy+')">'+
-        '<line x1="'+cx+'" y1="'+(cy+50)+'" x2="'+cx+'" y2="'+(cy-38)+'" stroke="#ff2222" stroke-width="2" stroke-linecap="round"/>'+
-        '<polygon points="'+cx+','+(cy-46)+' '+(cx-6)+','+(cy-32)+' '+(cx+6)+','+(cy-32)+'" fill="#ff2222"/>'+
-        '<circle cx="'+cx+'" cy="'+(cy+50)+'" r="6" fill="#ff2222" stroke="#fff" stroke-width="1.5"/>'+
+      // flecha roja del viento: FIX confirmado — apunta directo al grado
+      // reportado (promDirVieneDe), sin sumar 180, y acortada (mitad de
+      // longitud, mismo eje/centro que antes).
+      '<g transform="rotate('+promDirVieneDe+' '+cx+' '+cy+')">'+
+        '<line x1="'+cx+'" y1="'+(cy+25)+'" x2="'+cx+'" y2="'+(cy-19)+'" stroke="#ff2222" stroke-width="2" stroke-linecap="round"/>'+
+        '<polygon points="'+cx+','+(cy-23)+' '+(cx-6)+','+(cy-9)+' '+(cx+6)+','+(cy-9)+'" fill="#ff2222"/>'+
+        '<circle cx="'+cx+'" cy="'+(cy+25)+'" r="6" fill="#ff2222" stroke="#fff" stroke-width="1.5"/>'+
       '</g>'+
       '<circle cx="'+cx+'" cy="'+cy+'" r="3" fill="#ff2222" opacity="0.9"/>'+
       '<rect x="'+(cx-24)+'" y="'+(cy-6)+'" width="48" height="14" rx="3" fill="#0d1117" opacity="0.85"/>'+
