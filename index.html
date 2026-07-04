@@ -258,9 +258,24 @@
     cab.classList.toggle('abierto', abierto);
   }
 
+  // FIX (esta sesion): si hpACF es null (parque sin orientacion
+  // confirmada en parques-orientacion.js), YA NO se dibuja la brujula
+  // con un 45 grados inventado. Se muestra NO_CONFIRMADO en vez de una
+  // brujula falsa — mismo fix ya aplicado en casar-series.html y
+  // k6-test.html.
   function svgBrujulaJuego(idx, venue, hpACF, hoyDir, hoyVel){
     var cx=100, cy=100;
-    var hp = (hpACF!==null && hpACF!==undefined) ? hpACF : 45;
+    var venueEsc0 = String(venue||"").replace(/&/g,"&amp;").replace(/"/g,"&quot;");
+    if (hpACF===null || hpACF===undefined) {
+      return '<div class="brujula-explorer-wrap" data-idx="'+idx+'" data-venue="'+venueEsc0+'" data-hp="0">'+
+        '<svg viewBox="0 0 200 205">'+
+          '<circle cx="'+cx+'" cy="'+cy+'" r="95" fill="none" stroke="#333" stroke-width="1"/>'+
+          '<text x="'+cx+'" y="'+cy+'" fill="#8b949e" font-size="13" font-weight="700" text-anchor="middle">NO_CONFIRMADO</text>'+
+        '</svg>'+
+        '<div class="explorer-txt">'+venueEsc0+' · orientación de parque sin medir</div>'+
+      '</div>';
+    }
+    var hp = hpACF;
     var puntos16=[
       {g:0,t:"N"},{g:22.5,t:"NNE"},{g:45,t:"NE"},{g:67.5,t:"ENE"},
       {g:90,t:"E"},{g:112.5,t:"ESE"},{g:135,t:"SE"},{g:157.5,t:"SSE"},
@@ -294,7 +309,7 @@
       hoyVaTxt = Math.round(vaHacia)+"°";
     }
 
-    var venueEsc = String(venue||"").replace(/&/g,"&amp;").replace(/"/g,"&quot;");
+    var venueEsc = venueEsc0;
 
     return '<div class="brujula-explorer-wrap" data-idx="'+idx+'" data-venue="'+venueEsc+'" data-hp="'+hp+'">'+
       '<svg viewBox="0 0 200 205">'+
@@ -337,7 +352,7 @@
   function actualizarExplorer(wrap, deg){
     var idx = wrap.getAttribute('data-idx');
     var venue = wrap.getAttribute('data-venue');
-    var hp = Number(wrap.getAttribute('data-hp'))||45;
+    var hp = Number(wrap.getAttribute('data-hp'))||0;
     // deg es el angulo VISUAL (pantalla), pero como el parque ahora es
     // el marco fijo (no el norte real), hay que sumarle hp para volver
     // a tener el angulo REAL de viento y poder filtrar el cache
@@ -669,7 +684,7 @@
 
     var serieHtml='<details class="fold"><summary>Serie en este parque (por si ya jugaron en escena parecida)</summary>'+serieParqueHtml(venue,bloquesSerie,rosterMap)+'</details>';
 
-    var hpACFCard = (venue && typeof getOrientacionParque==="function") ? getOrientacionParque(venue) : 45;
+    var hpACFCard = (venue && typeof getOrientacionParque==="function") ? getOrientacionParque(venue) : null;
     var brujulaHoy = venue ? svgBrujulaJuego(idx, venue, hpACFCard, today?today.wind_dir:null, today?today.windspeed_mph:null) : '';
 
     return '<div class="juego">'+
