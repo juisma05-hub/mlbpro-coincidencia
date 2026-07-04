@@ -203,43 +203,43 @@
     ];
     var cardHtml="", degHtml="";
     puntos16.forEach(function(p){
-      // PERCEPCION (boceto original aprobado): el parque queda FIJO
-      // mirando arriba, y el anillo de cardinales rota al reves de la
-      // orientacion real del parque (hp) para que la lectura de "hacia
-      // donde mira el parque" siga siendo correcta.
-      var gAjustado = ((p.g - hp)%360+360)%360;
+      // FIX (arreglo confirmado): el anillo queda FIJO en su posicion real
+      // (0°=arriba siempre, sin ajuste). Ya no rota segun hp.
+      var gAjustado = p.g;
       cardHtml+='<g transform="rotate('+gAjustado+' '+cx+' '+cy+')"><text x="'+cx+'" y="14" font-size="9" font-weight="700" fill="#9b59ff" text-anchor="middle">'+p.t+'</text></g>';
       degHtml+='<g transform="rotate('+gAjustado+' '+cx+' '+cy+')"><text x="'+cx+'" y="38" font-size="7" font-weight="700" fill="#fff" text-anchor="middle">'+Math.round(p.g)+'°</text></g>';
     });
 
     // grado real HACIA donde va el viento (para dibujar la flecha) y
     // el grado original de donde VIENE (para la etiqueta de texto).
+    // Como el anillo ahora es absoluto/fijo, la flecha usa el grado real
+    // sin ajuste (ya no se resta hp).
     var promDirVieneDe = ((Number(promDir)%360)+360)%360;
     var promDirVaHacia = (promDirVieneDe + 180) % 360;
-    var vaHaciaAjustada = ((promDirVaHacia - hp)%360+360)%360;
 
     return '<svg width="200" height="205" viewBox="0 0 200 205" style="display:block;margin:0 auto">'+
       '<circle cx="'+cx+'" cy="'+cy+'" r="95" fill="none" stroke="#333" stroke-width="1"/>'+
       '<circle cx="'+cx+'" cy="'+cy+'" r="68" fill="none" stroke="#333" stroke-width="1"/>'+
       '<circle cx="'+cx+'" cy="'+cy+'" r="66" fill="#0e1420" stroke="#222" stroke-width="1"/>'+
       cardHtml + degHtml +
-      // PARQUE FIJO: ya NO rota con hpACF. Siempre mira hacia arriba
-      // (home -> jardin central apuntando al "norte" de la pantalla).
-      '<line x1="'+cx+'" y1="'+(cy+60)+'" x2="'+cx+'" y2="'+(cy-60)+'" stroke="#ff9f0a" stroke-width="1" stroke-dasharray="3,3" opacity="0.8"/>'+
-      '<path d="M '+cx+' '+(cy+42)+' L '+(cx-45)+' '+(cy-21)+' A 60 60 0 0 1 '+(cx+45)+' '+(cy-21)+' Z" fill="#1a4d2e" stroke="#2d7a4a" stroke-width="1" opacity="0.9"/>'+
-      '<path d="M '+(cx-21)+' '+(cy+42)+' Q '+cx+' '+(cy+18)+' '+(cx+21)+' '+(cy+42)+'" fill="none" stroke="#c9a94d" stroke-width="1" opacity="0.8"/>'+
-      '<path d="M '+(cx-27)+' '+(cy+42)+' Q '+cx+' '+(cy+9)+' '+(cx+27)+' '+(cy+42)+'" fill="none" stroke="#c9a94d" stroke-width="0.7" opacity="0.5"/>'+
-      '<g stroke="#c9a94d" stroke-width="1.5" fill="none">'+
-        '<polygon points="'+cx+','+cy+' '+(cx+18)+','+(cy+21)+' '+cx+','+(cy+42)+' '+(cx-18)+','+(cy+21)+'"/>'+
-        '<circle cx="'+cx+'" cy="'+cy+'" r="2.5" fill="#c9a94d"/>'+
-        '<circle cx="'+(cx+18)+'" cy="'+(cy+21)+'" r="2" fill="#c9a94d"/>'+
-        '<circle cx="'+cx+'" cy="'+(cy+42)+'" r="2" fill="#c9a94d"/>'+
-        '<circle cx="'+(cx-18)+'" cy="'+(cy+21)+'" r="2" fill="#c9a94d"/>'+
+      // FIX (arreglo confirmado): el parque (linea + abanico + diamante)
+      // AHORA SI rota segun hp, para apuntar al grado real en el anillo fijo.
+      '<g transform="rotate('+((hp+180)%360)+' '+cx+' '+cy+')">'+
+        '<line x1="'+cx+'" y1="'+(cy+60)+'" x2="'+cx+'" y2="'+(cy-60)+'" stroke="#ff9f0a" stroke-width="1" stroke-dasharray="3,3" opacity="0.8"/>'+
+        '<path d="M '+cx+' '+(cy+42)+' L '+(cx-45)+' '+(cy-21)+' A 60 60 0 0 1 '+(cx+45)+' '+(cy-21)+' Z" fill="#1a4d2e" stroke="#2d7a4a" stroke-width="1" opacity="0.9"/>'+
+        '<path d="M '+(cx-21)+' '+(cy+42)+' Q '+cx+' '+(cy+18)+' '+(cx+21)+' '+(cy+42)+'" fill="none" stroke="#c9a94d" stroke-width="1" opacity="0.8"/>'+
+        '<path d="M '+(cx-27)+' '+(cy+42)+' Q '+cx+' '+(cy+9)+' '+(cx+27)+' '+(cy+42)+'" fill="none" stroke="#c9a94d" stroke-width="0.7" opacity="0.5"/>'+
+        '<g stroke="#c9a94d" stroke-width="1.5" fill="none">'+
+          '<polygon points="'+cx+','+cy+' '+(cx+18)+','+(cy+21)+' '+cx+','+(cy+42)+' '+(cx-18)+','+(cy+21)+'"/>'+
+          '<circle cx="'+cx+'" cy="'+cy+'" r="2.5" fill="#c9a94d"/>'+
+          '<circle cx="'+(cx+18)+'" cy="'+(cy+21)+'" r="2" fill="#c9a94d"/>'+
+          '<circle cx="'+cx+'" cy="'+(cy+42)+'" r="2" fill="#c9a94d"/>'+
+          '<circle cx="'+(cx-18)+'" cy="'+(cy+21)+'" r="2" fill="#c9a94d"/>'+
+        '</g>'+
       '</g>'+
-      // flecha roja del viento: rota AJUSTADA al marco fijo del parque
-      // (vaHaciaAjustada), no el angulo real puro, porque ahora el
-      // parque es la referencia fija en vez del norte real.
-      '<g transform="rotate('+vaHaciaAjustada+' '+cx+' '+cy+')">'+
+      // flecha roja del viento: ahora usa el grado real absoluto directo,
+      // porque el anillo ya es el marco fijo/absoluto.
+      '<g transform="rotate('+promDirVaHacia+' '+cx+' '+cy+')">'+
         '<line x1="'+cx+'" y1="'+(cy+50)+'" x2="'+cx+'" y2="'+(cy-38)+'" stroke="#ff2222" stroke-width="2" stroke-linecap="round"/>'+
         '<polygon points="'+cx+','+(cy-46)+' '+(cx-6)+','+(cy-32)+' '+(cx+6)+','+(cy-32)+'" fill="#ff2222"/>'+
         '<circle cx="'+cx+'" cy="'+(cy+50)+'" r="6" fill="#ff2222" stroke="#fff" stroke-width="1.5"/>'+
