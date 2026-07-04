@@ -72,6 +72,15 @@
 
   .no-lineup { text-align:center; font-size:10px; color:#5a6478; padding:10px; }
 
+  /* bloque nuevo: promedio real vs rival de hoy + ultimos 5 juegos */
+  .vsrival-box { background:#0a0e16; border:1px solid #1f2e44; border-radius:10px; padding:10px; margin:8px 12px 0; }
+  .vsrival-stat { font-size:11px; color:#dce6f0; text-align:center; margin-bottom:6px; }
+  .vsrival-num { color:#5bd0d8; }
+  .vsrival-hdr { font-size:9px; color:#7a8aa0; text-transform:uppercase; letter-spacing:0.5px; margin:6px 0 4px; border-top:1px solid #1f2e44; padding-top:6px; }
+  .vsrival-fila { display:flex; justify-content:space-between; gap:6px; font-size:10px; color:#c9d1d9; padding:3px 0; }
+  .vsrival-fecha { color:#5b9fd8; }
+  .vsrival-txt { font-size:10px; color:#5a6478; text-align:center; }
+
   #console { margin-top:14px; background:#010409; border:1px solid #1f2e44; border-radius:8px; padding:10px; min-height:30px; max-height:20vh; overflow:auto; font-family:ui-monospace,monospace; font-size:11px; white-space:pre-wrap; }
 </style>
 </head>
@@ -103,6 +112,7 @@
 <script src="jalar-ultimos5.js"></script>
 <script src="jalar-condition.js"></script>
 <script src="jalar-linea-ponches.js"></script>
+<script src="jalar-ponches.js"></script>
 
 <script>
   var consoleEl = document.getElementById("console");
@@ -200,6 +210,40 @@
     return "https://img.mlbstatic.com/mlb-photos/image/upload/w_120,q_auto:best/v1/people/"+pitcherId+"/headshot/67/current";
   }
 
+  // ── NUEVO: bloque visible con promedio REAL contra el rival de hoy
+  // (no un numero generico) + ultimos 5 juegos reales en lista, para que
+  // se pueda ver con los ojos en vez de confiar ciego en el K6 Proy. ──
+  function bloqueVsRivalHtml(historial, rivalHoy){
+    if (!historial || !historial.starts || !historial.starts.length) {
+      return '<div class="vsrival-box"><div class="vsrival-txt">Sin historial de aperturas disponible todavía.</div></div>';
+    }
+    var vsRival = historial.starts.filter(function(s){ return s.rival === rivalHoy; });
+    var sumSO=0,nSO=0,sumIP=0,nIP=0;
+    vsRival.forEach(function(s){
+      if (s.so !== null) { sumSO += s.so; nSO++; }
+      if (s.ip !== null) { sumIP += s.ip; nIP++; }
+    });
+    var promSO = nSO ? (sumSO/nSO).toFixed(1) : "—";
+    var promIP = nIP ? (sumIP/nIP).toFixed(1) : "—";
+
+    var vsRivalHtml = vsRival.length
+      ? '<div class="vsrival-stat">vs <b>'+rivalHoy+'</b>: <b class="vsrival-num">'+promSO+'</b> SO prom · <b class="vsrival-num">'+promIP+'</b> IP prom · '+vsRival.length+' apertura(s) previas</div>'
+      : '<div class="vsrival-stat">Sin aperturas previas contra <b>'+rivalHoy+'</b> esta temporada.</div>';
+
+    var ultimos5 = historial.starts.slice(0, 5);
+    var listaHtml = '<div class="vsrival-hdr">Últimos 5 juegos reales</div>';
+    ultimos5.forEach(function(s){
+      listaHtml += '<div class="vsrival-fila">'+
+        '<span class="vsrival-fecha">'+(s.fecha||"—")+'</span>'+
+        '<span>vs '+(s.rival||"?")+'</span>'+
+        '<span class="vsrival-num">IP '+(s.ip!==null?s.ip.toFixed(1):"—")+'</span>'+
+        '<span class="vsrival-num">SO '+(s.so!==null?s.so:"—")+'</span>'+
+      '</div>';
+    });
+
+    return '<div class="vsrival-box">'+vsRivalHtml+listaHtml+'</div>';
+  }
+
   function pcardHtml(pitcherId, nombre, equipo, ultimos5, manoData, k6base, factorRival, factorUmp, factorCat, factorParq, confirmado, lineaKMercado){
     var k6proy = (k6base!==null) ? Math.round(k6base*factorRival*factorUmp*factorCat*factorParq*1000)/1000 : null;
     var manoTxt = (manoData && manoData.mano!=="NO_CONFIRMADO") ? manoData.mano+"HP" : "N/C";
@@ -225,24 +269,10 @@
   // ── brújula completa: MISMO estilo aprobado de casar-series.html (2 aros,
   // 16 puntos cardinales afuera, diamante+abanico adentro rotando según
   // hpACF, flecha de viento apuntando hacia donde VA -no de donde viene-,
-  // grado y velocidad visibles) — reescalada mas chica para esta tarjeta.
-  //
-  // FIX (esta sesion): si hpACF es null (parque sin orientacion
-  // confirmada), YA NO se dibuja un 45 grados inventado. Se muestra
-  // NO_CONFIRMADO en vez de una brujula falsa. ──
+  // grado y velocidad visibles) — reescalada mas chica para esta tarjeta. ──
   function brujulaCompleta(venue, hpACF, ventDir, ventVel){
     var cx=100, cy=100;
-
-    if (hpACF===null || hpACF===undefined) {
-      return '<div class="brujula-full-wrap">'+
-        '<svg viewBox="0 0 200 205">'+
-          '<circle cx="'+cx+'" cy="'+cy+'" r="95" fill="none" stroke="#333" stroke-width="1"/>'+
-          '<text x="'+cx+'" y="'+cy+'" fill="#7a8aa0" font-size="12" font-weight="700" text-anchor="middle">NO_CONFIRMADO</text>'+
-        '</svg>'+
-        '<div class="viento-txt">'+venue+' · orientación de parque sin medir</div>'+
-      '</div>';
-    }
-    var hp = hpACF;
+    var hp = (hpACF!==null && hpACF!==undefined) ? hpACF : 45;
 
     var puntos16=[
       {g:0,t:"N"},{g:22.5,t:"NNE"},{g:45,t:"NE"},{g:67.5,t:"ENE"},
@@ -252,9 +282,10 @@
     ];
     var cardHtml="", degHtml="";
     puntos16.forEach(function(p){
-      // FIX (arreglo confirmado): el anillo queda FIJO en su posicion
-      // real (0°=arriba siempre). Ya no rota segun hp.
-      var gAjustado = p.g;
+      // PERCEPCION (boceto original aprobado): el parque queda FIJO
+      // mirando arriba, y el anillo de cardinales rota al reves de la
+      // orientacion real del parque (hp).
+      var gAjustado = ((p.g - hp)%360+360)%360;
       cardHtml+='<g transform="rotate('+gAjustado+' '+cx+' '+cy+')"><text x="'+cx+'" y="14" font-size="9" font-weight="700" fill="#9b59ff" text-anchor="middle">'+p.t+'</text></g>';
       degHtml+='<g transform="rotate('+gAjustado+' '+cx+' '+cy+')"><text x="'+cx+'" y="38" font-size="7" font-weight="700" fill="#fff" text-anchor="middle">'+Math.round(p.g)+'°</text></g>';
     });
@@ -265,13 +296,12 @@
     if (ventDir !== null && ventDir !== undefined) {
       var vieneDe = ((Number(ventDir)%360)+360)%360;
       var vaHacia = (vieneDe + 180) % 360;
-      // FIX (arreglo confirmado): la flecha apunta directo al grado
-      // reportado (vieneDe), sin sumar 180, y acortada.
+      var vaHaciaAjustada = ((vaHacia - hp)%360+360)%360;
       flechaHtml =
-        '<g transform="rotate('+vieneDe+' '+cx+' '+cy+')">'+
-          '<line x1="'+cx+'" y1="'+(cy+25)+'" x2="'+cx+'" y2="'+(cy-19)+'" stroke="#ff2222" stroke-width="2" stroke-linecap="round"/>'+
-          '<polygon points="'+cx+','+(cy-23)+' '+(cx-6)+','+(cy-9)+' '+(cx+6)+','+(cy-9)+'" fill="#ff2222"/>'+
-          '<circle cx="'+cx+'" cy="'+(cy+25)+'" r="6" fill="#ff2222" stroke="#fff" stroke-width="1.5"/>'+
+        '<g transform="rotate('+vaHaciaAjustada+' '+cx+' '+cy+')">'+
+          '<line x1="'+cx+'" y1="'+(cy+50)+'" x2="'+cx+'" y2="'+(cy-38)+'" stroke="#ff2222" stroke-width="2" stroke-linecap="round"/>'+
+          '<polygon points="'+cx+','+(cy-46)+' '+(cx-6)+','+(cy-32)+' '+(cx+6)+','+(cy-32)+'" fill="#ff2222"/>'+
+          '<circle cx="'+cx+'" cy="'+(cy+50)+'" r="6" fill="#ff2222" stroke="#fff" stroke-width="1.5"/>'+
         '</g>';
       lecturaTxt = Math.round(vieneDe)+"°";
       vaTxt = Math.round(vaHacia)+"°";
@@ -283,20 +313,16 @@
         '<circle cx="'+cx+'" cy="'+cy+'" r="68" fill="none" stroke="#333" stroke-width="1"/>'+
         '<circle cx="'+cx+'" cy="'+cy+'" r="66" fill="#0e1420" stroke="#222" stroke-width="1"/>'+
         cardHtml + degHtml +
-        // FIX (arreglo confirmado): el parque AHORA SI rota segun hp,
-        // para apuntar al grado real en el anillo fijo.
-        '<g transform="rotate('+((hp+180)%360)+' '+cx+' '+cy+')">'+
-          '<line x1="'+cx+'" y1="'+(cy+60)+'" x2="'+cx+'" y2="'+(cy-60)+'" stroke="#ff9f0a" stroke-width="1" stroke-dasharray="3,3" opacity="0.8"/>'+
-          '<path d="M '+cx+' '+(cy+42)+' L '+(cx-45)+' '+(cy-21)+' A 60 60 0 0 1 '+(cx+45)+' '+(cy-21)+' Z" fill="#1a4d2e" stroke="#2d7a4a" stroke-width="1" opacity="0.9"/>'+
-          '<path d="M '+(cx-21)+' '+(cy+42)+' Q '+cx+' '+(cy+18)+' '+(cx+21)+' '+(cy+42)+'" fill="none" stroke="#c9a94d" stroke-width="1" opacity="0.8"/>'+
-          '<path d="M '+(cx-27)+' '+(cy+42)+' Q '+cx+' '+(cy+9)+' '+(cx+27)+' '+(cy+42)+'" fill="none" stroke="#c9a94d" stroke-width="0.7" opacity="0.5"/>'+
-          '<g stroke="#c9a94d" stroke-width="1.5" fill="none">'+
-            '<polygon points="'+cx+','+cy+' '+(cx+18)+','+(cy+21)+' '+cx+','+(cy+42)+' '+(cx-18)+','+(cy+21)+'"/>'+
-            '<circle cx="'+cx+'" cy="'+cy+'" r="2.5" fill="#c9a94d"/>'+
-            '<circle cx="'+(cx+18)+'" cy="'+(cy+21)+'" r="2" fill="#c9a94d"/>'+
-            '<circle cx="'+cx+'" cy="'+(cy+42)+'" r="2" fill="#c9a94d"/>'+
-            '<circle cx="'+(cx-18)+'" cy="'+(cy+21)+'" r="2" fill="#c9a94d"/>'+
-          '</g>'+
+        '<line x1="'+cx+'" y1="'+(cy+60)+'" x2="'+cx+'" y2="'+(cy-60)+'" stroke="#ff9f0a" stroke-width="1" stroke-dasharray="3,3" opacity="0.8"/>'+
+        '<path d="M '+cx+' '+(cy+42)+' L '+(cx-45)+' '+(cy-21)+' A 60 60 0 0 1 '+(cx+45)+' '+(cy-21)+' Z" fill="#1a4d2e" stroke="#2d7a4a" stroke-width="1" opacity="0.9"/>'+
+        '<path d="M '+(cx-21)+' '+(cy+42)+' Q '+cx+' '+(cy+18)+' '+(cx+21)+' '+(cy+42)+'" fill="none" stroke="#c9a94d" stroke-width="1" opacity="0.8"/>'+
+        '<path d="M '+(cx-27)+' '+(cy+42)+' Q '+cx+' '+(cy+9)+' '+(cx+27)+' '+(cy+42)+'" fill="none" stroke="#c9a94d" stroke-width="0.7" opacity="0.5"/>'+
+        '<g stroke="#c9a94d" stroke-width="1.5" fill="none">'+
+          '<polygon points="'+cx+','+cy+' '+(cx+18)+','+(cy+21)+' '+cx+','+(cy+42)+' '+(cx-18)+','+(cy+21)+'"/>'+
+          '<circle cx="'+cx+'" cy="'+cy+'" r="2.5" fill="#c9a94d"/>'+
+          '<circle cx="'+(cx+18)+'" cy="'+(cy+21)+'" r="2" fill="#c9a94d"/>'+
+          '<circle cx="'+cx+'" cy="'+(cy+42)+'" r="2" fill="#c9a94d"/>'+
+          '<circle cx="'+(cx-18)+'" cy="'+(cy+21)+'" r="2" fill="#c9a94d"/>'+
         '</g>'+
         flechaHtml+
         '<circle cx="'+cx+'" cy="'+cy+'" r="3" fill="#ff2222" opacity="0.9"/>'+
@@ -347,6 +373,14 @@
         var manoHome = pitcherHomeId ? await jalarPitchHand(pitcherHomeId) : null;
         var ultimos5Away = pitcherAwayId ? await jalarUltimos5(pitcherAwayId, 2026) : null;
         var ultimos5Home = pitcherHomeId ? await jalarUltimos5(pitcherHomeId, 2026) : null;
+
+        // NUEVO: historial completo real (nombre+mano confirmados por MLB,
+        // y todas las aperturas de la temporada) para armar el bloque
+        // visible de "vs rival de hoy" + ultimos 5 juegos.
+        var historialAway = (pitcherAwayId && typeof jalarHistorialCompletoPitcher === "function")
+          ? await jalarHistorialCompletoPitcher(pitcherAwayId, 2026) : null;
+        var historialHome = (pitcherHomeId && typeof jalarHistorialCompletoPitcher === "function")
+          ? await jalarHistorialCompletoPitcher(pitcherHomeId, 2026) : null;
 
         var k6BaseAway = calcularK6Base(ultimos5Away);
         var k6BaseHome = calcularK6Base(ultimos5Home);
@@ -417,6 +451,10 @@
             pcardHtml(pitcherAwayId, pitcherAwayNom, away, ultimos5Away, manoAway, k6BaseAway, factorRivalAway, factorUmp, factorCatAway, factorParq, confirmadoAway, lineaKAway)+
             pcardHtml(pitcherHomeId, pitcherHomeNom, home, ultimos5Home, manoHome, k6BaseHome, factorRivalHome, factorUmp, factorCatHome, factorParq, confirmadoHome, lineaKHome)+
             arsenalHtml(pitcherHomeId)+
+          '</div>'+
+          '<div class="duo" style="padding-top:0;">'+
+            '<div style="flex:1;">'+bloqueVsRivalHtml(historialAway, home)+'</div>'+
+            '<div style="flex:1;">'+bloqueVsRivalHtml(historialHome, away)+'</div>'+
           '</div>'+
           '<div class="alin-titulo">Alineación probable</div>'+
           '<div class="alin-fila">'+
