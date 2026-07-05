@@ -53,10 +53,20 @@ function lineasGuardarCache(obj) {
 }
 
 // Busca el total por venue del parque local
+// PIEZA AGREGADA 5 jul 2026: resolver alias de venue (ej. "UNIQLO Field at
+// Dodger Stadium" -> "Dodger Stadium") antes de comparar. El cache de este
+// archivo siempre guarda el nombre base (via ODDS_TEAM_TO_VENUE), pero
+// index.html llama esta funcion con el nombre que da la MLB API, que puede
+// traer el patrocinio nuevo. Usa el mismo STADIUM_ALIAS_2026 ya definido
+// en estadios.js -- no se duplica el mapeo, solo se reutiliza si existe.
 function lineasBuscarVenue(venue) {
   var cache = lineasLeerCache();
   if (!cache || !cache.juegos) return null;
-  var v = (venue || "").trim().toLowerCase();
+  var vReal = venue;
+  if (typeof STADIUM_ALIAS_2026 !== "undefined" && STADIUM_ALIAS_2026[venue]) {
+    vReal = STADIUM_ALIAS_2026[venue];
+  }
+  var v = (vReal || "").trim().toLowerCase();
   for (var i = 0; i < cache.juegos.length; i++) {
     var j = cache.juegos[i];
     if ((j.venue || "").trim().toLowerCase() === v) return j;
