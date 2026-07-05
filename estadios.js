@@ -40,6 +40,20 @@ const STADIUM_INDEX = new Map(
   STADIUM_COORDS_2026.map(function (s) { return [stadiumNorm(s.venue), s]; })
 );
 
+// PIEZA AGREGADA 5 jul 2026: alias de venue por renombre de patrocinio.
+// La MLB API devuelve "UNIQLO Field at Dodger Stadium" en 2026, pero este
+// archivo solo tenia la entrada "Dodger Stadium" -> STADIUM_INDEX.get()
+// devolvia undefined para el nombre nuevo, y por eso climaFetchWeather
+// nunca se llamaba (viento de hoy quedaba en N/C). Mismo patron que ya
+// usa PARQUES_ALIAS en parques-orientacion.js.
+const STADIUM_ALIAS_2026 = {
+  "UNIQLO Field at Dodger Stadium": "Dodger Stadium"
+};
+Object.keys(STADIUM_ALIAS_2026).forEach(function(alias){
+  var real = STADIUM_INDEX.get(stadiumNorm(STADIUM_ALIAS_2026[alias]));
+  if (real) STADIUM_INDEX.set(stadiumNorm(alias), real);
+});
+
 function stadiumNorm(n) {
   return String(n || "").trim().toLowerCase();
 }
