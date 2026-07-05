@@ -9,8 +9,28 @@
 // en estadios.js), el viento exterior NO entra al score, porque en un domo fijo
 // el viento de afuera no toca la pelota. NO se inventa brisa interna: el viento
 // simplemente no se evalua. Los retractables NO se tocan en esta pieza (Pieza 2).
+//
+// PIEZA AGREGADA 5 jul 2026: validacion de campos numericos. Si algun campo
+// requerido (temperature_f, windspeed_mph, humidity_pct, precipitation_mm) no
+// es un numero finito en 'today' o en 'h', esa comparacion no se puede hacer
+// de forma real -- se devuelve score 0 en vez de dejar que Number(undefined)
+// produzca NaN y arruine el promedio/top del llamador. No se inventa ningun
+// valor de reemplazo, simplemente no se computa ese match.
 
 function scoreMatch(today, h) {
+  if (
+    !Number.isFinite(Number(today.temperature_f)) ||
+    !Number.isFinite(Number(h.temperature_f)) ||
+    !Number.isFinite(Number(today.windspeed_mph)) ||
+    !Number.isFinite(Number(h.windspeed_mph)) ||
+    !Number.isFinite(Number(today.humidity_pct)) ||
+    !Number.isFinite(Number(h.humidity_pct)) ||
+    !Number.isFinite(Number(today.precipitation_mm)) ||
+    !Number.isFinite(Number(h.precipitation_mm))
+  ) {
+    return 0;
+  }
+
   let score = 0;
 
   // --- interruptor de domo fijo (lee roof de estadios.js, ya cargado antes) ---
