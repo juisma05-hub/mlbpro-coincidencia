@@ -19,10 +19,6 @@
   .cab .vs { font-size:15px; font-weight:700; color:#fff; }
   .cab .parque { font-size:10px; color:#5b7fb5; margin-top:2px; }
 
-  /* ── brújula completa del parque, entre el encabezado y las tarjetas de
-     pitchers, mismo estilo aprobado que casar-series.html (2 aros, 16
-     puntos cardinales afuera, diamante+abanico adentro, flecha de viento
-     con velocidad) pero más chica para que quepa en esta tarjeta ── */
   .brujula-full-wrap { text-align:center; padding:4px 12px 14px; border-bottom:1px solid #1f2e44; }
   .brujula-full-wrap svg { width:170px; height:174px; display:block; margin:0 auto; }
   .brujula-full-wrap .viento-txt { font-size:12px; color:#7a8aa0; margin-top:2px; }
@@ -72,7 +68,6 @@
 
   .no-lineup { text-align:center; font-size:10px; color:#5a6478; padding:10px; }
 
-  /* bloque nuevo: promedio real vs rival de hoy + ultimos 5 juegos */
   .vsrival-box { background:#0a0e16; border:1px solid #1f2e44; border-radius:10px; padding:10px; margin:8px 12px 0; }
   .vsrival-stat { font-size:11px; color:#dce6f0; text-align:center; margin-bottom:6px; }
   .vsrival-num { color:#5bd0d8; }
@@ -146,9 +141,14 @@
     return html;
   }
 
+  // CORRECCION (sesion 5 jul 2026): antes usaba ultimos5.k_promedio / ultimos5.ip_promedio
+  // (ambos ya redondeados por jalar-ultimos5.js), lo que arrastraba un error de redondeo
+  // temprano hacia el K6 final. Ahora usa las versiones _preciso (precision completa, sin
+  // redondear) que expone jalar-ultimos5.js corregido. El redondeo a 3 decimales se aplica
+  // SOLO al final para mostrar -- nunca antes de calcular.
   function calcularK6Base(ultimos5){
-    if(!ultimos5 || ultimos5.k_promedio===null || ultimos5.ip_promedio===null || ultimos5.ip_promedio===0) return null;
-    var kPorInning = ultimos5.k_promedio / ultimos5.ip_promedio;
+    if(!ultimos5 || ultimos5.k_promedio_preciso===null || ultimos5.ip_promedio_preciso===null || ultimos5.ip_promedio_preciso===0) return null;
+    var kPorInning = ultimos5.k_promedio_preciso / ultimos5.ip_promedio_preciso;
     return Math.round(kPorInning * 6.0 * 1000) / 1000;
   }
 
@@ -210,9 +210,6 @@
     return "https://img.mlbstatic.com/mlb-photos/image/upload/w_120,q_auto:best/v1/people/"+pitcherId+"/headshot/67/current";
   }
 
-  // ── NUEVO: bloque visible con promedio REAL contra el rival de hoy
-  // (no un numero generico) + ultimos 5 juegos reales en lista, para que
-  // se pueda ver con los ojos en vez de confiar ciego en el K6 Proy. ──
   function bloqueVsRivalHtml(historial, rivalHoy){
     if (!historial || !historial.starts || !historial.starts.length) {
       return '<div class="vsrival-box"><div class="vsrival-txt">Sin historial de aperturas disponible todavía.</div></div>';
@@ -266,13 +263,19 @@
     '</div>';
   }
 
-  // ── brújula completa: MISMO estilo aprobado de casar-series.html (2 aros,
-  // 16 puntos cardinales afuera, diamante+abanico adentro rotando según
-  // hpACF, flecha de viento apuntando hacia donde VA -no de donde viene-,
-  // grado y velocidad visibles) — reescalada mas chica para esta tarjeta. ──
+  // CORRECCION (sesion 5 jul 2026): antes, si hpACF era null (parque sin orientacion
+  // confirmada), se usaba 45 como valor de respaldo inventado y se dibujaba la brujula
+  // completa como si fuera dato real. Ahora, si hpACF es null, se muestra NO_CONFIRMADO
+  // real -- mismo criterio ya usado en index.html y casar-series-test.html.
   function brujulaCompleta(venue, hpACF, ventDir, ventVel){
     var cx=100, cy=100;
-    var hp = (hpACF!==null && hpACF!==undefined) ? hpACF : 45;
+    if (hpACF===null || hpACF===undefined) {
+      return '<div class="brujula-full-wrap"><svg viewBox="0 0 200 205">'+
+        '<circle cx="100" cy="100" r="95" fill="none" stroke="#333" stroke-width="1"/>'+
+        '<text x="100" y="100" fill="#7a8aa0" font-size="12" font-weight="700" text-anchor="middle">NO_CONFIRMADO</text>'+
+      '</svg><div class="viento-txt">'+venue+' · orientación de parque sin medir</div></div>';
+    }
+    var hp = hpACF;
 
     var puntos16=[
       {g:0,t:"N"},{g:22.5,t:"NNE"},{g:45,t:"NE"},{g:67.5,t:"ENE"},
@@ -282,9 +285,6 @@
     ];
     var cardHtml="", degHtml="";
     puntos16.forEach(function(p){
-      // PERCEPCION (boceto original aprobado): el parque queda FIJO
-      // mirando arriba, y el anillo de cardinales rota al reves de la
-      // orientacion real del parque (hp).
       var gAjustado = ((p.g - hp)%360+360)%360;
       cardHtml+='<g transform="rotate('+gAjustado+' '+cx+' '+cy+')"><text x="'+cx+'" y="14" font-size="9" font-weight="700" fill="#9b59ff" text-anchor="middle">'+p.t+'</text></g>';
       degHtml+='<g transform="rotate('+gAjustado+' '+cx+' '+cy+')"><text x="'+cx+'" y="38" font-size="7" font-weight="700" fill="#fff" text-anchor="middle">'+Math.round(p.g)+'°</text></g>';
@@ -374,9 +374,6 @@
         var ultimos5Away = pitcherAwayId ? await jalarUltimos5(pitcherAwayId, 2026) : null;
         var ultimos5Home = pitcherHomeId ? await jalarUltimos5(pitcherHomeId, 2026) : null;
 
-        // NUEVO: historial completo real (nombre+mano confirmados por MLB,
-        // y todas las aperturas de la temporada) para armar el bloque
-        // visible de "vs rival de hoy" + ultimos 5 juegos.
         var historialAway = (pitcherAwayId && typeof jalarHistorialCompletoPitcher === "function")
           ? await jalarHistorialCompletoPitcher(pitcherAwayId, 2026) : null;
         var historialHome = (pitcherHomeId && typeof jalarHistorialCompletoPitcher === "function")
@@ -420,9 +417,6 @@
 
         var hpACF = (typeof getOrientacionParque==="function") ? getOrientacionParque(venue) : null;
 
-        // ===== Viento del cache real de clima (igual que index.html) =====
-        // Se pide DIRECCION y VELOCIDAD juntas — antes solo se pedia
-        // direccion, la velocidad faltaba en toda esta pantalla.
         var ventDir = null;
         var ventVel = null;
         try {
@@ -441,7 +435,6 @@
         } catch (ew) {
           log("AVISO viento "+venue+": "+(ew&&ew.message?ew.message:ew));
         }
-        // ===== FIN =====
 
         html += '<div class="marco">'+
           '<div class="cab"><div class="vs">'+away+' @ '+home+'</div><div class="parque">'+venue+' · Hoy</div></div>'+
