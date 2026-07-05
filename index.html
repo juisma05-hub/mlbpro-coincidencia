@@ -347,6 +347,7 @@
   function actualizarExplorer(wrap, deg){
     var idx = wrap.getAttribute('data-idx');
     var venue = wrap.getAttribute('data-venue');
+    var venueReal = (typeof STADIUM_ALIAS_2026 !== "undefined" && STADIUM_ALIAS_2026[venue]) ? STADIUM_ALIAS_2026[venue] : venue;
     var degReal = ((deg%360)+360)%360;
     var lo = Math.floor(degReal/30)*30, hi = lo+30;
     var arrow = document.getElementById('explorerArrow_'+idx);
@@ -357,7 +358,7 @@
     try{
       var cache = climaLeerCache();
       var juegos = cache.filter(function(g){
-        return g && g.venue===venue && g.wind_dir!==undefined && g.wind_dir!==null && g.wind_dir!=="" &&
+        return g && g.venue===venueReal && g.wind_dir!==undefined && g.wind_dir!==null && g.wind_dir!=="" &&
                !isNaN(Number(g.wind_dir)) && (Number(g.wind_dir)%360)>=lo && (Number(g.wind_dir)%360)<hi;
       });
       var carreras=[], vels=[];
