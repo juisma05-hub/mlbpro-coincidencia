@@ -26,7 +26,7 @@ var PARQUES_ORIENTACION = {
   "Oracle Park":              { hpACF: 96,    roof:"abierto",   confianza:"exacta", fuente:"GPS propio - remedido" },
   "Busch Stadium":            { hpACF: 63,    roof:"abierto",   confianza:"exacta", fuente:"GPS propio - recalculado" },
   "Rate Field":               { hpACF: 127,   roof:"abierto",   confianza:"exacta", fuente:"GPS propio - recalculado" },
-  "Kauffman Stadium":         { hpACF: 45,    roof:"abierto",   confianza:"exacta", fuente:"GPS propio - remedido, distancia home-segunda verificada casi exacta (38.96m vs 38.8m real). Reemplaza 147 (error de formula)" },
+  "Kauffman Stadium":         { hpACF: 147,    roof:"abierto",   confianza:"exacta", fuente:"GPS propio - remedido, distancia home-segunda verificada casi exacta (38.96m vs 38.8m real). Reemplaza 147 (error de formula)" },
   "PNC Park":                 { hpACF: 152.5, roof:"abierto",   confianza:"exacta", fuente:"GPS propio - recalculado" },
   "Citi Field":               { hpACF: 17,    roof:"abierto",   confianza:"exacta", fuente:"GPS propio - coincide TickPick" },
   "Target Field":             { hpACF: 86,    roof:"abierto",   confianza:"exacta", fuente:"GPS propio" },
