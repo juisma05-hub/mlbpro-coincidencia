@@ -14,9 +14,6 @@
   .go { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#fff; background:#238636; cursor:pointer; }
   .go:disabled { background:#30363d; color:#8b949e; }
   .go .sub2 { display:block; font-size:11px; font-weight:600; opacity:0.85; margin-top:3px; }
-  /* mismo estilo de subtitulo para CUALQUIER boton, no solo el verde (.go) —
-     este era el bug: K6 y otros botones de color no heredaban el salto de
-     linea del subtitulo y quedaba todo pegado en una sola linea */
   button .sub2 { display:block; font-size:11px; font-weight:600; opacity:0.85; margin-top:3px; }
   .go-venideros { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#fff; background:#1f6feb; cursor:pointer; margin-top:12px; pointer-events:auto !important; opacity:1 !important; }
   .go-pasados { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#fff; background:#d2691e; cursor:pointer; margin-top:12px; pointer-events:auto !important; opacity:1 !important; }
@@ -28,7 +25,6 @@
 
   .juego { background:#161b22; border:1px solid #30363d; border-radius:14px; padding:16px; margin-top:14px; }
 
-  /* colapsable de cada juego (punto 1) */
   .juego-cab { cursor:pointer; display:flex; justify-content:space-between; align-items:center; gap:10px; }
   .juego-cab .chev { color:#8b949e; font-size:14px; transition:transform 0.2s; flex-shrink:0; }
   .juego-cab.abierto .chev { transform:rotate(90deg); }
@@ -82,7 +78,6 @@
   .serieparque .spprom .val { font-size:20px; font-weight:800; color:#79c0ff; }
   #console { margin-top:16px; background:#010409; border:1px solid #30363d; border-radius:8px; padding:12px; min-height:60px; max-height:30vh; overflow:auto; font-family:ui-monospace,monospace; font-size:12px; white-space:pre-wrap; }
 
-  /* brujula del juego + explorador de rango (puntos 6 y 7) */
   .brujula-explorer-wrap { text-align:center; padding:10px 0 6px; margin:6px 0; border-bottom:1px solid #21262d; touch-action:none; cursor:grab; }
   .brujula-explorer-wrap:active { cursor:grabbing; }
   .brujula-explorer-wrap svg { width:190px; height:194px; display:block; margin:0 auto; }
@@ -231,7 +226,6 @@
     return dd+" "+(MESES_CORTOS[mm]||mm)+" "+yy.slice(2);
   }
 
-  // NUEVO: hora del juego en horario local del telefono, formato 12h con AM/PM
   function horaBonita(gameDateISO){
     if(!gameDateISO) return "";
     try {
@@ -258,11 +252,14 @@
     cab.classList.toggle('abierto', abierto);
   }
 
-  // FIX (esta sesion): si hpACF es null (parque sin orientacion
-  // confirmada en parques-orientacion.js), YA NO se dibuja la brujula
-  // con un 45 grados inventado. Se muestra NO_CONFIRMADO en vez de una
-  // brujula falsa — mismo fix ya aplicado en casar-series.html y
-  // k6-test.html.
+  // FASE B (arreglo de hoy):
+  // 1) El parque ahora rota por 'hp' DIRECTO, sin sumarle 180 — el +180
+  //    de mas quedaba corrido, no calzaba con el anillo fijo. Confirmado
+  //    contra k6-test.html, que nunca tuvo ese +180.
+  // 2) La flecha del viento vuelve a apuntar hacia VA_HACIA (hacia donde
+  //    va el viento), no vieneDe. Es la convencion original de toda esta
+  //    sesion (bug fijo #1 del checkpoint madre) — esta version la habia
+  //    revertido sin querer a vieneDe. Vuelve a coincidir con k6-test.html.
   function svgBrujulaJuego(idx, venue, hpACF, hoyDir, hoyVel){
     var cx=100, cy=100;
     var venueEsc0 = String(venue||"").replace(/&/g,"&amp;").replace(/"/g,"&quot;");
@@ -284,8 +281,6 @@
     ];
     var cardHtml="", degHtml="";
     puntos16.forEach(function(p){
-      // FIX (arreglo confirmado): el anillo queda FIJO en su posicion
-      // real (0°=arriba siempre). Ya no rota segun hp.
       var gAjustado = p.g;
       cardHtml+='<g transform="rotate('+gAjustado+' '+cx+' '+cy+')"><text x="'+cx+'" y="14" font-size="9" font-weight="700" fill="#9b59ff" text-anchor="middle">'+p.t+'</text></g>';
       degHtml+='<g transform="rotate('+gAjustado+' '+cx+' '+cy+')"><text x="'+cx+'" y="38" font-size="7" font-weight="700" fill="#fff" text-anchor="middle">'+Math.round(p.g)+'°</text></g>';
@@ -297,10 +292,8 @@
     if (hoyDir !== null && hoyDir !== undefined && hoyDir !== "" && !isNaN(Number(hoyDir))) {
       var vieneDe = ((Number(hoyDir)%360)+360)%360;
       var vaHacia = (vieneDe+180)%360;
-      // FIX (arreglo confirmado): la flecha apunta directo al grado
-      // reportado (vieneDe), sin sumar 180, y acortada.
       hoyFlechaHtml =
-        '<g transform="rotate('+vieneDe+' '+cx+' '+cy+')">'+
+        '<g transform="rotate('+vaHacia+' '+cx+' '+cy+')">'+
           '<line x1="'+cx+'" y1="'+(cy+25)+'" x2="'+cx+'" y2="'+(cy-19)+'" stroke="#ff2222" stroke-width="2" stroke-linecap="round"/>'+
           '<polygon points="'+cx+','+(cy-23)+' '+(cx-6)+','+(cy-9)+' '+(cx+6)+','+(cy-9)+'" fill="#ff2222"/>'+
           '<circle cx="'+cx+'" cy="'+(cy+25)+'" r="6" fill="#ff2222" stroke="#fff" stroke-width="1.5"/>'+
@@ -317,9 +310,7 @@
         '<circle cx="'+cx+'" cy="'+cy+'" r="68" fill="none" stroke="#333" stroke-width="1"/>'+
         '<circle cx="'+cx+'" cy="'+cy+'" r="66" fill="#0e1420" stroke="#222" stroke-width="1"/>'+
         cardHtml + degHtml +
-        // FIX (arreglo confirmado): el parque AHORA SI rota segun hp,
-        // para apuntar al grado real en el anillo fijo.
-        '<g transform="rotate('+((hp+180)%360)+' '+cx+' '+cy+')">'+
+        '<g transform="rotate('+(((hp%360)+360)%360)+' '+cx+' '+cy+')">'+
           '<line x1="'+cx+'" y1="'+(cy+60)+'" x2="'+cx+'" y2="'+(cy-60)+'" stroke="#ff9f0a" stroke-width="1" stroke-dasharray="3,3" opacity="0.8"/>'+
           '<path d="M '+cx+' '+(cy+42)+' L '+(cx-45)+' '+(cy-21)+' A 60 60 0 0 1 '+(cx+45)+' '+(cy-21)+' Z" fill="#1a4d2e" stroke="#2d7a4a" stroke-width="1" opacity="0.9"/>'+
           '<path d="M '+(cx-21)+' '+(cy+42)+' Q '+cx+' '+(cy+18)+' '+(cx+21)+' '+(cy+42)+'" fill="none" stroke="#c9a94d" stroke-width="1" opacity="0.8"/>'+
@@ -356,8 +347,6 @@
   function actualizarExplorer(wrap, deg){
     var idx = wrap.getAttribute('data-idx');
     var venue = wrap.getAttribute('data-venue');
-    // FIX (arreglo confirmado): el anillo ahora es absoluto/fijo, asi que
-    // el angulo visual YA ES el angulo real. Ya no se suma hp.
     var degReal = ((deg%360)+360)%360;
     var lo = Math.floor(degReal/30)*30, hi = lo+30;
     var arrow = document.getElementById('explorerArrow_'+idx);
@@ -438,7 +427,6 @@
       if(!resp.ok) throw new Error("Schedule hoy HTTP "+resp.status);
       var data=await resp.json();
       var games=(data.dates&&data.dates[0])?data.dates[0].games:[];
-      // NUEVO: ordenar de mas temprano a mas tarde por hora real del juego
       games.sort(function(a,b){ return new Date(a.gameDate) - new Date(b.gameDate); });
       log("Juegos hoy: "+games.length);
       if(games.length===0){ log("No hay juegos hoy ("+hoy+")."); return; }
@@ -708,8 +696,6 @@
   }
 </script>
 <script>
-  // NUEVO: si ya entraste una vez en esta pestana/sesion, no mostrar la
-  // portada de nuevo al volver con el boton atras del navegador.
   function entrarApp(){
     document.getElementById("portada").style.display = "none";
     document.getElementById("appContenido").style.display = "block";
