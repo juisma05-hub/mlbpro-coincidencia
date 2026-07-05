@@ -16,7 +16,6 @@
   .go { width:100%; border:0; border-radius:10px; padding:16px; font-size:16px; font-weight:800; color:#fff; background:#238636; cursor:pointer; margin-bottom:8px; }
   .go-viento { width:100%; border:0; border-radius:10px; padding:16px; font-size:16px; font-weight:800; color:#fff; background:#1f6feb; cursor:pointer; margin-bottom:8px; }
 
-  /* ── VISTA 1: series ── */
   .serie { background:#161b22; border:1px solid #30363d; border-radius:14px; padding:14px; margin-top:14px; }
   .serie .cab { font-size:15px; font-weight:800; }
   .serie .sub { font-size:12px; color:#8b949e; margin:3px 0 8px; }
@@ -27,7 +26,6 @@
   .jrow .r { color:#3fb950; font-weight:700; }
   .tag-sube { color:#3fb950; } .tag-baja { color:#ff7b72; } .tag-est { color:#d29922; }
 
-  /* ── VISTA 2: rango de viento ── */
   .rv-bloque { border-radius:12px; margin-top:14px; overflow:hidden; border-width:2px; border-style:solid; }
   .rv-bloque.verde   { border-color:#3fb950; }
   .rv-bloque.amarillo{ border-color:#d29922; }
@@ -101,23 +99,12 @@
 
   function log(t){ var d=document.createElement("div"); d.textContent=t; consoleEl.appendChild(d); consoleEl.scrollTop=consoleEl.scrollHeight; }
 
-  // ── determina si el viento es favorable (empuja la bola hacia el
-  // jardin) o desfavorable (entra desde el jardin hacia el plato), relativo
-  // a la orientacion real del parque (hpACF).
-  // IMPORTANTE: windDir es "de donde viene" el viento (convencion
-  // meteorologica estandar, igual que en weather-direction.html). Por eso
-  // se compara contra el opuesto de hpACF (la direccion HACIA donde
-  // apunta el jardin central es hpACF; el viento FAVORECE cuando viene
-  // desde el lado contrario al jardin, es decir sopla HACIA el jardin).
-  // CORRECCION: si hpACF es null (parque sin orientacion confirmada), ya
-  // NO se calcula un favorable/desfavorable falso — se devuelve null y
-  // el llamador debe mostrar NO_CONFIRMADO.
   function vientoFavorable(windDir, hpACF) {
     if (hpACF===null || hpACF===undefined) return null;
     var opuesto = (hpACF + 180) % 360;
     var diff = Math.abs(windDir - opuesto);
     if (diff > 180) diff = 360 - diff;
-    return diff <= 90; // true = favorable (mas carreras esperadas)
+    return diff <= 90;
   }
 
   (function llenarParques(){
@@ -173,19 +160,13 @@
     return meses[parseInt(p[1],10)-1]+" "+parseInt(p[2],10)+", "+p[0].slice(2);
   }
 
-  // ── SVG brújula APROBADA (copiada del boceto v3): 2 aros, 16 puntos
-  // cardinales, diamante fijo mirando arriba, linea de orientacion de
-  // grado a grado (naranja punteada, rota segun hpACF), flecha roja desde
-  // segunda base con bolita atras (rota segun promDir del viento) ──
-  //
-  // FIX 2 jul 2026: promDir (g.wind_dir) es DE DONDE VIENE el viento
-  // (convencion meteorologica estandar, confirmado contra
-  // weather-direction.html). La flecha tiene que APUNTAR hacia donde el
-  // viento VA (promDir+180), con la bolita del lado de donde viene.
-  //
-  // FIX (esta sesion): si hpACF es null (parque sin orientacion
-  // confirmada), YA NO se dibuja la brujula con un 45 grados inventado.
-  // Se devuelve un SVG simple diciendo NO_CONFIRMADO.
+  // FASE B (arreglo de hoy):
+  // 1) El parque ahora rota por 'hp' DIRECTO, sin sumarle 180 — el +180
+  //    de mas quedaba corrido. Confirmado contra k6-test.html.
+  // 2) La flecha del viento vuelve a apuntar hacia VA_HACIA (hacia donde
+  //    va el viento), no vieneDe — convencion original de esta sesion,
+  //    revertida sin querer en la version anterior. Vuelve a coincidir
+  //    con k6-test.html e index.html (ya corregido tambien).
   function svgBrujula(hpACF, promDir) {
     var cx=100, cy=100;
     if (hpACF===null || hpACF===undefined) {
@@ -203,17 +184,11 @@
     ];
     var cardHtml="", degHtml="";
     puntos16.forEach(function(p){
-      // FIX (arreglo confirmado): el anillo queda FIJO en su posicion real
-      // (0°=arriba siempre, sin ajuste). Ya no rota segun hp.
       var gAjustado = p.g;
       cardHtml+='<g transform="rotate('+gAjustado+' '+cx+' '+cy+')"><text x="'+cx+'" y="14" font-size="9" font-weight="700" fill="#9b59ff" text-anchor="middle">'+p.t+'</text></g>';
       degHtml+='<g transform="rotate('+gAjustado+' '+cx+' '+cy+')"><text x="'+cx+'" y="38" font-size="7" font-weight="700" fill="#fff" text-anchor="middle">'+Math.round(p.g)+'°</text></g>';
     });
 
-    // grado real HACIA donde va el viento (para dibujar la flecha) y
-    // el grado original de donde VIENE (para la etiqueta de texto).
-    // FIX (arreglo confirmado): la flecha ahora apunta directo al grado
-    // reportado (vieneDe), sin sumarle 180, y se acorta la linea.
     var promDirVieneDe = ((Number(promDir)%360)+360)%360;
     var promDirVaHacia = (promDirVieneDe + 180) % 360;
 
@@ -222,9 +197,7 @@
       '<circle cx="'+cx+'" cy="'+cy+'" r="68" fill="none" stroke="#333" stroke-width="1"/>'+
       '<circle cx="'+cx+'" cy="'+cy+'" r="66" fill="#0e1420" stroke="#222" stroke-width="1"/>'+
       cardHtml + degHtml +
-      // FIX (arreglo confirmado): el parque (linea + abanico + diamante)
-      // AHORA SI rota segun hp, para apuntar al grado real en el anillo fijo.
-      '<g transform="rotate('+((hp+180)%360)+' '+cx+' '+cy+')">'+
+      '<g transform="rotate('+(((hp%360)+360)%360)+' '+cx+' '+cy+')">'+
         '<line x1="'+cx+'" y1="'+(cy+60)+'" x2="'+cx+'" y2="'+(cy-60)+'" stroke="#ff9f0a" stroke-width="1" stroke-dasharray="3,3" opacity="0.8"/>'+
         '<path d="M '+cx+' '+(cy+42)+' L '+(cx-45)+' '+(cy-21)+' A 60 60 0 0 1 '+(cx+45)+' '+(cy-21)+' Z" fill="#1a4d2e" stroke="#2d7a4a" stroke-width="1" opacity="0.9"/>'+
         '<path d="M '+(cx-21)+' '+(cy+42)+' Q '+cx+' '+(cy+18)+' '+(cx+21)+' '+(cy+42)+'" fill="none" stroke="#c9a94d" stroke-width="1" opacity="0.8"/>'+
@@ -237,21 +210,17 @@
           '<circle cx="'+(cx-18)+'" cy="'+(cy+21)+'" r="2" fill="#c9a94d"/>'+
         '</g>'+
       '</g>'+
-      // flecha roja del viento: FIX confirmado — apunta directo al grado
-      // reportado (promDirVieneDe), sin sumar 180, y acortada (mitad de
-      // longitud, mismo eje/centro que antes).
-      '<g transform="rotate('+promDirVieneDe+' '+cx+' '+cy+')">'+
+      '<g transform="rotate('+promDirVaHacia+' '+cx+' '+cy+')">'+
         '<line x1="'+cx+'" y1="'+(cy+25)+'" x2="'+cx+'" y2="'+(cy-19)+'" stroke="#ff2222" stroke-width="2" stroke-linecap="round"/>'+
         '<polygon points="'+cx+','+(cy-23)+' '+(cx-6)+','+(cy-9)+' '+(cx+6)+','+(cy-9)+'" fill="#ff2222"/>'+
         '<circle cx="'+cx+'" cy="'+(cy+25)+'" r="6" fill="#ff2222" stroke="#fff" stroke-width="1.5"/>'+
       '</g>'+
       '<circle cx="'+cx+'" cy="'+cy+'" r="3" fill="#ff2222" opacity="0.9"/>'+
       '<rect x="'+(cx-24)+'" y="'+(cy-6)+'" width="48" height="14" rx="3" fill="#0d1117" opacity="0.85"/>'+
-      '<text x="'+cx+'" y="'+(cy+4)+'" fill="#58a6ff" font-size="9" font-family="monospace" font-weight="700" text-anchor="middle">~'+Math.round(promDirVieneDe)+'°</text>'+
+      '<text x="'+cx+'" y="'+(cy+4)+'" fill="#58a6ff" font-size="9" font-family="monospace" font-weight="700" text-anchor="middle">~'+Math.round(promDirVaHacia)+'°</text>'+
     '</svg>';
   }
 
-  // ── VISTA 1: por series ──
   document.getElementById("go").addEventListener("click", function(){
     consoleEl.textContent=""; listaEl.innerHTML="";
     var venue=selParque.value;
@@ -298,7 +267,6 @@
     } catch(e){ log("ERROR: "+e.message); }
   });
 
-  // ── VISTA 2: por rango de viento ──
   document.getElementById("goViento").addEventListener("click", function(){
     consoleEl.textContent=""; listaEl.innerHTML="";
     var venue=selParque.value;
