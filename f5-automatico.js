@@ -2,6 +2,11 @@
 // Junta schedule de hoy + clima + lineup + cruce arsenal + línea F5 real.
 // Histórico = juego pasado más reciente en el mismo parque (climaLeerCache).
 // No inventa datos. Si falta algo, se marca SIN_DATOS/PENDIENTE, no se rellena.
+//
+// CORREGIDO 6 jul 2026: lineaMercadoF5 salía null en todos los juegos porque
+// el cruce era por venue, y el venue del cache de líneas F5 venía null
+// (ODDS_TEAM_TO_VENUE no encontraba el equipo). Ahora se cruza por nombre de
+// equipo (home/away), que sí coincide siempre entre The Odds API y MLB StatsAPI.
 
 async function f5AutomaticoHoy(logFn) {
   function log(t) { if (typeof logFn === "function") logFn(t); }
@@ -82,7 +87,8 @@ async function f5AutomaticoHoy(logFn) {
     try { lineupData = await jalarLineup(g.gamePk); } catch(e) { log("AVISO lineup: "+(e&&e.message?e.message:e)); }
 
     // --- cruce arsenal vs lineup rival (Carreraje) ---
-    var lineaF5Juego = lineasF5 ? lineasF5BuscarVenue(venue) : null;
+    // CORREGIDO: cruce por equipo (home/away), ya no por venue.
+    var lineaF5Juego = lineasF5 ? lineasF5BuscarEquipos(home, away) : null;
     var lineaCarreraje = (lineaF5Juego && lineaF5Juego.runlineF5) ? lineaF5Juego.runlineF5.point : 0.5;
 
     var carrerajeHome = { pieza:"F5_CARRERAJE", estado:"SIN_DATOS", detalle:"Sin pitcher o lineup rival." };
