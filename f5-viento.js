@@ -36,4 +36,4 @@ function f4Viento(vientoHoyMph, vientoHistoricoMph, direccionHoy, direccionHisto
   };
 }
 
-module.exports = { f4Viento };
+if (typeof module !== "undefined") { module.exports = { f4Viento }; }
