@@ -49,4 +49,4 @@ function f5PerfilPitcher(perfilHoy, perfilHistorico) {
   };
 }
 
-module.exports = { f5PerfilPitcher };
+if (typeof module !== "undefined") { module.exports = { f5PerfilPitcher }; }
