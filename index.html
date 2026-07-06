@@ -353,10 +353,14 @@
   // por fecha. Al traducir venueReal al nombre viejo, la comparacion
   // g.venue===venueReal nunca hacia match contra el cache -> por eso
   // salia siempre "sin juegos en cache para este rango".
+  function venueCanon(v) {
+    return (typeof STADIUM_ALIAS_2026 !== "undefined" && STADIUM_ALIAS_2026[v]) ? STADIUM_ALIAS_2026[v] : v;
+  }
+
   function actualizarExplorer(wrap, deg){
     var idx = wrap.getAttribute('data-idx');
     var venue = wrap.getAttribute('data-venue');
-    var venueReal = venue;
+    var venueReal = venueCanon(venue);
     var degReal = ((deg%360)+360)%360;
     var lo = Math.floor(degReal/30)*30, hi = lo+30;
     var arrow = document.getElementById('explorerArrow_'+idx);
@@ -367,7 +371,7 @@
     try{
       var cache = climaLeerCache();
       var juegos = cache.filter(function(g){
-        return g && g.venue===venueReal && g.wind_dir!==undefined && g.wind_dir!==null && g.wind_dir!=="" &&
+        return g && venueCanon(g.venue)===venueReal && g.wind_dir!==undefined && g.wind_dir!==null && g.wind_dir!=="" &&
                !isNaN(Number(g.wind_dir)) && (Number(g.wind_dir)%360)>=lo && (Number(g.wind_dir)%360)<hi;
       });
       var carreras=[], vels=[];
