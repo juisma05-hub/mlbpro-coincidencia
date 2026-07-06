@@ -17,6 +17,7 @@ async function f5AutomaticoHoy(logFn) {
   log("Trayendo líneas F5 de mercado...");
   var lineasF5 = null;
   try { lineasF5 = await jalarLineasF5(log); } catch(e) { log("AVISO líneas F5: "+(e&&e.message?e.message:e)); }
+  log("DIAGNOSTICO lineasF5: " + JSON.stringify(lineasF5));
 
   log("Trayendo schedule de hoy...");
   var mlbUrl = "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date="+hoy+"&hydrate=probablePitcher";
