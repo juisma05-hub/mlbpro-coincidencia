@@ -70,6 +70,11 @@ async function f5AutomaticoHoy(logFn) {
 
     var perfilPitcherHoy = (typeof armarPerfilPitcher === "function") ? armarPerfilPitcher(pitcherHomeId) : null;
     var perfilPitcherHist = (typeof armarPerfilPitcher === "function" && hist) ? armarPerfilPitcher(hist.home_pitcher_id) : null;
+    log("DIAGNOSTICO F5 pitcher ["+home+"]: pitcherHomeId="+pitcherHomeId+
+        " | hist.game_id="+(hist?hist.game_id:"sin_hist")+
+        " | hist.home_pitcher_id="+(hist?hist.home_pitcher_id:"sin_hist")+
+        " | perfilHoy="+JSON.stringify(perfilPitcherHoy)+
+        " | perfilHist="+JSON.stringify(perfilPitcherHist));
 
     var datosHistorico = hist ? {
       venue: hist.venue, roof: hist.roof||null, tempF: hist.temperature_f,
