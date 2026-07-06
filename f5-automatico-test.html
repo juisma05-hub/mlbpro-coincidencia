@@ -13,15 +13,20 @@
   main { padding:14px; max-width:900px; margin:0 auto; }
   .go { width:100%; border:0; border-radius:10px; padding:16px; font-size:15px; font-weight:800; color:#fff; background:#2563eb; cursor:pointer; margin-bottom:10px; }
   .go:disabled { background:#30363d; color:#8b949e; }
+  .go-auto { width:100%; border:0; border-radius:10px; padding:12px; font-size:13px; font-weight:800; color:#fff; background:#30363d; cursor:pointer; margin-bottom:10px; }
+  .go-auto.activo { background:#238636; }
   #console { margin-top:10px; background:#010409; border:1px solid #30363d; border-radius:8px; padding:12px; min-height:60px; max-height:70vh; overflow:auto; font-family:ui-monospace,monospace; font-size:12px; white-space:pre-wrap; word-break:break-word; }
   .juego { background:#161b22; border:1px solid #30363d; border-radius:10px; padding:12px; margin-bottom:10px; }
   .juego h3 { margin:0 0 6px; font-size:14px; color:#79c0ff; }
+  .proy { margin-top:8px; padding-top:8px; border-top:1px dashed #30363d; }
+  .proy .lbl { color:#ffd60a; font-weight:800; }
 </style>
 </head>
 <body>
 <header><h1>MLBPro · F5 Automático — juegos reales de hoy</h1></header>
 <main>
   <button id="btnCorrer" class="go">CORRER F5 AUTOMÁTICO (juegos de hoy)</button>
+  <button id="btnAuto" class="go-auto">🔄 Auto-actualizar cada 30 min: OFF (necesita esta pestaña abierta)</button>
   <div id="lista"></div>
   <div id="console">Pulsa el botón.</div>
 </main>
@@ -38,6 +43,7 @@
 <script src="catchers-master.js"></script>
 <script src="factor-arsenal-lineup.js"></script>
 <script src="perfil-pitcher-builder.js"></script>
+<script src="proyeccion-pitcher-temprana.js"></script>
 
 <script src="f5-estadio.js"></script>
 <script src="f5-roof.js"></script>
@@ -54,19 +60,30 @@
   var listaEl = document.getElementById("lista");
   function log(t){ var d=document.createElement("div"); d.textContent=t; consoleEl.appendChild(d); consoleEl.scrollTop=consoleEl.scrollHeight; }
 
-  document.getElementById("btnCorrer").addEventListener("click", async function(){
-    var btn=this; btn.disabled=true; btn.textContent="TRABAJANDO…";
+  async function correrTodo(){
+    var btn=document.getElementById("btnCorrer");
+    btn.disabled=true; btn.textContent="TRABAJANDO…";
     consoleEl.textContent=""; listaEl.innerHTML="";
     try {
       var resultados = await f5AutomaticoHoy(log);
       var html = "";
       resultados.forEach(function(r){
+        var py = r.proyeccionTemprana;
+        var pyHtml = "";
+        if (py && py.estado === "PROYECTADO") {
+          pyHtml = '<div class="proy"><span class="lbl">PROYECCIÓN TEMPRANA (solo xERA, sin lineup):</span><br>'+
+            'Carreras proy. home: '+py.carrerasHomeProy+' · Carreras proy. away: '+py.carrerasAwayProy+' · Total proy.: '+py.totalProyectado+
+            '</div>';
+        } else {
+          pyHtml = '<div class="proy"><span class="lbl">PROYECCIÓN TEMPRANA:</span> '+(py?py.estado:'SIN_DATOS')+'</div>';
+        }
         html += '<div class="juego"><h3>'+r.juego+' — '+(r.venue||"?")+'</h3>'+
           '<div><b>Coincidencia:</b> '+r.coincidencia.estado+' ('+r.coincidencia.confirmados+')</div>'+
           '<div><b>Carreraje home:</b> '+r.carrerajeHome.estado+'</div>'+
           '<div><b>Carreraje away:</b> '+r.carrerajeAway.estado+'</div>'+
           '<div><b>MoneyLine F5:</b> '+r.moneyline.estado+(r.moneyline.ventaja?(' — '+r.moneyline.ventaja):'')+'</div>'+
           '<div><b>Línea mercado F5:</b> '+(r.lineaMercadoF5&&r.lineaMercadoF5.runlineF5?r.lineaMercadoF5.runlineF5.point:'N/C')+'</div>'+
+          pyHtml+
         '</div>';
       });
       listaEl.innerHTML = html;
@@ -75,6 +92,23 @@
       log("ERROR: "+(e&&e.message?e.message:e));
     } finally {
       btn.disabled=false; btn.textContent="CORRER F5 AUTOMÁTICO (juegos de hoy)";
+    }
+  }
+
+  document.getElementById("btnCorrer").addEventListener("click", correrTodo);
+
+  var autoIntervalId = null;
+  document.getElementById("btnAuto").addEventListener("click", function(){
+    var btn = this;
+    if (autoIntervalId) {
+      clearInterval(autoIntervalId);
+      autoIntervalId = null;
+      btn.classList.remove("activo");
+      btn.textContent = "🔄 Auto-actualizar cada 30 min: OFF (necesita esta pestaña abierta)";
+    } else {
+      autoIntervalId = setInterval(correrTodo, 30*60*1000);
+      btn.classList.add("activo");
+      btn.textContent = "🔄 Auto-actualizar cada 30 min: ON (no cierres esta pestaña)";
     }
   });
 </script>
