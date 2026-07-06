@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>MLBPro · F5 Aislar 422</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; font-family:-apple-system,system-ui,sans-serif; background:#0d1117; color:#e6edf3; }
+  header { padding:14px 16px; border-bottom:1px solid #30363d; }
+  h1 { font-size:15px; margin:0; }
+  main { padding:14px; max-width:900px; margin:0 auto; }
+  .go { width:100%; border:0; border-radius:10px; padding:16px; font-size:15px; font-weight:800; color:#fff; background:#1f6feb; cursor:pointer; margin-bottom:10px; }
+  .go:disabled { background:#30363d; color:#8b949e; }
+  #console { margin-top:10px; background:#010409; border:1px solid #30363d; border-radius:8px; padding:12px; min-height:60px; max-height:70vh; overflow:auto; font-family:ui-monospace,monospace; font-size:12px; white-space:pre-wrap; word-break:break-word; }
+</style>
+</head>
+<body>
+<header><h1>MLBPro · Aislar causa del 422 (pruebas una por una)</h1></header>
+<main>
+  <button id="t1" class="go">PRUEBA 1: solo h2h_1st_5_innings, sin bookmakers</button>
+  <button id="t2" class="go">PRUEBA 2: solo spreads_1st_5_innings, sin bookmakers</button>
+  <button id="t3" class="go">PRUEBA 3: solo totals_1st_5_innings, sin bookmakers</button>
+  <div id="console">Pulsa una prueba a la vez. Cada una llama directo a The Odds API con UN solo mercado y SIN filtrar bookmakers, para ver cuál falla.</div>
+</main>
+
+<script src="mlb-routes.js"></script>
+
+<script>
+  var consoleEl = document.getElementById("console");
+  function log(t){ var d=document.createElement("div"); d.textContent=t; consoleEl.appendChild(d); consoleEl.scrollTop=consoleEl.scrollHeight; }
+
+  async function probar(mercado) {
+    consoleEl.textContent = "";
+    log("Probando mercado: " + mercado);
+    try {
+      var oddsUrl = "https://api.the-odds-api.com/v4/sports/baseball_mlb/odds/?regions=us&markets=" + mercado + "&oddsFormat=american";
+      var proxyUrl = MLB_ROUTES.WORKER_BASE + encodeURIComponent(oddsUrl);
+      var resp = await fetch(proxyUrl);
+      log("HTTP status: " + resp.status);
+      var texto = await resp.text();
+      log("RESPUESTA CRUDA:");
+      log(texto);
+    } catch (e) {
+      log("ERROR REAL: " + (e && e.message ? e.message : e));
+    }
+  }
+
+  document.getElementById("t1").addEventListener("click", function(){ probar("h2h_1st_5_innings"); });
+  document.getElementById("t2").addEventListener("click", function(){ probar("spreads_1st_5_innings"); });
+  document.getElementById("t3").addEventListener("click", function(){ probar("totals_1st_5_innings"); });
+</script>
+</body>
+</html>
