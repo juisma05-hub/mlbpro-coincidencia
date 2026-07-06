@@ -1,6 +1,12 @@
 // jalar-clima.js
 // PIEZA 4c - jalado completo: schedule + clima + carreras + cache.
 // Migrado a WeatherAPI. Incluye hoy (climaHoyISO).
+//
+// CORREGIDO 6 jul 2026: se agrega el pitcher abridor (home/away) de cada
+// juego Final, jalado del boxscore de MLB StatsAPI. Antes el cache de clima
+// no guardaba esto, y por eso F5 (perfil pitcher histórico) no tenía forma
+// de armarse. Se pide solo para juegos Final (mismo patrón que las carreras),
+// para no gastar llamadas de más.
 
 async function jalarClima(logFn) {
   function log(t) { if (typeof logFn === "function") logFn(t); }
@@ -59,6 +65,7 @@ async function jalarClima(logFn) {
   }
 
   const runsMap = new Map();
+  const pitchersMap = new Map();
   let m = 0;
   for (const g of games) {
     m++;
@@ -77,6 +84,23 @@ async function jalarClima(logFn) {
       runsMap.set(g.game_id, { home_runs: hr, away_runs: ar });
     } catch (err) {
       log("FALLO carreras " + g.game_id + ": " + err.message);
+    }
+
+    try {
+      const urlBox = MLB_ROUTES.WORKER_BASE +
+        encodeURIComponent("https://statsapi.mlb.com/api/v1/game/" + g.game_id + "/boxscore");
+      const resBox = await fetch(urlBox);
+      if (!resBox.ok) throw new Error("BOXSCORE HTTP " + resBox.status);
+      const dBox = await resBox.json();
+      const homePitchers = dBox?.teams?.home?.pitchers || [];
+      const awayPitchers = dBox?.teams?.away?.pitchers || [];
+      const homePitcherId = homePitchers.length > 0 ? homePitchers[0] : null;
+      const awayPitcherId = awayPitchers.length > 0 ? awayPitchers[0] : null;
+      if (homePitcherId || awayPitcherId) {
+        pitchersMap.set(g.game_id, { home_pitcher_id: homePitcherId, away_pitcher_id: awayPitcherId });
+      }
+    } catch (err) {
+      log("FALLO boxscore/pitcher " + g.game_id + ": " + err.message);
     }
   }
 
@@ -110,6 +134,7 @@ async function jalarClima(logFn) {
     }
 
     const rc = runsMap.get(g.game_id);
+    const pit = pitchersMap.get(g.game_id);
     nuevos.push({
       date: g.date, game_id: g.game_id,
       home_team: g.home_team, away_team: g.away_team,
@@ -119,7 +144,9 @@ async function jalarClima(logFn) {
       humidity_pct: w.humidity_pct, roof: roof, timezone: tz,
       home_runs: rc ? rc.home_runs : null,
       away_runs: rc ? rc.away_runs : null,
-      total_runs: rc ? (rc.home_runs + rc.away_runs) : null
+      total_runs: rc ? (rc.home_runs + rc.away_runs) : null,
+      home_pitcher_id: pit ? pit.home_pitcher_id : null,
+      away_pitcher_id: pit ? pit.away_pitcher_id : null
     });
   });
 
