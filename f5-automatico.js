@@ -68,16 +68,19 @@ async function f5AutomaticoHoy(logFn) {
     histCandidatos.sort(function(a,b){ return a.date<b.date?1:-1; });
     var hist = histCandidatos[0] || null;
 
+    var perfilPitcherHoy = (typeof armarPerfilPitcher === "function") ? armarPerfilPitcher(pitcherHomeId) : null;
+    var perfilPitcherHist = (typeof armarPerfilPitcher === "function" && hist) ? armarPerfilPitcher(hist.home_pitcher_id) : null;
+
     var datosHistorico = hist ? {
       venue: hist.venue, roof: hist.roof||null, tempF: hist.temperature_f,
       vientoMph: (typeof hist.windspeed_mph==="number")?hist.windspeed_mph:null,
-      direccionViento: hist.wind_dir||null, perfilPitcher: null
+      direccionViento: hist.wind_dir||null, perfilPitcher: perfilPitcherHist
     } : { venue: null, roof: null, tempF: null, vientoMph: null, direccionViento: null, perfilPitcher: null };
 
     var datosHoy = {
       juego: away+" @ "+home, venue: venue, roof: today.roof,
       tempF: today.tempF, vientoMph: today.vientoMph, direccionViento: today.direccionViento,
-      perfilPitcher: null
+      perfilPitcher: perfilPitcherHoy
     };
 
     var coincidencia = f5Coincidencia(datosHoy, datosHistorico);
