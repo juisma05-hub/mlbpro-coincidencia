@@ -33,4 +33,4 @@ function f3Temperatura(tempHoyF, tempHistoricoF) {
   };
 }
 
-module.exports = { f3Temperatura };
+if (typeof module !== "undefined") { module.exports = { f3Temperatura }; }
