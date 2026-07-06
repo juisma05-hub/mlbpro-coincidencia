@@ -62,4 +62,4 @@ function f5MoneyLine(carrerajeLocal, carrerajeVisitante) {
   };
 }
 
-module.exports = { f5MoneyLine };
+if (typeof module !== "undefined") { module.exports = { f5MoneyLine }; }
