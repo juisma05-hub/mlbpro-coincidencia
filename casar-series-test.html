@@ -99,6 +99,17 @@
 
   function log(t){ var d=document.createElement("div"); d.textContent=t; consoleEl.appendChild(d); consoleEl.scrollTop=consoleEl.scrollHeight; }
 
+  // FIX 5 jul 2026: el cache historico tiene el mismo parque guardado con
+  // dos nombres distintos ("Dodger Stadium" y "UNIQLO Field at Dodger
+  // Stadium"), segun que nombre devolvia la MLB API ese dia. venueCanon()
+  // traduce cualquiera de los dos al nombre canonico usando el mismo
+  // STADIUM_ALIAS_2026 de estadios.js. Se usa en LOS DOS LADOS de cada
+  // comparacion (el venue elegido en el <select> Y el g.venue de cada fila
+  // del cache) para que no importe con cual nombre quedo guardada cada fila.
+  function venueCanon(v) {
+    return (typeof STADIUM_ALIAS_2026 !== "undefined" && STADIUM_ALIAS_2026[v]) ? STADIUM_ALIAS_2026[v] : v;
+  }
+
   function vientoFavorable(windDir, hpACF) {
     if (hpACF===null || hpACF===undefined) return null;
     var opuesto = (hpACF + 180) % 360;
@@ -113,7 +124,10 @@
       if(!cache.length){ log("CACHE VACIO. Abre el index y pulsa COINCIDENCIA para llenar el cache."); return; }
       var set={};
       for(var i=0;i<cache.length;i++){
-        if(cache[i]&&cache[i].venue&&cache[i].home_team) set[cache[i].venue]=cache[i].home_team;
+        if(cache[i]&&cache[i].venue&&cache[i].home_team){
+          var vc = venueCanon(cache[i].venue);
+          set[vc]=cache[i].home_team;
+        }
       }
       var parques=Object.keys(set).sort(function(a,b){ return set[a]<set[b]?-1:(set[a]>set[b]?1:0); });
       for(var j=0;j<parques.length;j++){
@@ -125,7 +139,7 @@
   })();
 
   function casarSeries(cache,venue){
-    var juegos=cache.filter(function(g){ return g&&g.venue===venue&&g.date; });
+    var juegos=cache.filter(function(g){ return g&&venueCanon(g.venue)===venue&&g.date; });
     juegos.sort(function(a,b){ return a.date<b.date?-1:(a.date>b.date?1:0); });
     var series=[],actual=null;
     for(var i=0;i<juegos.length;i++){
@@ -160,7 +174,7 @@
     return meses[parseInt(p[1],10)-1]+" "+parseInt(p[2],10)+", "+p[0].slice(2);
   }
 
-  // FASE B (arreglo de hoy):
+  // FASE B (arreglo previo):
   // 1) El parque ahora rota por 'hp' DIRECTO, sin sumarle 180 — el +180
   //    de mas quedaba corrido. Confirmado contra k6-test.html.
   // 2) La flecha del viento vuelve a apuntar hacia VA_HACIA (hacia donde
@@ -277,11 +291,11 @@
 
       var homeTeam="";
       for(var ii=0;ii<cache.length;ii++){
-        if(cache[ii]&&cache[ii].venue===venue&&cache[ii].home_team){ homeTeam=cache[ii].home_team; break; }
+        if(cache[ii]&&venueCanon(cache[ii].venue)===venue&&cache[ii].home_team){ homeTeam=cache[ii].home_team; break; }
       }
 
       var juegos=cache.filter(function(g){
-        return g&&g.venue===venue&&g.date&&
+        return g&&venueCanon(g.venue)===venue&&g.date&&
                g.wind_dir!==undefined&&g.wind_dir!==null&&g.wind_dir!==""&&
                !isNaN(Number(g.wind_dir));
       });
