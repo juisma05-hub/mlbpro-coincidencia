@@ -58,4 +58,4 @@ function f5Carreraje(cruceArsenal, lineaCarreraje) {
   };
 }
 
-module.exports = { f5Carreraje };
+if (typeof module !== "undefined") { module.exports = { f5Carreraje }; }
