@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>MLBPro · Líneas F5 TEST</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; font-family:-apple-system,system-ui,sans-serif; background:#0d1117; color:#e6edf3; }
+  header { padding:14px 16px; border-bottom:1px solid #30363d; }
+  h1 { font-size:16px; margin:0; }
+  main { padding:14px; max-width:900px; margin:0 auto; }
+  .go { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#fff; background:#238636; cursor:pointer; }
+  .go:disabled { background:#30363d; color:#8b949e; }
+  #console { margin-top:16px; background:#010409; border:1px solid #30363d; border-radius:8px; padding:12px; min-height:60px; max-height:70vh; overflow:auto; font-family:ui-monospace,monospace; font-size:12px; white-space:pre-wrap; word-break:break-word; }
+</style>
+</head>
+<body>
+<header><h1>MLBPro · Líneas F5 TEST (jalar-linea-f5.js)</h1></header>
+<main>
+  <button id="go" class="go">JALAR LÍNEAS F5 DE HOY</button>
+  <div id="console">Pulsa el botón. Esto llama a The Odds API de verdad, con tu llave real vía el Worker.</div>
+</main>
+
+<script src="mlb-routes.js"></script>
+<script src="estadios.js"></script>
+<script src="jalar-linea.js"></script>
+<script src="jalar-linea-f5.js"></script>
+
+<script>
+  var consoleEl = document.getElementById("console");
+  function log(t){ var d=document.createElement("div"); d.textContent=t; consoleEl.appendChild(d); consoleEl.scrollTop=consoleEl.scrollHeight; }
+
+  document.getElementById("go").addEventListener("click", async function(){
+    var btn=this; btn.disabled=true; btn.textContent="TRABAJANDO…";
+    consoleEl.textContent="";
+    try {
+      var resultado = await jalarLineasF5(log);
+      log("──────────");
+      log("RESULTADO CRUDO COMPLETO:");
+      log(JSON.stringify(resultado, null, 2));
+    } catch(e) {
+      log("ERROR REAL: " + (e && e.message ? e.message : e));
+    } finally {
+      btn.disabled=false; btn.textContent="JALAR LÍNEAS F5 DE HOY";
+    }
+  });
+</script>
+</body>
+</html>
