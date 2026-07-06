@@ -20,6 +20,7 @@
   .go-hunter { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#fff; background:#8957e5; cursor:pointer; margin-top:12px; }
   .go-auditoria { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#fff; background:#da3633; cursor:pointer; margin-top:12px; }
   .go-k6 { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#fff; background:#5b3da8; cursor:pointer; margin-top:12px; }
+  .go-f5 { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#fff; background:linear-gradient(180deg,#a8d5ff,#2563eb); cursor:pointer; margin-top:12px; }
   .go-brujula { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#0d1117; background:linear-gradient(180deg,#7ee8e0,#1f9e93); cursor:pointer; margin-bottom:12px; }
   .go-brujula .sub2 { display:block; font-size:11px; font-weight:600; opacity:0.8; margin-top:3px; }
 
@@ -179,6 +180,7 @@
   <button id="goHunter" class="go-hunter">DATAPRO HUNTER</button>
   <button id="goAuditoria" class="go-auditoria">AUDITORÍA</button>
   <button id="goK6" class="go-k6">K6 · PONCHES<span class="sub2">Proyección de ponches del pitcher a 6 IP</span></button>
+  <button id="goF5" class="go-f5">🏁 F5 · COINCIDENCIA<span class="sub2">Motor F1-F5 · Carreraje · MoneyLine (prueba manual)</span></button>
   <div id="lista"></div>
   <div id="console">Pulsa el botón.</div>
 </main>
@@ -243,6 +245,7 @@
   document.getElementById("goHunter").addEventListener("click",function(){ location.href="dataprohunter.html"; });
   document.getElementById("goAuditoria").addEventListener("click",function(){ location.href="auditoria.html"; });
   document.getElementById("goK6").addEventListener("click",function(){ location.href="k6-test.html"; });
+  document.getElementById("goF5").addEventListener("click",function(){ location.href="f5-test.html"; });
 
   function toggleJuego(idx){
     var cab = document.getElementById('cab_'+idx);
