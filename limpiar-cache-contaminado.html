@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>MLBPro · Limpiar Cache Contaminado</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:-apple-system,system-ui,sans-serif; background:#0d1117; color:#e6edf3; padding:16px; }
+  h1 { font-size:16px; }
+  .go { width:100%; border:0; border-radius:10px; padding:16px; font-size:16px; font-weight:800; color:#fff; background:#da3633; cursor:pointer; margin-top:12px; }
+  #console { margin-top:16px; background:#010409; border:1px solid #30363d; border-radius:8px; padding:12px; min-height:60px; max-height:60vh; overflow:auto; font-family:ui-monospace,monospace; font-size:12px; white-space:pre-wrap; }
+</style>
+</head>
+<body>
+<h1>MLBPro · Limpiar filas contaminadas (ERR:VENUE_NOT_IN_TABLE / ERR:WEATHERAPI / ERR:NO_HOUR_MATCH)</h1>
+<button id="go" class="go">LIMPIAR CACHE CONTAMINADO</button>
+<div id="console">Pulsa el botón. Solo borra filas con esos 3 códigos de error exactos en cualquier campo de clima. No borra ni modifica ninguna otra fila.</div>
+
+<script src="clima-cache.js"></script>
+<script>
+  var consoleEl = document.getElementById("console");
+  function log(t){ var d=document.createElement("div"); d.textContent=t; consoleEl.appendChild(d); consoleEl.scrollTop=consoleEl.scrollHeight; }
+
+  var ERRORES = ["ERR:VENUE_NOT_IN_TABLE", "ERR:WEATHERAPI", "ERR:NO_HOUR_MATCH"];
+
+  function filaContaminada(g){
+    return ERRORES.indexOf(g.temperature_f) !== -1 ||
+           ERRORES.indexOf(g.windspeed_mph) !== -1 ||
+           ERRORES.indexOf(g.wind_dir) !== -1 ||
+           ERRORES.indexOf(g.precipitation_mm) !== -1 ||
+           ERRORES.indexOf(g.humidity_pct) !== -1;
+  }
+
+  document.getElementById("go").addEventListener("click", function(){
+    consoleEl.textContent = "";
+    try {
+      var cache = climaLeerCache();
+      log("Cache actual: " + cache.length + " filas.");
+
+      var limpio = [];
+      var borradas = [];
+      cache.forEach(function(g){
+        if (filaContaminada(g)) borradas.push(g);
+        else limpio.push(g);
+      });
+
+      log("Filas contaminadas encontradas: " + borradas.length);
+      borradas.forEach(function(g){
+        log("  BORRADA: " + g.date + " · " + g.venue + " · game_id " + g.game_id);
+      });
+
+      climaGuardarCache(limpio);
+      log("LISTO. Cache guardado con " + limpio.length + " filas (antes " + cache.length + ").");
+      log("La próxima vez que abras index.html y pulses COINCIDENCIA, jalarClima() va a volver a traer esos juegos limpios (si siguen dentro del rango de re-jalado).");
+    } catch(e) {
+      log("ERROR: " + e.message);
+    }
+  });
+</script>
+</body>
+</html>
