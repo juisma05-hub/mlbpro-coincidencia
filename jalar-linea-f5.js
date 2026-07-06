@@ -15,6 +15,13 @@
 //
 // La llave NUNCA sale al cliente -- la inyecta el Worker de Cloudflare (mismo patron que jalar-linea.js).
 // Reutiliza ODDS_TEAM_TO_VENUE de jalar-linea.js, no se duplica el mapeo.
+//
+// CORREGIDO 6 jul 2026 (parte 2): el cruce por venue fallaba porque
+// ODDS_TEAM_TO_VENUE[home] no siempre encuentra el equipo (venue quedaba null
+// en el cache). Se agrega lineasF5BuscarEquipos(home, away), que cruza por
+// nombre de equipo -- ese dato sí viene siempre bien desde The Odds API y
+// coincide exacto con los nombres del schedule de MLB StatsAPI. Se deja
+// lineasF5BuscarVenue() intacta por si se usa en otro lado, no se borra nada.
 
 var LINEAS_F5_CACHE_KEY = "lineas_f5_mercado_cache";
 
@@ -45,6 +52,22 @@ function lineasF5BuscarVenue(venue) {
   for (var i = 0; i < cache.juegos.length; i++) {
     var j = cache.juegos[i];
     if ((j.venue || "").trim().toLowerCase() === v) return j;
+  }
+  return null;
+}
+
+// NUEVO: busca el juego F5 por nombre de equipo home + away.
+// Más confiable que por venue porque no depende de ODDS_TEAM_TO_VENUE.
+function lineasF5BuscarEquipos(home, away) {
+  var cache = lineasF5LeerCache();
+  if (!cache || !cache.juegos) return null;
+  var h = (home || "").trim().toLowerCase();
+  var a = (away || "").trim().toLowerCase();
+  for (var i = 0; i < cache.juegos.length; i++) {
+    var j = cache.juegos[i];
+    var jh = (j.home || "").trim().toLowerCase();
+    var ja = (j.away || "").trim().toLowerCase();
+    if (jh === h && ja === a) return j;
   }
   return null;
 }
