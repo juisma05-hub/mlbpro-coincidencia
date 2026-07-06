@@ -69,12 +69,17 @@ async function f5AutomaticoHoy(logFn) {
     var hist = histCandidatos[0] || null;
 
     var perfilPitcherHoy = (typeof armarPerfilPitcher === "function") ? armarPerfilPitcher(pitcherHomeId) : null;
+    var perfilPitcherAwayHoy = (typeof armarPerfilPitcher === "function") ? armarPerfilPitcher(pitcherAwayId) : null;
     var perfilPitcherHist = (typeof armarPerfilPitcher === "function" && hist) ? armarPerfilPitcher(hist.home_pitcher_id) : null;
     log("DIAGNOSTICO F5 pitcher ["+home+"]: pitcherHomeId="+pitcherHomeId+
         " | hist.game_id="+(hist?hist.game_id:"sin_hist")+
         " | hist.home_pitcher_id="+(hist?hist.home_pitcher_id:"sin_hist")+
         " | perfilHoy="+JSON.stringify(perfilPitcherHoy)+
         " | perfilHist="+JSON.stringify(perfilPitcherHist));
+
+    var proyeccionTemprana = (typeof proyectarF5DesdePitcher === "function")
+      ? proyectarF5DesdePitcher(perfilPitcherHoy, perfilPitcherAwayHoy)
+      : { pieza: "F5_PROYECCION_TEMPRANA", estado: "SIN_DATOS", detalle: "Función de proyección no cargada." };
 
     var datosHistorico = hist ? {
       venue: hist.venue, roof: hist.roof||null, tempF: hist.temperature_f,
@@ -127,7 +132,8 @@ async function f5AutomaticoHoy(logFn) {
       carrerajeHome: carrerajeHome,
       carrerajeAway: carrerajeAway,
       moneyline: moneyline,
-      lineaMercadoF5: lineaF5Juego
+      lineaMercadoF5: lineaF5Juego,
+      proyeccionTemprana: proyeccionTemprana
     });
   }
 
