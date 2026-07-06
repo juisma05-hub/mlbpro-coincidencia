@@ -28,4 +28,4 @@ function f2Roof(roofHoy, roofHistorico) {
   };
 }
 
-module.exports = { f2Roof };
+if (typeof module !== "undefined") { module.exports = { f2Roof }; }
