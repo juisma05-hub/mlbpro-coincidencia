@@ -127,6 +127,7 @@ async function f5AutomaticoHoy(logFn) {
     resultados.push({
       juego: away+" @ "+home,
       venue: venue,
+      gamePk: g.gamePk,
       pitcherHomeId: pitcherHomeId, pitcherAwayId: pitcherAwayId,
       coincidencia: coincidencia,
       carrerajeHome: carrerajeHome,
