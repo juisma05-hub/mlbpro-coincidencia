@@ -21,6 +21,7 @@
   .go-auditoria { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#fff; background:#da3633; cursor:pointer; margin-top:12px; }
   .go-k6 { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#fff; background:#5b3da8; cursor:pointer; margin-top:12px; }
   .go-f5 { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#fff; background:linear-gradient(180deg,#a8d5ff,#2563eb); cursor:pointer; margin-top:12px; }
+  .go-f5-auto { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#fff; background:linear-gradient(180deg,#7ee787,#238636); cursor:pointer; margin-top:12px; }
   .go-brujula { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#0d1117; background:linear-gradient(180deg,#7ee8e0,#1f9e93); cursor:pointer; margin-bottom:12px; }
   .go-brujula .sub2 { display:block; font-size:11px; font-weight:600; opacity:0.8; margin-top:3px; }
 
@@ -181,6 +182,7 @@
   <button id="goAuditoria" class="go-auditoria">AUDITORÍA</button>
   <button id="goK6" class="go-k6">K6 · PONCHES<span class="sub2">Proyección de ponches del pitcher a 6 IP</span></button>
   <button id="goF5" class="go-f5">🏁 F5 · COINCIDENCIA<span class="sub2">Motor F1-F5 · Carreraje · MoneyLine (prueba manual)</span></button>
+  <button id="goF5Auto" class="go-f5-auto">🤖 F5 · AUTOMÁTICO<span class="sub2">Motor F1-F5 · Carreraje · MoneyLine (juegos reales de hoy, sin tocar nada a mano)</span></button>
   <div id="lista"></div>
   <div id="console">Pulsa el botón.</div>
 </main>
@@ -246,6 +248,7 @@
   document.getElementById("goAuditoria").addEventListener("click",function(){ location.href="auditoria.html"; });
   document.getElementById("goK6").addEventListener("click",function(){ location.href="k6-test.html"; });
   document.getElementById("goF5").addEventListener("click",function(){ location.href="f5-test.html"; });
+  document.getElementById("goF5Auto").addEventListener("click",function(){ location.href="f5-automatico-test.html"; });
 
   function toggleJuego(idx){
     var cab = document.getElementById('cab_'+idx);
@@ -255,14 +258,6 @@
     cab.classList.toggle('abierto', abierto);
   }
 
-  // FASE B (arreglo previo):
-  // 1) El parque ahora rota por 'hp' DIRECTO, sin sumarle 180 — el +180
-  //    de mas quedaba corrido, no calzaba con el anillo fijo. Confirmado
-  //    contra k6-test.html, que nunca tuvo ese +180.
-  // 2) La flecha del viento vuelve a apuntar hacia VA_HACIA (hacia donde
-  //    va el viento), no vieneDe. Es la convencion original de toda esta
-  //    sesion (bug fijo #1 del checkpoint madre) — esta version la habia
-  //    revertido sin querer a vieneDe. Vuelve a coincidir con k6-test.html.
   function svgBrujulaJuego(idx, venue, hpACF, hoyDir, hoyVel){
     var cx=100, cy=100;
     var venueEsc0 = String(venue||"").replace(/&/g,"&amp;").replace(/"/g,"&quot;");
@@ -347,15 +342,6 @@
     return null;
   }
 
-  // FIX 5 jul 2026: venueReal ya NO traduce con STADIUM_ALIAS_2026.
-  // Ese alias existe para que jalar-clima.js encuentre las coordenadas
-  // fijas ("Dodger Stadium") en STADIUM_INDEX — sirve para el clima de HOY.
-  // Pero el cache historico (climaLeerCache) guarda el venue TAL CUAL
-  // lo devuelve la MLB API ("UNIQLO Field at Dodger Stadium"), igual
-  // para juegos de hoy y de marzo, porque la API no versiona el nombre
-  // por fecha. Al traducir venueReal al nombre viejo, la comparacion
-  // g.venue===venueReal nunca hacia match contra el cache -> por eso
-  // salia siempre "sin juegos en cache para este rango".
   function venueCanon(v) {
     return (typeof STADIUM_ALIAS_2026 !== "undefined" && STADIUM_ALIAS_2026[v]) ? STADIUM_ALIAS_2026[v] : v;
   }
