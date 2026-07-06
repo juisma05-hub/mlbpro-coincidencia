@@ -6,22 +6,28 @@
 //
 // CORREGIDO 6 jul 2026: estos son "period markets" (no featured markets).
 // The Odds API los rechaza con HTTP 422 / INVALID_MARKET si se piden en el
-// endpoint masivo /v4/sports/{sport}/odds. Confirmado con la respuesta real
-// de la API: "Non-featured markets... can be queried one event at a time
-// using the event-odds... endpoints."
-// Por eso el flujo correcto es en DOS pasos:
-//   1) /v4/sports/baseball_mlb/events  -> trae los event_id de hoy (GRATIS, no gasta cuota)
+// endpoint masivo /v4/sports/{sport}/odds. El flujo correcto es en DOS pasos:
+//   1) /v4/sports/baseball_mlb/events  -> trae los event_id de hoy (GRATIS)
 //   2) /v4/sports/baseball_mlb/events/{eventId}/odds?markets=... -> F5 de ESE juego
 //
-// La llave NUNCA sale al cliente -- la inyecta el Worker de Cloudflare (mismo patron que jalar-linea.js).
-// Reutiliza ODDS_TEAM_TO_VENUE de jalar-linea.js, no se duplica el mapeo.
+// CORREGIDO 6 jul 2026 (parte 2): lineasF5BuscarEquipos(home, away) cruza por
+// nombre de equipo en vez de venue (venue puede venir null del mapeo de la API).
 //
-// CORREGIDO 6 jul 2026 (parte 2): el cruce por venue fallaba porque
-// ODDS_TEAM_TO_VENUE[home] no siempre encuentra el equipo (venue quedaba null
-// en el cache). Se agrega lineasF5BuscarEquipos(home, away), que cruza por
-// nombre de equipo -- ese dato sí viene siempre bien desde The Odds API y
-// coincide exacto con los nombres del schedule de MLB StatsAPI. Se deja
-// lineasF5BuscarVenue() intacta por si se usa en otro lado, no se borra nada.
+// CORREGIDO 6 jul 2026 (parte 3) — CONGELAMIENTO DE LÍNEA PRE-JUEGO:
+// Una vez el juego arranca, The Odds API deja de devolver la línea pre-juego
+// y devuelve la línea EN VIVO (in-play), que cambia con el marcador. No hay
+// forma de pedirle a ese mismo endpoint "la de antes". Por eso cada juego se
+// congela MLB_F5_MINUTOS_CONGELAR minutos antes de su commence_time (valor
+// configurable abajo). Desde ese momento en adelante, NUNCA se vuelve a jalar
+// mercado para ese juego -- se reusa siempre la última línea guardada antes
+// del corte. Si nunca se guardó una línea antes del corte (por ejemplo, si el
+// caché se limpió después de que ya pasó ese punto), se marca honestamente
+// como no disponible -- no se inventa ni se usa la de en vivo por error.
+
+// Minutos antes del inicio del juego en que se congela la línea. Cambiar este
+// número para ajustar (ej: 10, 15, 30). Una vez pasado ese punto, la línea
+// de ese juego ya no se vuelve a tocar bajo ninguna circunstancia.
+var MLB_F5_MINUTOS_CONGELAR = 30;
 
 var LINEAS_F5_CACHE_KEY = "lineas_f5_mercado_cache";
 
@@ -40,7 +46,6 @@ function lineasF5GuardarCache(obj) {
 }
 
 // Busca el juego F5 por venue del parque local.
-// Reutiliza STADIUM_ALIAS_2026 si existe (mismo criterio que lineasBuscarVenue en jalar-linea.js).
 function lineasF5BuscarVenue(venue) {
   var cache = lineasF5LeerCache();
   if (!cache || !cache.juegos) return null;
@@ -56,8 +61,7 @@ function lineasF5BuscarVenue(venue) {
   return null;
 }
 
-// NUEVO: busca el juego F5 por nombre de equipo home + away.
-// Más confiable que por venue porque no depende de ODDS_TEAM_TO_VENUE.
+// Busca el juego F5 por nombre de equipo home + away.
 function lineasF5BuscarEquipos(home, away) {
   var cache = lineasF5LeerCache();
   if (!cache || !cache.juegos) return null;
@@ -72,10 +76,14 @@ function lineasF5BuscarEquipos(home, away) {
   return null;
 }
 
+function _claveHA(home, away) {
+  return (home || "").trim().toLowerCase() + "|" + (away || "").trim().toLowerCase();
+}
+
 function parseMarketsF5(bookmakers, home, away) {
-  var moneylineF5 = null; // { home_price, away_price, bookie }
-  var runlineF5 = null;   // { point, home_price, away_price, bookie }
-  var totalF5 = null;     // { point, over_price, under_price, bookie }
+  var moneylineF5 = null;
+  var runlineF5 = null;
+  var totalF5 = null;
 
   var orden = ["draftkings", "fanduel", "betmgm"];
 
@@ -138,13 +146,14 @@ async function jalarLineasF5(logFn) {
     return d.getFullYear()+"-"+("0"+(d.getMonth()+1)).slice(-2)+"-"+("0"+d.getDate()).slice(-2);
   })();
 
-  var cache = lineasF5LeerCache();
-  if (cache && cache.fecha === hoy && cache.juegos && cache.juegos.length > 0) {
-    log("Lineas F5: cache de hoy OK (" + cache.juegos.length + " juegos).");
-    return cache;
+  var cacheViejo = lineasF5LeerCache();
+  var congeladosMapa = {};
+  if (cacheViejo && cacheViejo.fecha === hoy && cacheViejo.juegos) {
+    cacheViejo.juegos.forEach(function(j) {
+      congeladosMapa[_claveHA(j.home, j.away)] = j;
+    });
   }
 
-  // PASO 1: traer los eventos de hoy (endpoint /events, no gasta cuota).
   log("Paso 1/2: trayendo eventos de MLB de hoy...");
   var eventsUrl = "https://api.the-odds-api.com/v4/sports/baseball_mlb/events/";
   var proxyEventsUrl = MLB_ROUTES.WORKER_BASE + encodeURIComponent(eventsUrl);
@@ -154,8 +163,10 @@ async function jalarLineasF5(logFn) {
   if (!Array.isArray(events)) throw new Error("Odds API /events: respuesta inesperada");
   log("Eventos recibidos: " + events.length);
 
-  // PASO 2: por cada evento, pedir F5 con el endpoint correcto por-evento.
-  log("Paso 2/2: pidiendo mercados F5 evento por evento...");
+  var ahora = Date.now();
+  var margenMs = MLB_F5_MINUTOS_CONGELAR * 60 * 1000;
+
+  log("Paso 2/2: pidiendo mercados F5 evento por evento (congelamiento: " + MLB_F5_MINUTOS_CONGELAR + " min antes)...");
   var juegos = [];
   for (var i = 0; i < events.length; i++) {
     var ev = events[i];
@@ -163,6 +174,28 @@ async function jalarLineasF5(logFn) {
     var away = ev.away_team || "";
     var eventId = ev.id;
     var venue = (typeof ODDS_TEAM_TO_VENUE !== "undefined" && ODDS_TEAM_TO_VENUE[home]) ? ODDS_TEAM_TO_VENUE[home] : null;
+    var commenceMs = ev.commence_time ? new Date(ev.commence_time).getTime() : null;
+    var puntoCorte = (commenceMs !== null) ? (commenceMs - margenMs) : null;
+    var yaSeDebeCongelar = (puntoCorte !== null) && (ahora >= puntoCorte);
+
+    var previo = congeladosMapa[_claveHA(home, away)];
+
+    if (yaSeDebeCongelar) {
+      if (previo && (previo.moneylineF5 || previo.runlineF5 || previo.totalF5)) {
+        previo.congelada = true;
+        juegos.push(previo);
+        log("  " + away + " @ " + home + " -> dentro de la ventana de congelamiento (" + MLB_F5_MINUTOS_CONGELAR + " min antes). Usando línea CONGELADA.");
+      } else {
+        juegos.push({
+          home: home, away: away, venue: venue,
+          moneylineF5: null, runlineF5: null, totalF5: null,
+          congelada: false,
+          error: "SIN_LINEA_ANTES_DEL_CORTE"
+        });
+        log("  " + away + " @ " + home + " -> ya pasó el punto de congelamiento y no había línea guardada antes. NO se jala en vivo.");
+      }
+      continue;
+    }
 
     try {
       var oddsUrl = "https://api.the-odds-api.com/v4/sports/baseball_mlb/events/" + eventId +
@@ -172,7 +205,7 @@ async function jalarLineasF5(logFn) {
       if (!resp.ok) {
         var textoErr = await resp.text();
         log("  " + away + " @ " + home + " -> ERROR HTTP " + resp.status + ": " + textoErr);
-        juegos.push({ home: home, away: away, venue: venue, moneylineF5: null, runlineF5: null, totalF5: null, error: "HTTP_" + resp.status });
+        juegos.push({ home: home, away: away, venue: venue, moneylineF5: null, runlineF5: null, totalF5: null, congelada: false, error: "HTTP_" + resp.status });
         continue;
       }
       var data = await resp.json();
@@ -180,7 +213,8 @@ async function jalarLineasF5(logFn) {
 
       juegos.push({
         home: home, away: away, venue: venue,
-        moneylineF5: parsed.moneylineF5, runlineF5: parsed.runlineF5, totalF5: parsed.totalF5
+        moneylineF5: parsed.moneylineF5, runlineF5: parsed.runlineF5, totalF5: parsed.totalF5,
+        congelada: false
       });
 
       log("  " + away + " @ " + home + " -> venue: " + (venue||"N/C") +
@@ -189,7 +223,7 @@ async function jalarLineasF5(logFn) {
           " . Total F5: " + (parsed.totalF5 ? parsed.totalF5.point : "N/C"));
     } catch (eEvento) {
       log("  " + away + " @ " + home + " -> ERROR REAL: " + (eEvento && eEvento.message ? eEvento.message : eEvento));
-      juegos.push({ home: home, away: away, venue: venue, moneylineF5: null, runlineF5: null, totalF5: null, error: "ERROR_REAL" });
+      juegos.push({ home: home, away: away, venue: venue, moneylineF5: null, runlineF5: null, totalF5: null, congelada: false, error: "ERROR_REAL" });
     }
   }
 
