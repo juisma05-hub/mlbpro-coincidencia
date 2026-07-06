@@ -33,7 +33,7 @@ var PARQUES_ORIENTACION = {
   "Oriole Park at Camden Yards": { hpACF: 33, roof:"abierto",   confianza:"exacta", fuente:"confirmado antes de esta pasada" },
   "Coors Field":              { hpACF: 4.5,   roof:"abierto",   confianza:"exacta", fuente:"Ajuste directo confirmado por Perez 5 jul 2026 - hpACF 4.5" },
   "Fenway Park":              { hpACF: 146,   roof:"abierto",   confianza:"exacta", fuente:"GPS propio - contradice otras fuentes (decian NE), no es error de calculo" },
-  "Truist Park":              { hpACF: 202,   roof:"abierto",   confianza:"exacta", fuente:"GPS propio - contradice Clem's (SSE), no es error de calculo" },
+  "Truist Park":              { hpACF: 23,   roof:"abierto",   confianza:"exacta", fuente:"GPS propio - contradice Clem's (SSE), no es error de calculo" },
   "Angel Stadium": {
     hpACF: 17, roof:"abierto", confianza:"exacta",
     fuente:"GPS propio del usuario - aproximado, campo obstruido por pista de motocross, sin verificacion de distancia real",
