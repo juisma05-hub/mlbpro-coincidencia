@@ -1,9 +1,7 @@
 // jalar-lineup.js
 // PIEZA - trae el LINEUP confirmado (9 bateadores titulares) de un juego usando su game_id.
-// Misma ruta que jalar-roster.js (feed/live via MLB_ROUTES.WORKER_BASE).
-// NO inventa datos: si el lineup no esta publicado (MLB lo publica ~1-2h antes del juego),
-// devuelve lineup_away / lineup_home como arrays vacios y confirmado=false.
-// Devuelve IDs numericos (cruzan con BATTERS_VSPITCH_2026 por player_id).
+// USA /feed/game (no /feed/live) para que no cambie durante el juego.
+// NO inventa datos: si el lineup no esta publicado devuelve arrays vacios y confirmado=false.
 
 async function jalarLineup(gamePk) {
   const salida = {
@@ -16,10 +14,10 @@ async function jalarLineup(gamePk) {
   };
 
   try {
-    const mlbUrl = "https://statsapi.mlb.com/api/v1.1/game/" + gamePk + "/feed/live";
+    const mlbUrl = "https://statsapi.mlb.com/api/v1.1/game/" + gamePk + "/feed/game";
     const url = MLB_ROUTES.WORKER_BASE + encodeURIComponent(mlbUrl);
     const res = await fetch(url);
-    if (!res.ok) { salida.error = "ERR:FEEDLIVE_HTTP_" + res.status; return salida; }
+    if (!res.ok) { salida.error = "ERR:FEEDGAME_HTTP_" + res.status; return salida; }
     const data = await res.json();
 
     const box = data && data.liveData && data.liveData.boxscore;
@@ -40,9 +38,6 @@ async function jalarLineup(gamePk) {
   }
 }
 
-// Helper: extrae los 9 titulares de un equipo, ordenados por battingOrder (100,200,300...900).
-// battingOrder llega como string. Los suplentes/bullpen no tienen battingOrder valido de titular
-// (vienen con valores tipo "201","202" para sustitutos in-game, que se ignoran aqui).
 function extraerLineup(team) {
   if (!team || !team.players) return { lineup: [] };
 
@@ -53,7 +48,6 @@ function extraerLineup(team) {
     var ordenRaw = p && p.battingOrder;
     if (ordenRaw === undefined || ordenRaw === null || ordenRaw === "") continue;
 
-    // Solo titulares: terminacion "00" (100,200,...,900). Sustitutos in-game traen "101","202", etc.
     var ordenNum = parseInt(ordenRaw, 10);
     if (isNaN(ordenNum) || ordenNum % 100 !== 0) continue;
 
@@ -65,6 +59,5 @@ function extraerLineup(team) {
   }
 
   candidatos.sort(function(a, b) { return a.orden - b.orden; });
-
   return { lineup: candidatos };
 }
