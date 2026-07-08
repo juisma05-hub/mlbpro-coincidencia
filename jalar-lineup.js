@@ -1,6 +1,7 @@
 // jalar-lineup.js
 // PIEZA - trae el LINEUP confirmado (9 bateadores titulares) de un juego usando su game_id.
-// USA /feed/game (no /feed/live) para que no cambie durante el juego.
+// ENDPOINT REAL: /api/v1.1/game/{gamePk}/feed/live
+// (el endpoint /feed/game NO EXISTE en la API de MLB — daba HTTP 404 en todos los parques).
 // NO inventa datos: si el lineup no esta publicado devuelve arrays vacios y confirmado=false.
 
 async function jalarLineup(gamePk) {
@@ -14,10 +15,10 @@ async function jalarLineup(gamePk) {
   };
 
   try {
-    const mlbUrl = "https://statsapi.mlb.com/api/v1.1/game/" + gamePk + "/feed/game";
+    const mlbUrl = "https://statsapi.mlb.com/api/v1.1/game/" + gamePk + "/feed/live";
     const url = MLB_ROUTES.WORKER_BASE + encodeURIComponent(mlbUrl);
     const res = await fetch(url);
-    if (!res.ok) { salida.error = "ERR:FEEDGAME_HTTP_" + res.status; return salida; }
+    if (!res.ok) { salida.error = "ERR:FEEDLIVE_HTTP_" + res.status; return salida; }
     const data = await res.json();
 
     const box = data && data.liveData && data.liveData.boxscore;
