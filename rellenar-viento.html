@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MLBPro · Rellenar viento histórico</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:-apple-system,system-ui,sans-serif; background:#0d1117; color:#e6edf3; }
+  header { padding:14px 16px; border-bottom:1px solid #30363d; }
+  h1 { font-size:17px; margin:0; }
+  main { padding:16px; max-width:900px; margin:0 auto; }
+  .go { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#fff; background:#1f6feb; cursor:pointer; }
+  .go:disabled { background:#30363d; color:#8b949e; }
+  .go .sub2 { display:block; font-size:11px; font-weight:600; opacity:0.85; margin-top:3px; }
+  .aviso { background:#161b22; border:1px solid #30363d; border-radius:10px; padding:12px; font-size:13px; color:#c9d1d9; margin-top:12px; }
+  .aviso b { color:#ffd60a; }
+  #resumen { display:none; background:#161b22; border:1px solid #238636; border-radius:10px; padding:14px; margin-top:14px; }
+  #resumen .titulo { font-size:14px; font-weight:800; color:#3fb950; margin-bottom:8px; }
+  #resumen .fila { font-size:13px; color:#c9d1d9; padding:3px 0; }
+  #resumen .fila b { color:#fff; }
+  #console { margin-top:16px; background:#010409; border:1px solid #30363d; border-radius:8px; padding:12px; min-height:60px; max-height:50vh; overflow:auto; font-family:ui-monospace,monospace; font-size:12px; white-space:pre-wrap; }
+</style>
+</head>
+<body>
+<header><h1>Rellenar viento histórico (wind_dir) · herramienta de una sola vez</h1></header>
+<main>
+  <button id="go" class="go">RELLENAR DIRECCIÓN DE VIENTO FALTANTE<span class="sub2">Lee el cache, rellena SOLO los huecos con Open-Meteo Archive. No borra ni toca lo que ya existe.</span></button>
+
+  <div class="aviso">
+    Esta herramienta <b>no borra nada</b>. Recorre la Data Madre buscando juegos sin dirección de viento
+    (<b>wind_dir</b> vacío), les jala el clima real de su fecha y hora desde el archivo histórico de Open-Meteo,
+    y rellena únicamente los campos que falten. Todo lo que no pueda rellenar queda contado y reportado
+    como <b>NO_CONFIRMADO</b> — nunca inventado.
+  </div>
+
+  <div id="resumen">
+    <div class="titulo">RESUMEN DEL RELLENADO</div>
+    <div class="fila">Registros totales en cache: <b id="rTotal">—</b></div>
+    <div class="fila">Sin wind_dir antes de empezar: <b id="rSinDir">—</b></div>
+    <div class="fila">✅ Rellenados con dato real: <b id="rOk">—</b></div>
+    <div class="fila">⛔ Sin estadio reconocido (alias): <b id="rSinEstadio">—</b></div>
+    <div class="fila">⛔ Sin hora de juego guardada: <b id="rSinHora">—</b></div>
+    <div class="fila">⛔ Sin dato en archivo Open-Meteo (±3h): <b id="rSinDato">—</b></div>
+    <div class="fila">Quedan sin wind_dir después: <b id="rRestan">—</b></div>
+  </div>
+
+  <div id="console">Pulsa el botón. Puedes correrla las veces que quieras: solo toca los huecos.</div>
+</main>
+
+<script src="estadios.js"></script>
+<script src="clima-cache.js"></script>
+<script>
+  var consoleEl = document.getElementById("console");
+  function log(t){ var d=document.createElement("div"); d.textContent=t; consoleEl.appendChild(d); consoleEl.scrollTop=consoleEl.scrollHeight; }
+
+  function sinDir(r){
+    return r && (r.wind_dir === undefined || r.wind_dir === null || r.wind_dir === "" || isNaN(Number(r.wind_dir)));
+  }
+
+  function estadioDe(venue){
+    if (typeof stadiumGet === "function") return stadiumGet(venue);
+    if (typeof STADIUM_INDEX !== "undefined" && typeof stadiumNorm === "function") return STADIUM_INDEX.get(stadiumNorm(venue));
+    return null;
+  }
+
+  // Saca "YYYY-MM-DDTHH" del registro. Usa game_time si existe; si no, no inventa.
+  function horaDelRegistro(r){
+    var gt = r.game_time;
+    if (typeof gt === "string" && gt.length >= 13) return gt.slice(0, 13); // "YYYY-MM-DDTHH"
+    return null;
+  }
+
+  function claveHora(fecha, hh){
+    return fecha + "T" + ("0" + hh).slice(-2) + ":00";
+  }
+
+  // Busca en el mapa del archive la hora exacta o la más cercana en ±3h del MISMO día.
+  function buscarEnArchive(m, fecha, hh){
+    var offsets = [0, 1, -1, 2, -2, 3, -3];
+    for (var i = 0; i < offsets.length; i++) {
+      var h2 = hh + offsets[i];
+      if (h2 < 0 || h2 > 23) continue;
+      var hit = m.get(claveHora(fecha, h2));
+      if (hit) return hit;
+    }
+    return null;
+  }
+
+  document.getElementById("go").addEventListener("click", async function(){
+    var btn = this; btn.disabled = true; btn.textContent = "RELLENANDO…";
+    consoleEl.textContent = "";
+    document.getElementById("resumen").style.display = "none";
+
+    try {
+      var cache = climaLeerCache() || [];
+      log("Registros totales en cache: " + cache.length);
+
+      var pendientes = [];
+      for (var i = 0; i < cache.length; i++) {
+        if (sinDir(cache[i])) pendientes.push(cache[i]);
+      }
+      log("Registros sin wind_dir: " + pendientes.length);
+
+      if (!pendientes.length) {
+        log("Nada que rellenar. La Data Madre ya tiene dirección en todos los registros.");
+        return;
+      }
+
+      // Agrupar por estadio real (canónico) para hacer UNA llamada de archive por parque.
+      var grupos = {}; // key: nombre canónico -> { stadium, fechas:Set, filas:[] }
+      var nSinEstadio = 0;
+
+      for (var p = 0; p < pendientes.length; p++) {
+        var r = pendientes[p];
+        var s = estadioDe(r.venue);
+        if (!s) { nSinEstadio++; log("  ⛔ estadio NO_CONFIRMADO: '" + r.venue + "' (" + r.date + ")"); continue; }
+        var k = s.name || s.venue || String(r.venue);
+        if (!grupos[k]) grupos[k] = { stadium: s, fechas: {}, filas: [] };
+        if (r.date) grupos[k].fechas[r.date] = true;
+        grupos[k].filas.push(r);
+      }
+
+      var hoy = climaHoyISO();
+      var limiteArchive = climaSumarDias(hoy, -2); // el archive confiable llega hasta ~2 días atrás
+
+      var nOk = 0, nSinHora = 0, nSinDato = 0;
+      var nombres = Object.keys(grupos);
+
+      for (var g = 0; g < nombres.length; g++) {
+        var grupo = grupos[nombres[g]];
+        var fechas = Object.keys(grupo.fechas).sort();
+        if (!fechas.length) continue;
+
+        var desde = fechas[0];
+        var hasta = fechas[fechas.length - 1];
+        if (hasta > limiteArchive) hasta = limiteArchive;
+        if (desde > hasta) {
+          log(nombres[g] + ": solo fechas muy recientes, el archive aún no las tiene. Se saltan.");
+          nSinDato += grupo.filas.length;
+          continue;
+        }
+
+        log(nombres[g] + ": archive " + desde + " → " + hasta + " (" + grupo.filas.length + " registro(s) pendiente(s))");
+
+        var m;
+        try {
+          m = await climaFetchArchive(grupo.stadium, desde, hasta);
+        } catch (eA) {
+          log("  ⛔ archive falló: " + (eA && eA.message ? eA.message : eA));
+          nSinDato += grupo.filas.length;
+          continue;
+        }
+
+        for (var f = 0; f < grupo.filas.length; f++) {
+          var fila = grupo.filas[f];
+          var horaBase = horaDelRegistro(fila);
+
+          if (!horaBase) { nSinHora++; log("  ⛔ " + fila.date + " " + (fila.away_team||"?") + " @ " + (fila.home_team||"?") + " → sin hora de juego guardada, NO_CONFIRMADO"); continue; }
+
+          var fecha = horaBase.slice(0, 10);
+          var hh = parseInt(horaBase.slice(11, 13), 10);
+          if (isNaN(hh)) { nSinHora++; continue; }
+
+          var hit = buscarEnArchive(m, fecha, hh);
+          if (!hit || hit.wind_dir === undefined || hit.wind_dir === null) {
+            nSinDato++;
+            log("  ⛔ " + fila.date + " " + (fila.away_team||"?") + " @ " + (fila.home_team||"?") + " → sin dato en archive (±3h)");
+            continue;
+          }
+
+          // Rellenar SOLO los huecos. Nunca pisar valores existentes.
+          fila.wind_dir = hit.wind_dir;
+          if (fila.windspeed_mph === undefined || fila.windspeed_mph === null || fila.windspeed_mph === "") fila.windspeed_mph = hit.windspeed_mph;
+          if (fila.temperature_f === undefined || fila.temperature_f === null || fila.temperature_f === "") fila.temperature_f = hit.temperature_f;
+          if (fila.humidity_pct === undefined || fila.humidity_pct === null || fila.humidity_pct === "") fila.humidity_pct = hit.humidity_pct;
+          if (fila.precipitation_mm === undefined || fila.precipitation_mm === null || fila.precipitation_mm === "") fila.precipitation_mm = hit.precipitation_mm;
+
+          nOk++;
+        }
+      }
+
+      climaGuardarCache(cache);
+
+      var restan = 0;
+      for (var q = 0; q < cache.length; q++) if (sinDir(cache[q])) restan++;
+
+      log("");
+      log("GUARDADO. Rellenados: " + nOk + " · sin estadio: " + nSinEstadio + " · sin hora: " + nSinHora + " · sin dato: " + nSinDato + " · restan sin dir: " + restan);
+      log("LISTO.");
+
+      document.getElementById("rTotal").textContent = cache.length;
+      document.getElementById("rSinDir").textContent = pendientes.length;
+      document.getElementById("rOk").textContent = nOk;
+      document.getElementById("rSinEstadio").textContent = nSinEstadio;
+      document.getElementById("rSinHora").textContent = nSinHora;
+      document.getElementById("rSinDato").textContent = nSinDato;
+      document.getElementById("rRestan").textContent = restan;
+      document.getElementById("resumen").style.display = "block";
+
+    } catch (e) {
+      log("ERROR: " + (e && e.message ? e.message : e));
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = 'RELLENAR DIRECCIÓN DE VIENTO FALTANTE<span class="sub2">Lee el cache, rellena SOLO los huecos con Open-Meteo Archive. No borra ni toca lo que ya existe.</span>';
+    }
+  });
+</script>
+</body>
+</html>
