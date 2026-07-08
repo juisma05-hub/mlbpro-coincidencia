@@ -1,213 +1,157 @@
 // jalar-clima.js
-// MLBPro · Jalar clima de hoy por parque
-// Usa Open-Meteo + schedule MLB.
-// No usa Data Madre. No inventa datos.
+// PIEZA 4c - jalado completo: schedule + clima + carreras + cache.
+// Migrado a WeatherAPI. Incluye hoy (climaHoyISO).
+//
+// CORREGIDO 6 jul 2026: se agrega el pitcher abridor (home/away) de cada
+// juego Final, jalado del boxscore de MLB StatsAPI. Antes el cache de clima
+// no guardaba esto, y por eso F5 (perfil pitcher histórico) no tenía forma
+// de armarse. Se pide solo para juegos Final (mismo patrón que las carreras),
+// para no gastar llamadas de más.
 
-async function climaFetchWeather(stadium, fechaInicio, fechaFin) {
-  if (!stadium) throw new Error("climaFetchWeather: stadium vacío");
+async function jalarClima(logFn) {
+  function log(t) { if (typeof logFn === "function") logFn(t); }
 
-  var lat = stadium.lat || stadium.latitude;
-  var lon = stadium.lon || stadium.lng || stadium.longitude;
-  var tz = stadium.timezone || "America/New_York";
+  const cacheViejo = climaLeerCache();
+  const start = climaStartDesde(cacheViejo);
+  const end = climaHoyISO(); // incluye hoy
 
-  if (lat === undefined || lon === undefined) {
-    throw new Error("climaFetchWeather: estadio sin lat/lon");
+  log("Cache: " + cacheViejo.length + " filas. Jalando " + start + " -> " + end);
+
+  const mlbUrl = "https://statsapi.mlb.com/api/v1/schedule?sportId=1" +
+    "&startDate=" + start + "&endDate=" + end;
+  const urlSched = MLB_ROUTES.WORKER_BASE + encodeURIComponent(mlbUrl);
+
+  const resSched = await fetch(urlSched);
+  if (!resSched.ok) throw new Error("SCHEDULE HTTP " + resSched.status);
+  const dataSched = await resSched.json();
+  if (!dataSched || !Array.isArray(dataSched.dates)) {
+    throw new Error("El proxy no devolvio el calendario esperado.");
   }
 
-  var url =
-    "https://api.open-meteo.com/v1/forecast" +
-    "?latitude=" + encodeURIComponent(lat) +
-    "&longitude=" + encodeURIComponent(lon) +
-    "&hourly=temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m,wind_direction_10m" +
-    "&temperature_unit=fahrenheit" +
-    "&wind_speed_unit=mph" +
-    "&precipitation_unit=mm" +
-    "&timezone=" + encodeURIComponent(tz) +
-    "&start_date=" + encodeURIComponent(fechaInicio) +
-    "&end_date=" + encodeURIComponent(fechaFin);
-
-  var resp = await fetch(url);
-  if (!resp.ok) throw new Error("Open-Meteo HTTP " + resp.status);
-
-  var data = await resp.json();
-  var h = data.hourly || {};
-  var times = h.time || [];
-
-  var map = new Map();
-
-  for (var i = 0; i < times.length; i++) {
-    map.set(times[i], {
-      time: times[i],
-      temperature_f: h.temperature_2m ? h.temperature_2m[i] : null,
-      humidity_pct: h.relative_humidity_2m ? h.relative_humidity_2m[i] : null,
-      precipitation_mm: h.precipitation ? h.precipitation[i] : null,
-      windspeed_mph: h.wind_speed_10m ? h.wind_speed_10m[i] : null,
-      wind_dir: h.wind_direction_10m ? h.wind_direction_10m[i] : null
+  const games = [];
+  dataSched.dates.forEach(function(day) {
+    (day.games || []).forEach(function(g) {
+      games.push({
+        date: day.date,
+        gameDate: g.gameDate,
+        game_id: g.gamePk,
+        home_team: g.teams?.home?.team?.name || "",
+        away_team: g.teams?.away?.team?.name || "",
+        venue: g.venue ? g.venue.name : "",
+        status: g.status ? g.status.detailedState : ""
+      });
     });
-  }
-
-  return map;
-}
-
-function climaKeyTZ(gameDateISO, timezone) {
-  try {
-    var d = new Date(gameDateISO);
-    var parts = new Intl.DateTimeFormat("en-CA", {
-      timeZone: timezone || "America/New_York",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false
-    }).formatToParts(d);
-
-    var obj = {};
-    for (var i = 0; i < parts.length; i++) {
-      obj[parts[i].type] = parts[i].value;
-    }
-
-    var hh = obj.hour;
-    if (hh === "24") hh = "00";
-
-    return obj.year + "-" + obj.month + "-" + obj.day + "T" + hh + ":" + obj.minute;
-  } catch(e) {
-    return String(gameDateISO || "").replace("Z", "").slice(0, 16);
-  }
-}
-
-function climaBuscarHoraCercana(map, key) {
-  if (!map || !key) return null;
-  if (map.get(key)) return map.get(key);
-
-  var base = new Date(key);
-  if (isNaN(base.getTime())) return null;
-
-  var mejor = null;
-  var mejorDif = Infinity;
-
-  map.forEach(function(val, k) {
-    var d = new Date(k);
-    if (isNaN(d.getTime())) return;
-
-    var dif = Math.abs(d.getTime() - base.getTime());
-    if (dif < mejorDif) {
-      mejorDif = dif;
-      mejor = val;
-    }
   });
+  log("Juegos en rango: " + games.length);
 
-  return mejor;
-}
+  const present = new Map();
+  games.forEach(function(g) {
+    const k = stadiumNorm(g.venue);
+    if (STADIUM_INDEX.has(k)) present.set(k, STADIUM_INDEX.get(k));
+  });
+  log("Estadios a consultar: " + present.size);
 
-function climaGuardarFilaHoy(fila) {
-  try {
-    if (typeof climaLeerCache !== "function" || typeof climaGuardarCache !== "function") return;
+  const weather = new Map();
+  let n = 0;
+  for (const e of present) {
+    const k = e[0], s = e[1]; n++;
+    try {
+      log("Clima " + n + "/" + present.size + ": " + s.venue);
+      weather.set(k, await climaFetchWeather(s, start, end));
+    } catch (err) {
+      weather.set(k, { error: err.message });
+      log("FALLO " + s.venue + ": " + err.message);
+    }
+  }
 
-    var cache = climaLeerCache() || [];
+  const runsMap = new Map();
+  const pitchersMap = new Map();
+  let m = 0;
+  for (const g of games) {
+    m++;
+    if (g.status !== "Final") { continue; }
+    try {
+      log("Carreras " + m + "/" + games.length + ": " + g.game_id);
+      const urlLs = MLB_ROUTES.WORKER_BASE +
+        encodeURIComponent("https://statsapi.mlb.com/api/v1/game/" + g.game_id + "/linescore");
+      const resLs = await fetch(urlLs);
+      if (!resLs.ok) throw new Error("LINESCORE HTTP " + resLs.status);
+      const dLs = await resLs.json();
+      if (!dLs.teams || !dLs.teams.home || !dLs.teams.away) throw new Error("SIN teams.runs");
+      const hr = dLs.teams.home.runs;
+      const ar = dLs.teams.away.runs;
+      if (typeof hr !== "number" || typeof ar !== "number") throw new Error("runs no numerico");
+      runsMap.set(g.game_id, { home_runs: hr, away_runs: ar });
+    } catch (err) {
+      log("FALLO carreras " + g.game_id + ": " + err.message);
+    }
 
-    var existe = false;
-    for (var i = 0; i < cache.length; i++) {
-      if (cache[i] && cache[i].game_id === fila.game_id && cache[i].date === fila.date) {
-        cache[i] = fila;
-        existe = true;
-        break;
+    try {
+      const urlBox = MLB_ROUTES.WORKER_BASE +
+        encodeURIComponent("https://statsapi.mlb.com/api/v1/game/" + g.game_id + "/boxscore");
+      const resBox = await fetch(urlBox);
+      if (!resBox.ok) throw new Error("BOXSCORE HTTP " + resBox.status);
+      const dBox = await resBox.json();
+      const homePitchers = dBox?.teams?.home?.pitchers || [];
+      const awayPitchers = dBox?.teams?.away?.pitchers || [];
+      const homePitcherId = homePitchers.length > 0 ? homePitchers[0] : null;
+      const awayPitcherId = awayPitchers.length > 0 ? awayPitchers[0] : null;
+      if (homePitcherId || awayPitcherId) {
+        pitchersMap.set(g.game_id, { home_pitcher_id: homePitcherId, away_pitcher_id: awayPitcherId });
+      }
+    } catch (err) {
+      log("FALLO boxscore/pitcher " + g.game_id + ": " + err.message);
+    }
+  }
+
+  const nuevos = [];
+  games.forEach(function(g) {
+    const k = stadiumNorm(g.venue);
+    const s = STADIUM_INDEX.get(k);
+    let w = { temperature_f: "", windspeed_mph: "", wind_dir: "", precipitation_mm: "", humidity_pct: "" };
+    let roof = "", tz = "";
+
+    if (!s) {
+      const e1 = "ERR:VENUE_NOT_IN_TABLE";
+      w = { temperature_f: e1, windspeed_mph: e1, wind_dir: e1, precipitation_mm: e1, humidity_pct: e1 };
+    } else {
+      roof = s.roof; tz = s.timezone;
+      const c = weather.get(k);
+      if (c && c.error) {
+        const e2 = "ERR:WEATHERAPI";
+        w = { temperature_f: e2, windspeed_mph: e2, wind_dir: e2, precipitation_mm: e2, humidity_pct: e2 };
+      } else {
+        // WeatherAPI da hora local — usar directamente sin convertir timezone
+        const gameLocal = g.gameDate.replace("Z","").slice(0,16); // "2026-06-29T14:00"
+        const hit = c.get(gameLocal) || c.get(climaKeyTZ(g.gameDate, tz));
+        if (!hit) {
+          const e3 = "ERR:NO_HOUR_MATCH";
+          w = { temperature_f: e3, windspeed_mph: e3, wind_dir: e3, precipitation_mm: e3, humidity_pct: e3 };
+        } else {
+          w = hit;
+        }
       }
     }
 
-    if (!existe) cache.push(fila);
+    const rc = runsMap.get(g.game_id);
+    const pit = pitchersMap.get(g.game_id);
+    nuevos.push({
+      date: g.date, game_id: g.game_id,
+      home_team: g.home_team, away_team: g.away_team,
+      venue: g.venue, status: g.status,
+      temperature_f: w.temperature_f, windspeed_mph: w.windspeed_mph,
+      wind_dir: w.wind_dir, precipitation_mm: w.precipitation_mm,
+      humidity_pct: w.humidity_pct, roof: roof, timezone: tz,
+      home_runs: rc ? rc.home_runs : null,
+      away_runs: rc ? rc.away_runs : null,
+      total_runs: rc ? (rc.home_runs + rc.away_runs) : null,
+      home_pitcher_id: pit ? pit.home_pitcher_id : null,
+      away_pitcher_id: pit ? pit.away_pitcher_id : null
+    });
+  });
 
-    climaGuardarCache(cache);
-  } catch(e) {}
-}
+  const total = climaMerge(cacheViejo, nuevos);
+  climaGuardarCache(total);
+  log("LISTO. Total en cache: " + total.length + " filas (" + nuevos.length + " jaladas esta vez).");
 
-async function jalarClima(logFn) {
-  function log(t) {
-    if (typeof logFn === "function") logFn(t);
-  }
-
-  var hoy = (function(){
-    var d = new Date(Date.now() - 6 * 60 * 60 * 1000);
-    return d.getFullYear() + "-" +
-      ("0" + (d.getMonth() + 1)).slice(-2) + "-" +
-      ("0" + d.getDate()).slice(-2);
-  })();
-
-  log("Jalando clima de hoy: " + hoy);
-
-  var mlbUrl =
-    "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=" +
-    hoy +
-    "&hydrate=probablePitcher";
-
-  var resp = await fetch(MLB_ROUTES.WORKER_BASE + encodeURIComponent(mlbUrl));
-  if (!resp.ok) throw new Error("Schedule clima HTTP " + resp.status);
-
-  var data = await resp.json();
-  var games = (data.dates && data.dates[0]) ? data.dates[0].games : [];
-
-  log("Juegos para clima: " + games.length);
-
-  for (var i = 0; i < games.length; i++) {
-    var g = games[i];
-
-    var venue = g.venue ? g.venue.name : "";
-    var away = g.teams && g.teams.away && g.teams.away.team ? g.teams.away.team.name : "";
-    var home = g.teams && g.teams.home && g.teams.home.team ? g.teams.home.team.name : "";
-
-    var stadium = null;
-
-    if (typeof stadiumGet === "function") {
-      stadium = stadiumGet(venue);
-    } else if (typeof STADIUM_INDEX !== "undefined" && typeof stadiumNorm === "function") {
-      stadium = STADIUM_INDEX.get(stadiumNorm(venue));
-    }
-
-    if (!stadium) {
-      log("  " + away + " @ " + home + " · " + venue + " → estadio NO_CONFIRMADO");
-      continue;
-    }
-
-    var wmap = await climaFetchWeather(stadium, hoy, hoy);
-
-    var keyTZ = climaKeyTZ(g.gameDate, stadium.timezone);
-    var hit = climaBuscarHoraCercana(wmap, keyTZ);
-
-    if (!hit) {
-      log("  " + away + " @ " + home + " · " + venue + " → clima N/C");
-      continue;
-    }
-
-    var fila = {
-      date: hoy,
-      game_id: g.gamePk,
-      venue: venue,
-      away_team: away,
-      home_team: home,
-      game_time: keyTZ,
-
-      temperature_f: hit.temperature_f,
-      windspeed_mph: hit.windspeed_mph,
-      wind_dir: hit.wind_dir,
-      humidity_pct: hit.humidity_pct,
-      precipitation_mm: hit.precipitation_mm,
-
-      source: "open-meteo",
-      tipo: "HOY"
-    };
-
-    climaGuardarFilaHoy(fila);
-
-    log(
-      "  " + away + " @ " + home +
-      " · " + venue +
-      " → " + hit.temperature_f + "°" +
-      " · viento " + hit.windspeed_mph +
-      " · dir " + hit.wind_dir +
-      " · hum " + hit.humidity_pct + "%"
-    );
-  }
-
-  log("Clima de hoy listo.");
-  return true;
-}
+  return total;
