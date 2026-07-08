@@ -46,6 +46,36 @@ function climaKeyTZ(utcISO, tz) {
   return g("year")+"-"+g("month")+"-"+g("day")+"T"+g("hour")+":00";
 }
 
+// Busca la hora mas cercana en el mapa de clima cuando la hora exacta no existe.
+// Honesta: busca maximo ±3 horas alrededor de keyTZ. Si no hay nada en ese rango,
+// devuelve null (NO inventa clima de horas lejanas).
+// keyTZ debe venir en formato "YYYY-MM-DDTHH:00" (el mismo que produce climaKeyTZ).
+function climaBuscarHoraCercana(m, keyTZ) {
+  if (!m || typeof m.get !== "function") return null;
+  if (!keyTZ || typeof keyTZ !== "string" || keyTZ.length < 13) return null;
+
+  const y  = parseInt(keyTZ.slice(0, 4), 10);
+  const mo = parseInt(keyTZ.slice(5, 7), 10);
+  const dd = parseInt(keyTZ.slice(8, 10), 10);
+  const hh = parseInt(keyTZ.slice(11, 13), 10);
+  if (isNaN(y) || isNaN(mo) || isNaN(dd) || isNaN(hh)) return null;
+
+  const base = new Date(y, mo - 1, dd, hh, 0, 0);
+  const offsets = [1, -1, 2, -2, 3, -3];
+
+  for (let i = 0; i < offsets.length; i++) {
+    const d = new Date(base.getTime() + offsets[i] * 3600000);
+    const k = d.getFullYear() + "-" +
+      ("0" + (d.getMonth() + 1)).slice(-2) + "-" +
+      ("0" + d.getDate()).slice(-2) + "T" +
+      ("0" + d.getHours()).slice(-2) + ":00";
+    const hit = m.get(k);
+    if (hit) return hit;
+  }
+
+  return null;
+}
+
 function climaSumarDias(fecha, n) {
   const d = new Date(fecha + "T00:00:00");
   d.setDate(d.getDate() + n);
