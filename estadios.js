@@ -41,18 +41,57 @@ const STADIUM_INDEX = new Map(
 );
 
 // PIEZA AGREGADA 5 jul 2026: alias de venue por renombre de patrocinio.
-// La MLB API devuelve "UNIQLO Field at Dodger Stadium" en 2026, pero este
-// archivo solo tenia la entrada "Dodger Stadium" -> STADIUM_INDEX.get()
-// devolvia undefined para el nombre nuevo, y por eso climaFetchWeather
-// nunca se llamaba (viento de hoy quedaba en N/C). Mismo patron que ya
-// usa PARQUES_ALIAS en parques-orientacion.js.
+// Mantener este archivo como maestro de nombres para clima, lineas,
+// coincidencia, brujula, orientacion y F5.
 const STADIUM_ALIAS_2026 = {
-  "UNIQLO Field at Dodger Stadium": "Dodger Stadium"
+  "UNIQLO Field at Dodger Stadium": "Dodger Stadium",
+
+  "Guaranteed Rate Field": "Rate Field",
+  "US Cellular Field": "Rate Field",
+  "Comiskey Park": "Rate Field",
+
+  "loanDepot park": "loanDepot Park",
+  "LoanDepot Park": "loanDepot Park",
+  "Marlins Park": "loanDepot Park",
+
+  "Minute Maid Park": "Daikin Park",
+
+  "Miller Park": "American Family Field",
+
+  "Oakland Coliseum": "Sutter Health Park",
+  "Raley Field": "Sutter Health Park",
+
+  "Camden Yards": "Oriole Park at Camden Yards",
+  "AT&T Park": "Oracle Park"
 };
+
 Object.keys(STADIUM_ALIAS_2026).forEach(function(alias){
   var real = STADIUM_INDEX.get(stadiumNorm(STADIUM_ALIAS_2026[alias]));
   if (real) STADIUM_INDEX.set(stadiumNorm(alias), real);
 });
+
+function stadiumCanonName(venue) {
+  var raw = String(venue || "").trim();
+  if (!raw) return "";
+
+  if (STADIUM_ALIAS_2026[raw]) return STADIUM_ALIAS_2026[raw];
+
+  var rn = stadiumNorm(raw);
+  for (var alias in STADIUM_ALIAS_2026) {
+    if (stadiumNorm(alias) === rn) return STADIUM_ALIAS_2026[alias];
+  }
+
+  return raw;
+}
+
+function stadiumGet(venue) {
+  var raw = String(venue || "").trim();
+  var canon = stadiumCanonName(raw);
+
+  return STADIUM_INDEX.get(stadiumNorm(canon)) ||
+         STADIUM_INDEX.get(stadiumNorm(raw)) ||
+         null;
+}
 
 function stadiumNorm(n) {
   return String(n || "").trim().toLowerCase();
