@@ -7,6 +7,10 @@
 // no guardaba esto, y por eso F5 (perfil pitcher histórico) no tenía forma
 // de armarse. Se pide solo para juegos Final (mismo patrón que las carreras),
 // para no gastar llamadas de más.
+//
+// NOTA 8 jul 2026 - COINCIDENCIA:
+// Se mantiene estructura original. Se cambia búsqueda directa en STADIUM_INDEX
+// por stadiumGet() cuando existe, para respetar aliases maestros de estadios.js.
 
 async function jalarClima(logFn) {
   function log(t) { if (typeof logFn === "function") logFn(t); }
@@ -46,8 +50,8 @@ async function jalarClima(logFn) {
 
   const present = new Map();
   games.forEach(function(g) {
-    const k = stadiumNorm(g.venue);
-    if (STADIUM_INDEX.has(k)) present.set(k, STADIUM_INDEX.get(k));
+    const s = (typeof stadiumGet === "function") ? stadiumGet(g.venue) : STADIUM_INDEX.get(stadiumNorm(g.venue));
+    if (s) present.set(stadiumNorm(s.venue), s);
   });
   log("Estadios a consultar: " + present.size);
 
@@ -106,8 +110,8 @@ async function jalarClima(logFn) {
 
   const nuevos = [];
   games.forEach(function(g) {
-    const k = stadiumNorm(g.venue);
-    const s = STADIUM_INDEX.get(k);
+    const s = (typeof stadiumGet === "function") ? stadiumGet(g.venue) : STADIUM_INDEX.get(stadiumNorm(g.venue));
+    const k = s ? stadiumNorm(s.venue) : stadiumNorm(g.venue);
     let w = { temperature_f: "", windspeed_mph: "", wind_dir: "", precipitation_mm: "", humidity_pct: "" };
     let roof = "", tz = "";
 
@@ -138,7 +142,7 @@ async function jalarClima(logFn) {
     nuevos.push({
       date: g.date, game_id: g.game_id,
       home_team: g.home_team, away_team: g.away_team,
-      venue: g.venue, status: g.status,
+      venue: s ? s.venue : g.venue, status: g.status,
       temperature_f: w.temperature_f, windspeed_mph: w.windspeed_mph,
       wind_dir: w.wind_dir, precipitation_mm: w.precipitation_mm,
       humidity_pct: w.humidity_pct, roof: roof, timezone: tz,
