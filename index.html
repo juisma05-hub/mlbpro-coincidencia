@@ -343,6 +343,7 @@
   }
 
   function venueCanon(v) {
+    if (typeof stadiumCanonName === "function") return stadiumCanonName(v);
     return (typeof STADIUM_ALIAS_2026 !== "undefined" && STADIUM_ALIAS_2026[v]) ? STADIUM_ALIAS_2026[v] : v;
   }
 
@@ -489,11 +490,12 @@
           factorH.nota = "ERROR";
         }
 
-        var s=STADIUM_INDEX.get(stadiumNorm(venue));
+        var s=(typeof stadiumGet==="function")?stadiumGet(venue):STADIUM_INDEX.get(stadiumNorm(venue));
         var horaTxt = horaBonita(g.gameDate);
         if(!s){ html+=tarjeta(away,home,venue,horaTxt,null,i,null,pitcherAway,pitcherHome,pitcherAwayId,pitcherHomeId,bloquesSerie,rosterMap,catcherAwayId,catcherHomeId,umpireHomeHoy,lineaMercado,factorH); continue; }
         var w=await climaFetchWeather(s,hoy,hoy);
-        var hit=w.get(climaKeyTZ(g.gameDate,s.timezone));
+        var gameLocal = g.gameDate.replace("Z","").slice(0,16);
+        var hit=w.get(gameLocal) || w.get(climaKeyTZ(g.gameDate,s.timezone));
         if(!hit){ html+=tarjeta(away,home,venue,horaTxt,null,i,null,pitcherAway,pitcherHome,pitcherAwayId,pitcherHomeId,bloquesSerie,rosterMap,catcherAwayId,catcherHomeId,umpireHomeHoy,lineaMercado,factorH); continue; }
         var condHoy=await jalarCondition(g.gamePk);
         var today={temperature_f:hit.temperature_f,windspeed_mph:hit.windspeed_mph,humidity_pct:hit.humidity_pct,precipitation_mm:hit.precipitation_mm,wind_dir:hit.wind_dir,venueName:venue,condition:condHoy};
@@ -509,8 +511,8 @@
 
   function serieDelParque(venue,bloquesSerie){
     if(!venue||!bloquesSerie||!bloquesSerie.length) return null;
-    var v=stadiumNorm(venue);
-    var candidatos=bloquesSerie.filter(function(b){ return stadiumNorm(b.venue)===v; });
+    var v=stadiumNorm(venueCanon(venue));
+    var candidatos=bloquesSerie.filter(function(b){ return stadiumNorm(venueCanon(b.venue))===v; });
     if(!candidatos.length) return null;
     candidatos.sort(function(a,b){ return a.fecha_inicio<b.fecha_inicio?1:-1; });
     return candidatos[0];
@@ -573,7 +575,8 @@
 
   function tarjeta(away,home,venue,horaTxt,r,idx,today,pitcherAway,pitcherHome,pitcherAwayId,pitcherHomeId,bloquesSerie,rosterMap,catcherAwayId,catcherHomeId,umpireHomeHoy,lineaMercado,factorH){
     var sc=r&&r.top?r.top.score:null,cls=r?r.cls:"bad";
-    var brisaInfo=(typeof BRISA_GEO_PARQUES_MLB_2026!=="undefined"&&BRISA_GEO_PARQUES_MLB_2026[venue])?BRISA_GEO_PARQUES_MLB_2026[venue]:null;
+    var venueReal=venueCanon(venue);
+    var brisaInfo=(typeof BRISA_GEO_PARQUES_MLB_2026!=="undefined"&&BRISA_GEO_PARQUES_MLB_2026[venueReal])?BRISA_GEO_PARQUES_MLB_2026[venueReal]:null;
     var hoychips="";
     if(today){
       hoychips='<div class="hoychips">'+
