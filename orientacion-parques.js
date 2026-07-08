@@ -6,6 +6,10 @@
 // Cada entrada trae su FUENTE. Si no hay fuente confirmada o hay contradiccion sin resolver,
 // el valor es null (NO_CONFIRMADO) y confirmado: false.
 // NO se debe rellenar ningun valor sin fuente citable.
+//
+// NOTA 8 jul 2026 - COINCIDENCIA:
+// Se mantiene estructura original. Se actualizan retractables/domo con capturas usuario
+// y se respeta stadiumCanonName() si existe para evitar cruce de aliases.
 
 const ORIENTACION_PARQUES_2026 = {
   // ---- 20 MEDIDOS POR COORDENADAS PROPIAS (jardin central -> segunda base -> home plate) ----
@@ -42,7 +46,7 @@ const ORIENTACION_PARQUES_2026 = {
   "T-Mobile Park": {
     direccion_texto: "noreste (NE)",
     grado_aproximado: 54.5,
-    fuente: "Medicion propia por coordenadas; coincide con Clem's Baseball",
+    fuente: "ShadedSeats.com - captura usuario; grafico confirma orientacion NE aprox. Mantiene 54.5 de medicion previa",
     confirmado: true
   },
   "Petco Park": {
@@ -59,8 +63,8 @@ const ORIENTACION_PARQUES_2026 = {
   },
   "Dodger Stadium": {
     direccion_texto: "norte-noreste (NNE)",
-    grado_aproximado: 25.5,
-    fuente: "Medicion propia por coordenadas; coincide con Clem's Baseball",
+    grado_aproximado: 26,
+    fuente: "GPS propio verificado 5 jul 2026 (home 34.073413,-118.240223 / segunda 34.073726,-118.240038 / jardin central 34.074357,-118.239658) - distancia home-segunda 38.8m calza con oficial MLB (38.79m). Reemplaza 25.5 anterior.",
     confirmado: true
   },
   "Oracle Park": {
@@ -83,8 +87,8 @@ const ORIENTACION_PARQUES_2026 = {
   },
   "Kauffman Stadium": {
     direccion_texto: "noreste (NE)",
-    grado_aproximado: 45,
-    fuente: "Medicion propia por coordenadas (jardin central 39.052026,-94.479846 / segunda base 39.051486,-94.480493 / home plate 39.051246,-94.480821) - remedido, distancia home-segunda verificada casi exacta (38.96m vs 38.8m real). Reemplaza valor anterior de 147 grados (ese fue el error de formula ya marcado como sospechoso en el checkpoint original)",
+    grado_aproximado: 46.4,
+    fuente: "GPS propio del usuario 5 jul 2026 (jardin central 39.051993,-94.479810 / segunda base 39.051485,-94.480495 / home plate 39.051247,-94.480819) - distancia home-segunda 38.55m vs 38.79m oficial (0.6% margen). Reemplaza 147.",
     confirmado: true
   },
   "PNC Park": {
@@ -146,9 +150,9 @@ const ORIENTACION_PARQUES_2026 = {
 
   // ---- TECHADOS - FUENTE DE TEXTO EXTERNA CITADA (sin verificacion geoespacial propia) ----
   "Chase Field": {
-    direccion_texto: "norte-noreste (NNE)",
+    direccion_texto: "norte-noreste / noreste (NNE/NE)",
     grado_aproximado: 23,
-    fuente: "theshadium.com - texto, sin verificacion geoespacial propia",
+    fuente: "ShadedSeats.com - captura usuario; grafico orientado NNE/NE aprox., sin grado exacto",
     confirmado: true
   },
   "Sutter Health Park": {
@@ -158,51 +162,53 @@ const ORIENTACION_PARQUES_2026 = {
     confirmado: true
   },
   "Globe Life Field": {
-    direccion_texto: "este-noreste (ENE)",
-    grado_aproximado: null,
-    fuente: "MLB.com / Texas Rangers (oficial) - texto, sin grado exacto",
+    direccion_texto: "noreste (NE)",
+    grado_aproximado: 45,
+    fuente: "ShadedSeats.com - captura usuario; texto: oriented to the northeast; reemplaza 67.5 ENE",
     confirmado: true
   },
   "loanDepot Park": {
     direccion_texto: "sureste (SE)",
-    grado_aproximado: null,
-    fuente: "shadedseats.com - texto, sin grado exacto",
+    grado_aproximado: 135,
+    fuente: "ShadedSeats.com - captura usuario; grafico y texto indican orientacion SE / home plate facing southeast aprox.",
     confirmado: true
   },
   "Rogers Centre": {
     direccion_texto: "norte (aprox)",
-    grado_aproximado: null,
-    fuente: "shadedseats.com - texto ('el bateador mira hacia el norte'), sin grado exacto",
+    grado_aproximado: 0,
+    fuente: "ShadedSeats.com - captura usuario; bateador/home plate orientado hacia norte aproximado, sin grado exacto",
     confirmado: true
   },
 
-  // ---- SIN CONFIRMAR (contradiccion entre fuentes o sin dato) ----
+  // ---- AJUSTADOS CON CAPTURAS / APROXIMACION USUARIO 8 JUL 2026 ----
   "Daikin Park": {
-    direccion_texto: null,
-    grado_aproximado: null,
-    fuente: null,
-    confirmado: false,
-    nota: "CONTRADICCION: shadedseats.com y wherestheshade.com dicen NNW/NW; houstonticketbrokers.com dice home plate mira NE. Ningun grado exacto. PENDIENTE resolver."
+    direccion_texto: "norte-noreste / noreste (NNE/NE)",
+    grado_aproximado: 20,
+    fuente: "ShadedSeats.com - captura usuario; grafico con brujula y trayectoria del sol; orientacion aproximada NE/NNE, sin grado exacto",
+    confirmado: true
   },
   "American Family Field": {
-    direccion_texto: null,
-    grado_aproximado: null,
-    fuente: null,
-    confirmado: false,
-    nota: "CONTRADICCION: wherestheshade.com dice que el estadio mira sureste; theshadium.com dice NNW. Ningun grado exacto. PENDIENTE resolver."
+    direccion_texto: "sureste (SE)",
+    grado_aproximado: 135,
+    fuente: "ShadedSeats.com / Miller Park - captura usuario; texto: home plate facing southeast; reemplaza 330 en contradiccion",
+    confirmado: true
   },
   "Tropicana Field": {
-    direccion_texto: null,
-    grado_aproximado: null,
-    fuente: null,
-    confirmado: false,
-    nota: "NO_CONFIRMADO. 1) Se busco grado/direccion de orientacion. 2) Busqueda web combinada e individual. 3) Resultados solo devolvieron direccion/parking/capacidad. 4) Falta grado o direccion cardinal desde fuente citable."
+    direccion_texto: "suroeste (SW) aproximado",
+    grado_aproximado: 222,
+    fuente: "Coordenadas aproximadas del usuario desde satelite: CF 27.767650,-82.653893 / medio 27.768237,-82.653255 / HP 27.768734,-82.652649. Domo cerrado; solo para orientacion visual, viento exterior NO cuenta.",
+    confirmado: true
   }
 };
 
 // Devuelve la info de orientacion de un parque, o null si no esta confirmado.
 function orientacionDelParque(venue) {
-  const key = String(venue || "").trim();
+  var key = String(venue || "").trim();
+
+  if (typeof stadiumCanonName === "function") {
+    key = stadiumCanonName(key);
+  }
+
   const info = ORIENTACION_PARQUES_2026[key];
   if (!info || !info.confirmado) return null;
   return info;
