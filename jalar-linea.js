@@ -12,13 +12,19 @@ var ODDS_TEAM_TO_VENUE = {
   "Tampa Bay Rays":          "Tropicana Field",
   "Toronto Blue Jays":       "Rogers Centre",
   "Chicago White Sox":       "Rate Field",
+  "Chi White Sox":           "Rate Field",
   "Cleveland Guardians":     "Progressive Field",
   "Detroit Tigers":          "Comerica Park",
   "Kansas City Royals":      "Kauffman Stadium",
   "Minnesota Twins":         "Target Field",
   "Houston Astros":          "Daikin Park",
   "Los Angeles Angels":      "Angel Stadium",
+  "LA Angels":               "Angel Stadium",
+  "Los Angeles Angels of Anaheim": "Angel Stadium",
   "Oakland Athletics":       "Sutter Health Park",
+  "Athletics":               "Sutter Health Park",
+  "Sacramento Athletics":    "Sutter Health Park",
+  "A's":                     "Sutter Health Park",
   "Seattle Mariners":        "T-Mobile Park",
   "Texas Rangers":           "Globe Life Field",
   "Atlanta Braves":          "Truist Park",
@@ -32,8 +38,10 @@ var ODDS_TEAM_TO_VENUE = {
   "Pittsburgh Pirates":      "PNC Park",
   "St. Louis Cardinals":     "Busch Stadium",
   "Arizona Diamondbacks":    "Chase Field",
+  "Arizona D-backs":         "Chase Field",
   "Colorado Rockies":        "Coors Field",
   "Los Angeles Dodgers":     "Dodger Stadium",
+  "LA Dodgers":              "Dodger Stadium",
   "San Diego Padres":        "Petco Park",
   "San Francisco Giants":    "Oracle Park"
 };
@@ -63,13 +71,19 @@ function lineasBuscarVenue(venue) {
   var cache = lineasLeerCache();
   if (!cache || !cache.juegos) return null;
   var vReal = venue;
-  if (typeof STADIUM_ALIAS_2026 !== "undefined" && STADIUM_ALIAS_2026[venue]) {
+  if (typeof stadiumCanonName === "function") {
+    vReal = stadiumCanonName(venue);
+  } else if (typeof STADIUM_ALIAS_2026 !== "undefined" && STADIUM_ALIAS_2026[venue]) {
     vReal = STADIUM_ALIAS_2026[venue];
   }
   var v = (vReal || "").trim().toLowerCase();
   for (var i = 0; i < cache.juegos.length; i++) {
     var j = cache.juegos[i];
-    if ((j.venue || "").trim().toLowerCase() === v) return j;
+    var jVenue = j.venue || "";
+    if (typeof stadiumCanonName === "function") {
+      jVenue = stadiumCanonName(jVenue);
+    }
+    if ((jVenue || "").trim().toLowerCase() === v) return j;
   }
   return null;
 }
@@ -111,16 +125,17 @@ async function jalarLineas(logFn) {
 
     var orden = ["draftkings", "fanduel", "betmgm"];
     for (var bo = 0; bo < orden.length && total === null; bo++) {
-      for (var b = 0; b < g.bookmakers.length; b++) {
-        if (g.bookmakers[b].key !== orden[bo]) continue;
-        var mkts = g.bookmakers[b].markets || [];
+      var bookmakers = g.bookmakers || [];
+      for (var b = 0; b < bookmakers.length; b++) {
+        if (bookmakers[b].key !== orden[bo]) continue;
+        var mkts = bookmakers[b].markets || [];
         for (var m = 0; m < mkts.length; m++) {
           if (mkts[m].key !== "totals") continue;
           var outs = mkts[m].outcomes || [];
           for (var o = 0; o < outs.length; o++) {
             if (outs[o].name === "Over" && outs[o].point !== undefined) {
               total = outs[o].point;
-              bookie = g.bookmakers[b].title;
+              bookie = bookmakers[b].title;
               break;
             }
           }
