@@ -1,6 +1,7 @@
 // jalar-roster.js
 // PIEZA - trae pitcher, catcher y umpire REALES de UN juego usando su game_id.
-// USA /feed/game (no /feed/live) para que no cambie durante el juego.
+// ENDPOINT REAL: /api/v1.1/game/{gamePk}/feed/live
+// (el endpoint /feed/game NO EXISTE en la API de MLB — daba HTTP 404 en todos los parques).
 // NO inventa datos: si un campo no viene, devuelve "NO_CONFIRMADO".
 
 async function jalarRoster(gamePk) {
@@ -15,10 +16,10 @@ async function jalarRoster(gamePk) {
   };
 
   try {
-    const mlbUrl = "https://statsapi.mlb.com/api/v1.1/game/" + gamePk + "/feed/game";
+    const mlbUrl = "https://statsapi.mlb.com/api/v1.1/game/" + gamePk + "/feed/live";
     const url = MLB_ROUTES.WORKER_BASE + encodeURIComponent(mlbUrl);
     const res = await fetch(url);
-    if (!res.ok) { salida.error = "ERR:FEEDGAME_HTTP_" + res.status; return salida; }
+    if (!res.ok) { salida.error = "ERR:FEEDLIVE_HTTP_" + res.status; return salida; }
     const data = await res.json();
 
     // ---- PITCHERS (probables del gameData) ----
