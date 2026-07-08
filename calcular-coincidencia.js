@@ -12,7 +12,15 @@ function calcularCoincidencia(today) {
 
   // mismo parque primero: filtra historicos del mismo venue si los hay
   const mismoParque = hist.filter(function (h) {
-    return today.venueName && h.venue && h.venue === today.venueName;
+    var todayVenue = today.venueName || "";
+    var histVenue = h.venue || "";
+
+    if (typeof stadiumCanonName === "function") {
+      todayVenue = stadiumCanonName(todayVenue);
+      histVenue = stadiumCanonName(histVenue);
+    }
+
+    return todayVenue && histVenue && stadiumNorm(todayVenue) === stadiumNorm(histVenue);
   });
   const base = mismoParque.length > 0 ? mismoParque : hist;
 
