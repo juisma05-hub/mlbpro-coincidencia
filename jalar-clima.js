@@ -1,278 +1,213 @@
-// jalar-linea.js
-// Jala línea de mercado MLB de hoy desde The Odds API.
-// Incluye TOTAL (O/U) y MONEYLINE.
-// La llave NUNCA sale al cliente — la inyecta el Worker de Cloudflare.
+// jalar-clima.js
+// MLBPro · Jalar clima de hoy por parque
+// Usa Open-Meteo + schedule MLB.
+// No usa Data Madre. No inventa datos.
 
-var LINEAS_CACHE_KEY = "lineas_mercado_cache";
+async function climaFetchWeather(stadium, fechaInicio, fechaFin) {
+  if (!stadium) throw new Error("climaFetchWeather: stadium vacío");
 
-// Mapeo: nombre de equipo (como viene de The Odds API) → venue exacto del estadio
-var ODDS_TEAM_TO_VENUE = {
-  "Baltimore Orioles":       "Oriole Park at Camden Yards",
-  "Boston Red Sox":          "Fenway Park",
-  "New York Yankees":        "Yankee Stadium",
-  "Tampa Bay Rays":          "Tropicana Field",
-  "Toronto Blue Jays":       "Rogers Centre",
-  "Chicago White Sox":       "Rate Field",
-  "Chi White Sox":           "Rate Field",
-  "Cleveland Guardians":     "Progressive Field",
-  "Detroit Tigers":          "Comerica Park",
-  "Kansas City Royals":      "Kauffman Stadium",
-  "Minnesota Twins":         "Target Field",
-  "Houston Astros":          "Daikin Park",
-  "Los Angeles Angels":      "Angel Stadium",
-  "LA Angels":               "Angel Stadium",
-  "Los Angeles Angels of Anaheim": "Angel Stadium",
-  "Oakland Athletics":       "Sutter Health Park",
-  "Athletics":               "Sutter Health Park",
-  "Sacramento Athletics":    "Sutter Health Park",
-  "A's":                     "Sutter Health Park",
-  "Seattle Mariners":        "T-Mobile Park",
-  "Texas Rangers":           "Globe Life Field",
-  "Atlanta Braves":          "Truist Park",
-  "Miami Marlins":           "loanDepot Park",
-  "New York Mets":           "Citi Field",
-  "Philadelphia Phillies":   "Citizens Bank Park",
-  "Washington Nationals":    "Nationals Park",
-  "Chicago Cubs":            "Wrigley Field",
-  "Cincinnati Reds":         "Great American Ball Park",
-  "Milwaukee Brewers":       "American Family Field",
-  "Pittsburgh Pirates":      "PNC Park",
-  "St. Louis Cardinals":     "Busch Stadium",
-  "Arizona Diamondbacks":    "Chase Field",
-  "Arizona D-backs":         "Chase Field",
-  "Colorado Rockies":        "Coors Field",
-  "Los Angeles Dodgers":     "Dodger Stadium",
-  "LA Dodgers":              "Dodger Stadium",
-  "San Diego Padres":        "Petco Park",
-  "San Francisco Giants":    "Oracle Park"
-};
+  var lat = stadium.lat || stadium.latitude;
+  var lon = stadium.lon || stadium.lng || stadium.longitude;
+  var tz = stadium.timezone || "America/New_York";
 
-function lineasLeerCache() {
+  if (lat === undefined || lon === undefined) {
+    throw new Error("climaFetchWeather: estadio sin lat/lon");
+  }
+
+  var url =
+    "https://api.open-meteo.com/v1/forecast" +
+    "?latitude=" + encodeURIComponent(lat) +
+    "&longitude=" + encodeURIComponent(lon) +
+    "&hourly=temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m,wind_direction_10m" +
+    "&temperature_unit=fahrenheit" +
+    "&wind_speed_unit=mph" +
+    "&precipitation_unit=mm" +
+    "&timezone=" + encodeURIComponent(tz) +
+    "&start_date=" + encodeURIComponent(fechaInicio) +
+    "&end_date=" + encodeURIComponent(fechaFin);
+
+  var resp = await fetch(url);
+  if (!resp.ok) throw new Error("Open-Meteo HTTP " + resp.status);
+
+  var data = await resp.json();
+  var h = data.hourly || {};
+  var times = h.time || [];
+
+  var map = new Map();
+
+  for (var i = 0; i < times.length; i++) {
+    map.set(times[i], {
+      time: times[i],
+      temperature_f: h.temperature_2m ? h.temperature_2m[i] : null,
+      humidity_pct: h.relative_humidity_2m ? h.relative_humidity_2m[i] : null,
+      precipitation_mm: h.precipitation ? h.precipitation[i] : null,
+      windspeed_mph: h.wind_speed_10m ? h.wind_speed_10m[i] : null,
+      wind_dir: h.wind_direction_10m ? h.wind_direction_10m[i] : null
+    });
+  }
+
+  return map;
+}
+
+function climaKeyTZ(gameDateISO, timezone) {
   try {
-    var raw = localStorage.getItem(LINEAS_CACHE_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw);
+    var d = new Date(gameDateISO);
+    var parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: timezone || "America/New_York",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false
+    }).formatToParts(d);
+
+    var obj = {};
+    for (var i = 0; i < parts.length; i++) {
+      obj[parts[i].type] = parts[i].value;
+    }
+
+    var hh = obj.hour;
+    if (hh === "24") hh = "00";
+
+    return obj.year + "-" + obj.month + "-" + obj.day + "T" + hh + ":" + obj.minute;
   } catch(e) {
-    return null;
+    return String(gameDateISO || "").replace("Z", "").slice(0, 16);
   }
 }
 
-function lineasGuardarCache(obj) {
+function climaBuscarHoraCercana(map, key) {
+  if (!map || !key) return null;
+  if (map.get(key)) return map.get(key);
+
+  var base = new Date(key);
+  if (isNaN(base.getTime())) return null;
+
+  var mejor = null;
+  var mejorDif = Infinity;
+
+  map.forEach(function(val, k) {
+    var d = new Date(k);
+    if (isNaN(d.getTime())) return;
+
+    var dif = Math.abs(d.getTime() - base.getTime());
+    if (dif < mejorDif) {
+      mejorDif = dif;
+      mejor = val;
+    }
+  });
+
+  return mejor;
+}
+
+function climaGuardarFilaHoy(fila) {
   try {
-    localStorage.setItem(LINEAS_CACHE_KEY, JSON.stringify(obj));
+    if (typeof climaLeerCache !== "function" || typeof climaGuardarCache !== "function") return;
+
+    var cache = climaLeerCache() || [];
+
+    var existe = false;
+    for (var i = 0; i < cache.length; i++) {
+      if (cache[i] && cache[i].game_id === fila.game_id && cache[i].date === fila.date) {
+        cache[i] = fila;
+        existe = true;
+        break;
+      }
+    }
+
+    if (!existe) cache.push(fila);
+
+    climaGuardarCache(cache);
   } catch(e) {}
 }
 
-function lineasCanonVenue(venue) {
-  var vReal = venue || "";
-
-  if (typeof stadiumCanonName === "function") {
-    vReal = stadiumCanonName(vReal);
-  } else if (typeof STADIUM_ALIAS_2026 !== "undefined" && STADIUM_ALIAS_2026[vReal]) {
-    vReal = STADIUM_ALIAS_2026[vReal];
-  }
-
-  return String(vReal || "").trim().toLowerCase();
-}
-
-function lineasNormTeam(x) {
-  return String(x || "")
-    .toLowerCase()
-    .replace(/\./g, "")
-    .replace(/-/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-// Busca línea por venue/parque
-function lineasBuscarVenue(venue) {
-  var cache = lineasLeerCache();
-  if (!cache || !cache.juegos) return null;
-
-  var v = lineasCanonVenue(venue);
-
-  for (var i = 0; i < cache.juegos.length; i++) {
-    var j = cache.juegos[i];
-    var jVenue = lineasCanonVenue(j.venue);
-
-    if (jVenue === v) return j;
-  }
-
-  return null;
-}
-
-// Busca línea por equipos, si el venue falla
-function lineasBuscarJuego(away, home, venue) {
-  var cache = lineasLeerCache();
-  if (!cache || !cache.juegos) return null;
-
-  var byVenue = lineasBuscarVenue(venue);
-  if (byVenue) return byVenue;
-
-  var a = lineasNormTeam(away);
-  var h = lineasNormTeam(home);
-
-  for (var i = 0; i < cache.juegos.length; i++) {
-    var j = cache.juegos[i];
-
-    var ja = lineasNormTeam(j.away);
-    var jh = lineasNormTeam(j.home);
-
-    if (ja === a && jh === h) return j;
-  }
-
-  return null;
-}
-
-function lineasFormatoML(n) {
-  if (n === null || n === undefined || n === "") return "N/C";
-  var num = Number(n);
-  if (!Number.isFinite(num)) return "N/C";
-  return num > 0 ? "+" + num : String(num);
-}
-
-async function jalarLineas(logFn) {
+async function jalarClima(logFn) {
   function log(t) {
     if (typeof logFn === "function") logFn(t);
   }
 
   var hoy = (function(){
-    var d = new Date(Date.now() - 6*60*60*1000);
-    return d.getFullYear()+"-"+("0"+(d.getMonth()+1)).slice(-2)+"-"+("0"+d.getDate()).slice(-2);
+    var d = new Date(Date.now() - 6 * 60 * 60 * 1000);
+    return d.getFullYear() + "-" +
+      ("0" + (d.getMonth() + 1)).slice(-2) + "-" +
+      ("0" + d.getDate()).slice(-2);
   })();
 
-  var cache = lineasLeerCache();
+  log("Jalando clima de hoy: " + hoy);
 
-  if (cache && cache.fecha === hoy && cache.juegos && cache.juegos.length > 0) {
-    log("Líneas de mercado: cache de hoy OK (" + cache.juegos.length + " juegos).");
-    return cache;
-  }
+  var mlbUrl =
+    "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=" +
+    hoy +
+    "&hydrate=probablePitcher";
 
-  log("Jalando líneas de mercado: totals + moneyline...");
-
-  var oddsUrl =
-    "https://api.the-odds-api.com/v4/sports/baseball_mlb/odds/?" +
-    "regions=us&markets=totals,h2h&oddsFormat=american&bookmakers=draftkings,fanduel,betmgm";
-
-  var proxyUrl = MLB_ROUTES.WORKER_BASE + encodeURIComponent(oddsUrl);
-
-  var resp = await fetch(proxyUrl);
-
-  if (!resp.ok) {
-    throw new Error("Odds API HTTP " + resp.status);
-  }
+  var resp = await fetch(MLB_ROUTES.WORKER_BASE + encodeURIComponent(mlbUrl));
+  if (!resp.ok) throw new Error("Schedule clima HTTP " + resp.status);
 
   var data = await resp.json();
+  var games = (data.dates && data.dates[0]) ? data.dates[0].games : [];
 
-  if (!Array.isArray(data)) {
-    throw new Error("Odds API: respuesta inesperada");
-  }
+  log("Juegos para clima: " + games.length);
 
-  log("Juegos recibidos de Odds API: " + data.length);
+  for (var i = 0; i < games.length; i++) {
+    var g = games[i];
 
-  var juegos = [];
-  var orden = ["draftkings", "fanduel", "betmgm"];
+    var venue = g.venue ? g.venue.name : "";
+    var away = g.teams && g.teams.away && g.teams.away.team ? g.teams.away.team.name : "";
+    var home = g.teams && g.teams.home && g.teams.home.team ? g.teams.home.team.name : "";
 
-  for (var i = 0; i < data.length; i++) {
-    var g = data[i];
+    var stadium = null;
 
-    var home = g.home_team || "";
-    var away = g.away_team || "";
-    var venue = ODDS_TEAM_TO_VENUE[home] || null;
-
-    if (typeof stadiumCanonName === "function" && venue) {
-      venue = stadiumCanonName(venue);
+    if (typeof stadiumGet === "function") {
+      stadium = stadiumGet(venue);
+    } else if (typeof STADIUM_INDEX !== "undefined" && typeof stadiumNorm === "function") {
+      stadium = STADIUM_INDEX.get(stadiumNorm(venue));
     }
 
-    var total = null;
-    var totalBookie = null;
-
-    var mlHome = null;
-    var mlAway = null;
-    var mlBookie = null;
-
-    for (var bo = 0; bo < orden.length; bo++) {
-      var bookmakers = g.bookmakers || [];
-
-      for (var b = 0; b < bookmakers.length; b++) {
-        if (bookmakers[b].key !== orden[bo]) continue;
-
-        var mkts = bookmakers[b].markets || [];
-
-        for (var m = 0; m < mkts.length; m++) {
-          var market = mkts[m];
-
-          // TOTAL / OVER UNDER
-          if (market.key === "totals" && total === null) {
-            var outsTotal = market.outcomes || [];
-
-            for (var o = 0; o < outsTotal.length; o++) {
-              if (outsTotal[o].name === "Over" && outsTotal[o].point !== undefined) {
-                total = outsTotal[o].point;
-                totalBookie = bookmakers[b].title;
-                break;
-              }
-            }
-          }
-
-          // MONEYLINE
-          if (market.key === "h2h" && (mlHome === null || mlAway === null)) {
-            var outsML = market.outcomes || [];
-
-            for (var x = 0; x < outsML.length; x++) {
-              var out = outsML[x];
-
-              if (out.name === home && out.price !== undefined) {
-                mlHome = out.price;
-              }
-
-              if (out.name === away && out.price !== undefined) {
-                mlAway = out.price;
-              }
-            }
-
-            if (mlHome !== null || mlAway !== null) {
-              mlBookie = bookmakers[b].title;
-            }
-          }
-        }
-      }
-
-      if (total !== null && mlHome !== null && mlAway !== null) break;
+    if (!stadium) {
+      log("  " + away + " @ " + home + " · " + venue + " → estadio NO_CONFIRMADO");
+      continue;
     }
 
-    juegos.push({
-      home: home,
-      away: away,
+    var wmap = await climaFetchWeather(stadium, hoy, hoy);
+
+    var keyTZ = climaKeyTZ(g.gameDate, stadium.timezone);
+    var hit = climaBuscarHoraCercana(wmap, keyTZ);
+
+    if (!hit) {
+      log("  " + away + " @ " + home + " · " + venue + " → clima N/C");
+      continue;
+    }
+
+    var fila = {
+      date: hoy,
+      game_id: g.gamePk,
       venue: venue,
+      away_team: away,
+      home_team: home,
+      game_time: keyTZ,
 
-      total: total,
-      bookie: totalBookie,
+      temperature_f: hit.temperature_f,
+      windspeed_mph: hit.windspeed_mph,
+      wind_dir: hit.wind_dir,
+      humidity_pct: hit.humidity_pct,
+      precipitation_mm: hit.precipitation_mm,
 
-      moneyline_home: mlHome,
-      moneyline_away: mlAway,
-      moneyline_home_txt: lineasFormatoML(mlHome),
-      moneyline_away_txt: lineasFormatoML(mlAway),
-      moneyline_bookie: mlBookie
-    });
+      source: "open-meteo",
+      tipo: "HOY"
+    };
+
+    climaGuardarFilaHoy(fila);
 
     log(
       "  " + away + " @ " + home +
-      " → venue: " + (venue || "N/C") +
-      " · total: " + (total !== null ? total : "N/C") +
-      " · ML away: " + lineasFormatoML(mlAway) +
-      " · ML home: " + lineasFormatoML(mlHome)
+      " · " + venue +
+      " → " + hit.temperature_f + "°" +
+      " · viento " + hit.windspeed_mph +
+      " · dir " + hit.wind_dir +
+      " · hum " + hit.humidity_pct + "%"
     );
   }
 
-  var nuevo = {
-    fecha: hoy,
-    juegos: juegos
-  };
-
-  lineasGuardarCache(nuevo);
-
-  log("Líneas de mercado guardadas en cache.");
-
-  return nuevo;
+  log("Clima de hoy listo.");
+  return true;
 }
