@@ -50,13 +50,19 @@ function lineasF5BuscarVenue(venue) {
   var cache = lineasF5LeerCache();
   if (!cache || !cache.juegos) return null;
   var vReal = venue;
-  if (typeof STADIUM_ALIAS_2026 !== "undefined" && STADIUM_ALIAS_2026[venue]) {
+  if (typeof stadiumCanonName === "function") {
+    vReal = stadiumCanonName(venue);
+  } else if (typeof STADIUM_ALIAS_2026 !== "undefined" && STADIUM_ALIAS_2026[venue]) {
     vReal = STADIUM_ALIAS_2026[venue];
   }
   var v = (vReal || "").trim().toLowerCase();
   for (var i = 0; i < cache.juegos.length; i++) {
     var j = cache.juegos[i];
-    if ((j.venue || "").trim().toLowerCase() === v) return j;
+    var jVenue = j.venue || "";
+    if (typeof stadiumCanonName === "function") {
+      jVenue = stadiumCanonName(jVenue);
+    }
+    if ((jVenue || "").trim().toLowerCase() === v) return j;
   }
   return null;
 }
