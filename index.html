@@ -502,7 +502,8 @@ if (lineasCache) {
         if(!s){ html+=tarjeta(away,home,venue,horaTxt,null,i,null,pitcherAway,pitcherHome,pitcherAwayId,pitcherHomeId,bloquesSerie,rosterMap,catcherAwayId,catcherHomeId,umpireHomeHoy,lineaMercado,factorH); continue; }
         var w=await climaFetchWeather(s,hoy,hoy);
         var gameLocal = g.gameDate.replace("Z","").slice(0,16);
-        var hit=w.get(gameLocal) || w.get(climaKeyTZ(g.gameDate,s.timezone));
+        var keyTZ = climaKeyTZ(g.gameDate, s.timezone);
+        var hit = w.get(gameLocal) || w.get(keyTZ) || climaBuscarHoraCercana(w, keyTZ);
         if(!hit){ html+=tarjeta(away,home,venue,horaTxt,null,i,null,pitcherAway,pitcherHome,pitcherAwayId,pitcherHomeId,bloquesSerie,rosterMap,catcherAwayId,catcherHomeId,umpireHomeHoy,lineaMercado,factorH); continue; }
         var condHoy=await jalarCondition(g.gamePk);
         var today={temperature_f:hit.temperature_f,windspeed_mph:hit.windspeed_mph,humidity_pct:hit.humidity_pct,precipitation_mm:hit.precipitation_mm,wind_dir:hit.wind_dir,venueName:venue,condition:condHoy};
@@ -613,9 +614,30 @@ if (lineasCache) {
       '<div class="pbox"><div class="lbl">COINCIDENCIA</div><div class="val v-coin '+cls+'">'+coinTxt+'</div></div>'+
       '<div class="pbox"><div class="lbl">COINC. PROMEDIO</div><div class="val v-run">'+(promScore!==null?promScore+"%":"—")+'</div></div>'+
     '</div>';
-    var mercadoVal,mercadoClass;
-if(lineaMercado&&lineaMercado.total!==null){ mercadoVal=lineaMercado.total+(lineaMercado.bookie?'<br><span style="font-size:9px;color:#555;">'+lineaMercado.bookie+'</span>':''); mercadoClass='val'; }
-else{ mercadoVal='N/C'; mercadoClass='val pendiente'; }
+    var mercadoVal, mercadoClass;
+
+    if (lineaMercado && (lineaMercado.moneyline_away_txt || lineaMercado.moneyline_home_txt)) {
+      mercadoVal =
+        '<div style="font-size:11px;color:#c9d1d9;">' + away + '</div>' +
+        '<div style="font-size:18px;color:#ffd60a;font-weight:900;">' + (lineaMercado.moneyline_away_txt || "N/C") + '</div>' +
+        '<div style="font-size:11px;color:#c9d1d9;margin-top:4px;">' + home + '</div>' +
+        '<div style="font-size:18px;color:#ffd60a;font-weight:900;">' + (lineaMercado.moneyline_home_txt || "N/C") + '</div>' +
+        '<div style="font-size:9px;color:#6e7681;margin-top:4px;">O/U ' +
+        (lineaMercado.total !== null && lineaMercado.total !== undefined ? lineaMercado.total : "N/C") +
+        (lineaMercado.moneyline_bookie ? ' · ' + lineaMercado.moneyline_bookie : '') +
+        '</div>';
+
+      mercadoClass = 'val';
+    } else if (lineaMercado && lineaMercado.total !== null) {
+      mercadoVal =
+        'O/U ' + lineaMercado.total +
+        (lineaMercado.bookie ? '<br><span style="font-size:9px;color:#555;">' + lineaMercado.bookie + '</span>' : '');
+
+      mercadoClass = 'val';
+    } else {
+      mercadoVal = 'N/C';
+      mercadoClass = 'val pendiente';
+    }
 
     var fhVal, fhClass, fhSub;
     if(factorH && factorH.confirmado && factorH.factor_final !== null && promRuns !== null){
