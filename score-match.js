@@ -35,8 +35,13 @@ function scoreMatch(today, h) {
 
   // --- interruptor de domo fijo (lee roof de estadios.js, ya cargado antes) ---
   let vientoCuenta = true;
-  if (typeof STADIUM_INDEX !== "undefined" && today.venueName) {
-    const s = STADIUM_INDEX.get(stadiumNorm(today.venueName));
+  if (today.venueName) {
+    let s = null;
+    if (typeof stadiumGet === "function") {
+      s = stadiumGet(today.venueName);
+    } else if (typeof STADIUM_INDEX !== "undefined") {
+      s = STADIUM_INDEX.get(stadiumNorm(today.venueName));
+    }
     if (s && s.roof === "fixed_dome") {
       vientoCuenta = false;
     }
@@ -56,13 +61,23 @@ function scoreMatch(today, h) {
 
   // direccion del viento solo cuenta si es el MISMO parque (igual que tu app)
   // y solo si el viento cuenta (en domo fijo tampoco aplica la direccion)
-  if (vientoCuenta && today.venueName && h.venueName && today.venueName === h.venueName) {
-    const td = Number(today.wind_dir);
-    const hd = Number(h.wind_dir);
-    if (Number.isFinite(td) && Number.isFinite(hd)) {
-      let dd = Math.abs(td - hd);
-      if (dd > 180) dd = 360 - dd;
-      score += Math.max(0, 10 - (dd / 18));
+  if (vientoCuenta && today.venueName && h.venueName) {
+    let todayVenue = today.venueName;
+    let histVenue = h.venueName;
+
+    if (typeof stadiumCanonName === "function") {
+      todayVenue = stadiumCanonName(todayVenue);
+      histVenue = stadiumCanonName(histVenue);
+    }
+
+    if (stadiumNorm(todayVenue) === stadiumNorm(histVenue)) {
+      const td = Number(today.wind_dir);
+      const hd = Number(h.wind_dir);
+      if (Number.isFinite(td) && Number.isFinite(hd)) {
+        let dd = Math.abs(td - hd);
+        if (dd > 180) dd = 360 - dd;
+        score += Math.max(0, 10 - (dd / 18));
+      }
     }
   }
 
