@@ -464,7 +464,14 @@
         var catcherAwayId=rosterHoy?rosterHoy.catcher_away_id:"NO_CONFIRMADO";
         var catcherHomeId=rosterHoy?rosterHoy.catcher_home_id:"NO_CONFIRMADO";
         var umpireHomeHoy=rosterHoy?rosterHoy.umpire_home:"NO_CONFIRMADO";
-        var lineaMercado=lineasCache?lineasBuscarVenue(venue):null;
+        var lineaMercado = null;
+if (lineasCache) {
+  if (typeof lineasBuscarJuego === "function") {
+    lineaMercado = lineasBuscarJuego(away, home, venue);
+  } else {
+    lineaMercado = lineasBuscarVenue(venue);
+  }
+}
 
         var factorH = { factor_final: null, confirmado: false, nota: "PENDIENTE" };
         try {
@@ -607,8 +614,8 @@
       '<div class="pbox"><div class="lbl">COINC. PROMEDIO</div><div class="val v-run">'+(promScore!==null?promScore+"%":"—")+'</div></div>'+
     '</div>';
     var mercadoVal,mercadoClass;
-    if(lineaMercado&&lineaMercado.total!==null){ mercadoVal=lineaMercado.total+(lineaMercado.bookie?'<br><span style="font-size:9px;color:#555;">'+lineaMercado.bookie+'</span>':''); mercadoClass='val'; }
-    else{ mercadoVal='N/C'; mercadoClass='val pendiente'; }
+if(lineaMercado&&lineaMercado.total!==null){ mercadoVal=lineaMercado.total+(lineaMercado.bookie?'<br><span style="font-size:9px;color:#555;">'+lineaMercado.bookie+'</span>':''); mercadoClass='val'; }
+else{ mercadoVal='N/C'; mercadoClass='val pendiente'; }
 
     var fhVal, fhClass, fhSub;
     if(factorH && factorH.confirmado && factorH.factor_final !== null && promRuns !== null){
