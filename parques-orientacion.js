@@ -10,6 +10,7 @@
 //
 // confianza: "exacta" = medicion GPS propia o grado citado puntual
 // "direccion" = solo direccion cardinal, sin grado fino
+// "aproximada" = coordenadas/imagen aproximada, no GPS exacto
 // "contradiccion" = fuentes se contradicen, sin resolver
 // "no_confirmado" = sin dato
 
@@ -19,7 +20,7 @@ var PARQUES_ORIENTACION = {
   "Yankee Stadium":           { hpACF: 75,    roof:"abierto",   confianza:"exacta", fuente:"GPS propio - coincide TickPick" },
   "Progressive Field":        { hpACF: 0,     roof:"abierto",   confianza:"exacta", fuente:"GPS propio - coincide exacto Clem's" },
   "Citizens Bank Park":       { hpACF: 9.5,   roof:"abierto",   confianza:"exacta", fuente:"GPS propio" },
-  "T-Mobile Park":            { hpACF: 54.5,  roof:"retractil", confianza:"exacta", fuente:"GPS propio - coincide Clem's" },
+  "T-Mobile Park":            { hpACF: 54.5,  roof:"retractil", confianza:"direccion", fuente:"ShadedSeats.com - captura usuario; grafico confirma orientacion NE aprox. Mantiene 54.5 de medicion previa" },
   "Petco Park":               { hpACF: 1.5,   roof:"abierto",   confianza:"exacta", fuente:"GPS propio - coincide Clem's" },
   "Comerica Park":            { hpACF: 150.5, roof:"abierto",   confianza:"exacta", fuente:"GPS propio - coincide Clem's (SSE)" },
   "Dodger Stadium":           { hpACF: 26,    roof:"abierto",   confianza:"exacta", fuente:"GPS propio verificado 5 jul 2026 (home 34.073413,-118.240223 / segunda 34.073726,-118.240038 / jardin central 34.074357,-118.239658) - distancia home-segunda 38.8m calza con oficial MLB (38.79m). Reemplaza 25.5 anterior." },
@@ -44,25 +45,25 @@ var PARQUES_ORIENTACION = {
     fuente:"GPS propio del usuario - verificado, campo visible, contra Shaded Seats/orientacion del rio",
     jardin_central:"39.096917,-84.505866", segunda_base:"39.097286,-84.506673", home_plate:"39.097470,-84.507044"
   },
-  "Chase Field":              { hpACF: 23,  roof:"retractil", confianza:"exacta",    fuente:"theshadium.com" },
+  "Chase Field":              { hpACF: 23,  roof:"retractil", confianza:"direccion", fuente:"ShadedSeats.com - captura usuario; grafico orientado NNE/NE aprox., sin grado exacto" },
   "Sutter Health Park": {
     hpACF: 330, roof:"abierto", confianza:"exacta",
     fuente:"theshadium.com - CAMBIO DE CRITERIO: pasada anterior rechazaba este valor (outlier) y usaba 56 por consenso; este documento lo adopta como decision tomada"
   },
-  "Globe Life Field":         { hpACF: 67.5, roof:"retractil", confianza:"direccion", fuente:"MLB.com/Rangers oficial - solo ENE, sin grado exacto" },
-  "loanDepot park":           { hpACF: 135,  roof:"retractil", confianza:"direccion", fuente:"shadedseats.com - solo SE, sin grado exacto" },
-  "Rogers Centre":            { hpACF: 0,    roof:"retractil", confianza:"direccion", fuente:"shadedseats.com - 'el bateador mira hacia el norte', sin grado exacto" },
+  "Globe Life Field":         { hpACF: 45,  roof:"retractil", confianza:"direccion", fuente:"ShadedSeats.com - captura usuario; texto: oriented to the northeast; reemplaza 67.5 ENE" },
+  "loanDepot Park":           { hpACF: 135, roof:"retractil", confianza:"direccion", fuente:"ShadedSeats.com - captura usuario; grafico y texto indican orientacion SE / home plate facing southeast aprox." },
+  "Rogers Centre":            { hpACF: 0,   roof:"retractil", confianza:"direccion", fuente:"ShadedSeats.com - captura usuario; bateador/home plate orientado hacia norte aproximado, sin grado exacto" },
   "Daikin Park": {
-    hpACF: 20, roof:"retractil", confianza:"contradiccion",
-    fuente:"shadedseats.com y wherestheshade.com dicen NNW/NW; houstonticketbrokers.com dice home plate mira NE (jardin central SO) - SIN RESOLVER, valor previo mantenido"
+    hpACF: 20, roof:"retractil", confianza:"direccion",
+    fuente:"ShadedSeats.com - captura usuario; grafico con brujula y trayectoria del sol; orientacion aproximada NE/NNE, sin grado exacto"
   },
   "American Family Field": {
-    hpACF: 330, roof:"retractil", confianza:"contradiccion",
-    fuente:"wherestheshade.com dice SE; theshadium.com dice NNW repetidamente - SIN RESOLVER, valor previo mantenido"
+    hpACF: 135, roof:"retractil", confianza:"direccion",
+    fuente:"ShadedSeats.com / Miller Park - captura usuario; texto: home plate facing southeast; reemplaza 330 en contradiccion"
   },
   "Tropicana Field": {
-    hpACF: null, roof:"domo_fijo", confianza:"no_confirmado",
-    fuente:"sin fuente citable de orientacion encontrada - domo fijo, se excluye del calculo de viento de todas formas"
+    hpACF: 222, roof:"domo_fijo", confianza:"aproximada",
+    fuente:"Coordenadas aproximadas del usuario desde satelite: CF 27.767650,-82.653893 / medio 27.768237,-82.653255 / HP 27.768734,-82.652649. Domo cerrado; solo para orientacion visual, viento exterior NO cuenta."
   }
 };
 
@@ -75,20 +76,25 @@ var PARQUES_ALIAS = {
   "UNIQLO Field at Dodger Stadium": "Dodger Stadium",
   "Camden Yards": "Oriole Park at Camden Yards",
   "AT&T Park": "Oracle Park",
-  "loanDepot Park": "loanDepot park",
-  "Raley Field": "Sutter Health Park"
+  "loanDepot park": "loanDepot Park",
+  "LoanDepot Park": "loanDepot Park",
+  "Marlins Park": "loanDepot Park",
+  "Miller Park": "American Family Field",
+  "Raley Field": "Sutter Health Park",
+  "Oakland Coliseum": "Sutter Health Park",
+  "Minute Maid Park": "Daikin Park"
 };
 
 // Busca la orientacion (hpACF) de un parque por nombre de venue, con
-// coincidencia difusa. Devuelve el numero de grados, o 45 (valor neutro)
-// si no encuentra nada o si el parque no tiene grado confirmado (null).
+// coincidencia difusa. Devuelve el numero de grados, o null
+// si no encuentra nada o si el parque no tiene grado confirmado.
 function getOrientacionParque(venue) {
-  if (!venue) return 45;
+  if (!venue) return null;
   var v = venue.toLowerCase();
 
   if (PARQUES_ORIENTACION[venue]) {
     var hp = PARQUES_ORIENTACION[venue].hpACF;
-    return (hp === null || hp === undefined) ? 45 : hp;
+    return (hp === null || hp === undefined) ? null : hp;
   }
 
   for (var alias in PARQUES_ALIAS) {
@@ -96,7 +102,7 @@ function getOrientacionParque(venue) {
       var real = PARQUES_ALIAS[alias];
       if (PARQUES_ORIENTACION[real]) {
         var hp2 = PARQUES_ORIENTACION[real].hpACF;
-        return (hp2 === null || hp2 === undefined) ? 45 : hp2;
+        return (hp2 === null || hp2 === undefined) ? null : hp2;
       }
     }
   }
@@ -104,7 +110,7 @@ function getOrientacionParque(venue) {
   for (var key in PARQUES_ORIENTACION) {
     if (v.indexOf(key.toLowerCase()) >= 0 || key.toLowerCase().indexOf(v) >= 0) {
       var hp3 = PARQUES_ORIENTACION[key].hpACF;
-      return (hp3 === null || hp3 === undefined) ? 45 : hp3;
+      return (hp3 === null || hp3 === undefined) ? null : hp3;
     }
   }
   for (var a in PARQUES_ALIAS) {
@@ -112,12 +118,12 @@ function getOrientacionParque(venue) {
       var real2 = PARQUES_ALIAS[a];
       if (PARQUES_ORIENTACION[real2]) {
         var hp4 = PARQUES_ORIENTACION[real2].hpACF;
-        return (hp4 === null || hp4 === undefined) ? 45 : hp4;
+        return (hp4 === null || hp4 === undefined) ? null : hp4;
       }
     }
   }
 
-  return 45;
+  return null;
 }
 
 function getInfoParque(venue) {
