@@ -17,6 +17,32 @@
 
   select { width:100%; padding:12px; font-size:15px; background:#161b22; color:#e6edf3; border:1px solid #30363d; border-radius:10px; margin-bottom:14px; }
 
+  /* ===== PANEL DE PROGRESO ===== */
+  .prog-panel { background:#161b22; border:1px solid #30363d; border-radius:14px; padding:12px; margin-bottom:12px; }
+  .prog-hdr { font-size:11px; color:#8b949e; font-weight:700; letter-spacing:0.5px; text-transform:uppercase; margin-bottom:8px; }
+  .prog-contadores { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px; }
+  .prog-cont { flex:1; min-width:90px; background:#0d1117; border:1px solid #30363d; border-radius:8px; padding:7px; text-align:center; }
+  .prog-cont .l { font-size:9px; color:#8b949e; text-transform:uppercase; }
+  .prog-cont .v { font-size:13px; font-weight:800; margin-top:2px; color:#e6edf3; }
+  .paso { display:flex; align-items:center; gap:8px; padding:4px 2px; font-size:12px; color:#8b949e; }
+  .paso .ic { width:18px; text-align:center; flex-shrink:0; }
+  .paso.pendiente { color:#6e7681; }
+  .paso.trabajando { color:#79c0ff; }
+  .paso.ok { color:#3fb950; }
+  .paso.error { color:#ff453a; }
+  .paso.noconf { color:#d29922; }
+
+  /* ===== PANEL DE CAPAS ===== */
+  .capas-panel { background:#161b22; border:1px solid #30363d; border-radius:14px; padding:12px; margin-bottom:12px; }
+  .capas-grid { display:flex; gap:6px; flex-wrap:wrap; }
+  .capa { flex:1; min-width:135px; background:#0d1117; border:1px solid #30363d; border-radius:8px; padding:7px 9px; display:flex; justify-content:space-between; align-items:center; gap:6px; }
+  .capa .n { font-size:10px; color:#c9d1d9; }
+  .capa .e { font-size:9px; font-weight:800; padding:2px 7px; border-radius:6px; flex-shrink:0; }
+  .e.ok { color:#3fb950; background:#0d2818; }
+  .e.noconf { color:#d29922; background:#2d2408; }
+  .e.nocon { color:#8b949e; background:#21262d; }
+  .e.esp { color:#6e7681; background:#161b22; }
+
   .parque-bloque { background:#161b22; border:1px solid #30363d; border-radius:14px; padding:14px; margin-bottom:14px; }
   .parque-titulo { font-size:16px; font-weight:800; margin-bottom:6px; text-align:center; }
 
@@ -38,6 +64,7 @@
   .v-pct.bajo { color:#ff7b72; }
   .v-pct.medio { color:#d29922; }
   .v-vel { color:#58a6ff; }
+  .v-n { color:#e6edf3; }
 
   .pitcher-lista-hdr { font-size:11px; color:#8b949e; font-weight:700; letter-spacing:0.5px; margin:12px 0 6px; text-transform:uppercase; }
   .pitcher-fila { background:#0d1117; border:1px solid #21262d; border-radius:8px; padding:8px 10px; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center; gap:8px; }
@@ -48,6 +75,7 @@
   .badge.apaleado { color:#ff453a; background:#2d0d0d; }
 
   #console { margin-top:16px; background:#010409; border:1px solid #30363d; border-radius:8px; padding:12px; min-height:50px; max-height:30vh; overflow:auto; font-family:ui-monospace,monospace; font-size:11px; white-space:pre-wrap; }
+  .console-hdr { font-size:10px; color:#6e7681; margin-top:14px; letter-spacing:0.5px; text-transform:uppercase; }
 </style>
 </head>
 <body>
@@ -59,9 +87,44 @@
 
   <button id="goJalar" class="go">JALAR PONCHES DE TODOS LOS ABRIDORES</button>
 
+  <!-- ===== PANEL DE PROGRESO ===== -->
+  <div class="prog-panel">
+    <div class="prog-hdr">Progreso del proceso</div>
+    <div class="prog-contadores">
+      <div class="prog-cont"><div class="l">Clima</div><div class="v" id="cntClima">esperando</div></div>
+      <div class="prog-cont"><div class="l">Pitchers</div><div class="v" id="cntPitchers">—</div></div>
+      <div class="prog-cont"><div class="l">Cruce clima</div><div class="v" id="cntCruce">—</div></div>
+      <div class="prog-cont"><div class="l">Parques disp.</div><div class="v" id="cntParques">—</div></div>
+      <div class="prog-cont"><div class="l">Resumen</div><div class="v" id="cntResumen">esperando</div></div>
+    </div>
+    <div class="paso pendiente" id="paso1"><span class="ic">○</span>1. Verificando cache de clima</div>
+    <div class="paso pendiente" id="paso2"><span class="ic">○</span>2. Actualizando clima de hoy (si jalarClima está disponible)</div>
+    <div class="paso pendiente" id="paso3"><span class="ic">○</span>3. Jalando historial de pitchers</div>
+    <div class="paso pendiente" id="paso4"><span class="ic">○</span>4. Cruzando pitchers con clima</div>
+    <div class="paso pendiente" id="paso5"><span class="ic">○</span>5. Armando parques / rangos de viento</div>
+    <div class="paso pendiente" id="paso6"><span class="ic">○</span>6. Resumen listo</div>
+  </div>
+
+  <!-- ===== PANEL DE CAPAS ===== -->
+  <div class="capas-panel">
+    <div class="prog-hdr">Paquetes / capas de datos</div>
+    <div class="capas-grid">
+      <div class="capa"><span class="n">Historial pitcher</span><span class="e esp" id="capaHist">esperando</span></div>
+      <div class="capa"><span class="n">IP ≥ 4.0</span><span class="e esp" id="capaIP">esperando</span></div>
+      <div class="capa"><span class="n">Ponches reales</span><span class="e esp" id="capaSO">esperando</span></div>
+      <div class="capa"><span class="n">Clima cache</span><span class="e esp" id="capaClima">esperando</span></div>
+      <div class="capa"><span class="n">Viento dirección</span><span class="e esp" id="capaViento">esperando</span></div>
+      <div class="capa"><span class="n">Parque/orientación</span><span class="e esp" id="capaOri">esperando</span></div>
+      <div class="capa"><span class="n">Línea mercado</span><span class="e nocon">NO_CONECTADO</span></div>
+      <div class="capa"><span class="n">Live ponches</span><span class="e nocon">NO_CONECTADO</span></div>
+    </div>
+  </div>
+
   <select id="selParque" style="display:none;"><option value="">— elegir parque —</option></select>
 
   <div id="resultado"></div>
+
+  <div class="console-hdr">Consola de auditoría técnica</div>
   <div id="console">Pulsa el botón (puede tardar, son ~150 pedidos, uno por pitcher).</div>
 </main>
 
@@ -81,6 +144,33 @@
 
   var registrosGlobal = null;
 
+  /* ===== helpers de progreso (solo presentación, no tocan datos) ===== */
+  var ICONO = { pendiente:"○", trabajando:"◐", ok:"●", error:"✕", noconf:"△" };
+  function setPaso(n, estado, extraTxt){
+    var el = document.getElementById("paso"+n);
+    if (!el) return;
+    el.className = "paso " + estado;
+    var base = el.textContent.replace(/^[○◐●✕△]\s*/,"");
+    if (extraTxt !== undefined) base = base.replace(/\s·.*$/,"") + " · " + extraTxt;
+    el.innerHTML = '<span class="ic">'+(ICONO[estado]||"○")+'</span>' + base;
+  }
+  function setCnt(id, txt){ var el = document.getElementById(id); if (el) el.textContent = txt; }
+  function setCapa(id, estado){
+    var el = document.getElementById(id);
+    if (!el) return;
+    if (estado === "OK") { el.className = "e ok"; el.textContent = "OK"; }
+    else if (estado === "NO_CONFIRMADO") { el.className = "e noconf"; el.textContent = "NO_CONFIRMADO"; }
+    else { el.className = "e esp"; el.textContent = estado; }
+  }
+
+  // Envuelve el log para reflejar contadores del jalador de pitchers si el
+  // texto trae "X/Y". No inventa números: solo espeja lo que la consola ya dice.
+  function logConProgreso(t){
+    log(t);
+    var m = /(\d+)\s*\/\s*(\d+)/.exec(String(t));
+    if (m) setCnt("cntPitchers", m[1] + "/" + m[2]);
+  }
+
   function pctClase(pct){
     if (pct === null) return "medio";
     if (pct >= 70) return "alto";
@@ -90,6 +180,20 @@
 
   function dibujarBrujula(venue, hp){
     var cx=100, cy=100;
+    var venueEsc = String(venue||"").replace(/&/g,"&amp;").replace(/"/g,"&quot;");
+
+    // REGLA DE DATOS: sin orientación medida no se dibuja campo rotado ni se
+    // finge un valor. Se muestra NO_CONFIRMADO.
+    if (hp === null || hp === undefined || isNaN(Number(hp))) {
+      return '<div class="brujula-wrap" data-venue="'+venueEsc+'" data-hp="">'+
+        '<svg viewBox="0 0 200 205">'+
+          '<circle cx="'+cx+'" cy="'+cy+'" r="95" fill="none" stroke="#333" stroke-width="1"/>'+
+          '<text x="'+cx+'" y="'+cy+'" fill="#8b949e" font-size="13" font-weight="700" text-anchor="middle">NO_CONFIRMADO</text>'+
+        '</svg>'+
+        '<div class="brujula-txt">'+venueEsc+' · orientación de parque sin medir</div>'+
+      '</div>';
+    }
+
     var puntos16=[
       {g:0,t:"N"},{g:22.5,t:"NNE"},{g:45,t:"NE"},{g:67.5,t:"ENE"},
       {g:90,t:"E"},{g:112.5,t:"ESE"},{g:135,t:"SE"},{g:157.5,t:"SSE"},
@@ -102,8 +206,6 @@
       cardHtml+='<g transform="rotate('+gAjustado+' '+cx+' '+cy+')"><text x="'+cx+'" y="14" font-size="9" font-weight="700" fill="#9b59ff" text-anchor="middle">'+p.t+'</text></g>';
       degHtml+='<g transform="rotate('+gAjustado+' '+cx+' '+cy+')"><text x="'+cx+'" y="38" font-size="7" font-weight="700" fill="#fff" text-anchor="middle">'+Math.round(p.g)+'°</text></g>';
     });
-
-    var venueEsc = String(venue||"").replace(/&/g,"&amp;").replace(/"/g,"&quot;");
 
     return '<div class="brujula-wrap" data-venue="'+venueEsc+'" data-hp="'+hp+'">'+
       '<svg viewBox="0 0 200 205">'+
@@ -155,7 +257,10 @@
 
   function actualizarBrujula(wrap, degVisual){
     var venue = wrap.getAttribute('data-venue');
-    var hp = Number(wrap.getAttribute('data-hp'))||45;
+    var hpRaw = wrap.getAttribute('data-hp');
+    if (hpRaw === "" || hpRaw === null) return; // orientación NO_CONFIRMADA: no se explora
+    var hp = Number(hpRaw);
+    if (isNaN(hp)) return;
     var degReal = ((degVisual + hp)%360+360)%360;
     var lo = Math.floor(degReal/30)*30, hi = lo+30;
     var vaHacia = (degReal+180)%360;
@@ -186,10 +291,11 @@
     var promVel = nVel ? (sumVel/nVel) : null;
 
     var statsHtml = '<div class="stat-row">'+
-      '<div class="stat-chip"><div class="l">Ponches prom</div><div class="v v-so">'+(promSO!==null?promSO.toFixed(1):"—")+'</div></div>'+
-      '<div class="stat-chip"><div class="l">IP prom</div><div class="v v-ip">'+(promIP!==null?promIP.toFixed(1):"—")+'</div></div>'+
-      '<div class="stat-chip"><div class="l">Llegó a 4ta</div><div class="v v-pct '+pctClase(pct4)+'">'+(pct4!==null?pct4.toFixed(0)+"%":"—")+'</div></div>'+
-      '<div class="stat-chip"><div class="l">Viento avg</div><div class="v v-vel">'+(promVel!==null?promVel.toFixed(1)+" mph":"—")+'</div></div>'+
+      '<div class="stat-chip"><div class="l">Aperturas</div><div class="v v-n">'+n+'</div></div>'+
+      '<div class="stat-chip"><div class="l">Ponches prom</div><div class="v v-so">'+(promSO!==null?promSO.toFixed(1):"NO_CONFIRMADO")+'</div></div>'+
+      '<div class="stat-chip"><div class="l">IP prom</div><div class="v v-ip">'+(promIP!==null?promIP.toFixed(1):"NO_CONFIRMADO")+'</div></div>'+
+      '<div class="stat-chip"><div class="l">Llegó a 4ta</div><div class="v v-pct '+pctClase(pct4)+'">'+(pct4!==null?pct4.toFixed(0)+"%":"NO_CONFIRMADO")+'</div></div>'+
+      '<div class="stat-chip"><div class="l">Viento avg</div><div class="v v-vel">'+(promVel!==null?promVel.toFixed(1)+" mph":"NO_CONFIRMADO")+'</div></div>'+
     '</div>';
 
     var listaHtml = '<div class="pitcher-lista-hdr">'+lo+'°–'+hi+'° (viene de) · '+n+' apertura(s)</div>';
@@ -240,7 +346,7 @@
   resultadoEl.addEventListener('pointercancel', function(){ dragging = false; });
 
   function dibujarParque(venue){
-    var hp = (typeof getOrientacionParque === "function") ? getOrientacionParque(venue) : 45;
+    var hp = (typeof getOrientacionParque === "function") ? getOrientacionParque(venue) : null;
     var equipo = (window.__venueEquipoMap && window.__venueEquipoMap[venue]) ? window.__venueEquipoMap[venue] : "";
     return '<div class="parque-bloque">'+
       '<div class="parque-titulo">'+(equipo?equipo+' · ':'')+venue+'</div>'+
@@ -253,21 +359,69 @@
   document.getElementById("goJalar").addEventListener("click", async function(){
     var btn = this; btn.disabled = true; btn.textContent = "JALANDO… (puede tardar varios minutos)";
     consoleEl.textContent = ""; resultadoEl.innerHTML = "";
+    selParque.style.display = "none";
+
+    // reset visual
+    for (var pi = 1; pi <= 6; pi++) setPaso(pi, "pendiente");
+    setCnt("cntClima","esperando"); setCnt("cntPitchers","—"); setCnt("cntCruce","—");
+    setCnt("cntParques","—"); setCnt("cntResumen","esperando");
+    ["capaHist","capaIP","capaSO","capaClima","capaViento","capaOri"].forEach(function(id){ setCapa(id,"esperando"); });
+
     try {
+      // ---- PASO 1: cache de clima ----
+      setPaso(1, "trabajando"); setCnt("cntClima","verificando");
+      var cacheClimaPre = (typeof climaLeerCache === "function") ? (climaLeerCache() || []) : [];
+      log("Cache de clima: " + cacheClimaPre.length + " registro(s).");
+      setPaso(1, "ok", cacheClimaPre.length + " registros");
+      setCapa("capaClima", cacheClimaPre.length ? "OK" : "NO_CONFIRMADO");
+
+      // ---- PASO 2: clima de hoy ----
       if (typeof jalarClima === "function") {
+        setPaso(2, "trabajando"); setCnt("cntClima","actualizando");
         log("Verificando cache de clima...");
         await jalarClima(log);
+        setPaso(2, "ok"); setCnt("cntClima","listo");
       } else {
         log("AVISO: jalarClima no disponible, se usará el cache de clima que ya exista.");
+        setPaso(2, "noconf", "jalarClima no disponible");
+        setCnt("cntClima", cacheClimaPre.length ? "solo cache" : "NO_CONFIRMADO");
       }
 
-      var res = await jalarPonchesTodos(log);
+      // ---- PASO 3: historial de pitchers ----
+      setPaso(3, "trabajando"); setCnt("cntPitchers","trabajando…");
+      var res = await jalarPonchesTodos(logConProgreso);
+      var nRegs = (res && res.registros) ? res.registros.length : 0;
+      setPaso(3, nRegs ? "ok" : "noconf", nRegs + " apertura(s)");
+      setCnt("cntPitchers", String(nRegs));
+      setCapa("capaHist", nRegs ? "OK" : "NO_CONFIRMADO");
+
+      var hayIP = false, haySO = false;
+      if (res && res.registros) {
+        for (var ri = 0; ri < res.registros.length; ri++) {
+          if (res.registros[ri].ip !== null && res.registros[ri].ip !== undefined) hayIP = true;
+          if (res.registros[ri].so !== null && res.registros[ri].so !== undefined) haySO = true;
+          if (hayIP && haySO) break;
+        }
+      }
+      setCapa("capaIP", hayIP ? "OK" : "NO_CONFIRMADO");
+      setCapa("capaSO", haySO ? "OK" : "NO_CONFIRMADO");
+
+      // ---- PASO 4: cruce con clima ----
+      setPaso(4, "trabajando");
       log("Cruzando con el clima...");
       var conClima = ponchesCruzarConClima(res.registros);
       var conClimaValido = conClima.filter(function(r){ return r.tiene_clima && r.wind_dir !== null; });
       log("Aperturas con clima confirmado: " + conClimaValido.length + " de " + conClima.length);
+      setPaso(4, conClimaValido.length ? "ok" : "noconf", conClimaValido.length + " de " + conClima.length);
+      setCnt("cntCruce", conClimaValido.length + "/" + conClima.length);
+      setCapa("capaViento", conClimaValido.length ? "OK" : "NO_CONFIRMADO");
 
       registrosGlobal = conClimaValido;
+
+      // ---- PASO 5: parques / rangos ----
+      setPaso(5, "trabajando");
+
+      setCapa("capaOri", (typeof getOrientacionParque === "function") ? "OK" : "NO_CONFIRMADO");
 
       // REGLA: siempre mostrar "Equipo · Parque". El equipo sale del
       // cache de clima (mismo dato que ya usa el resto de la app), no
@@ -292,14 +446,26 @@
         selParque.appendChild(o);
       });
       selParque.style.display = venuesList.length ? "block" : "none";
+      setPaso(5, venuesList.length ? "ok" : "noconf", venuesList.length + " parque(s)");
+      setCnt("cntParques", String(venuesList.length));
 
+      // ---- PASO 6: resumen ----
       if (!venuesList.length) {
         resultadoEl.innerHTML = '<div style="color:#8b949e;text-align:center;padding:20px;">Sin datos suficientes cruzados con clima todavía.</div>';
+        setPaso(6, "noconf", "sin parques");
+        setCnt("cntResumen","NO_CONFIRMADO");
       } else {
         log("Elige un parque en el selector para ver el detalle.");
+        setPaso(6, "ok", "elige un parque");
+        setCnt("cntResumen","listo");
       }
     } catch(e) {
       log("ERROR: " + (e && e.message ? e.message : e));
+      for (var pe = 1; pe <= 6; pe++) {
+        var elp = document.getElementById("paso"+pe);
+        if (elp && elp.className.indexOf("trabajando") !== -1) setPaso(pe, "error");
+      }
+      setCnt("cntResumen","error");
     } finally {
       btn.disabled = false; btn.textContent = "JALAR PONCHES DE TODOS LOS ABRIDORES";
     }
