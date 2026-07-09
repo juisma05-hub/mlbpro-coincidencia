@@ -99,15 +99,22 @@
 
   function log(t){ var d=document.createElement("div"); d.textContent=t; consoleEl.appendChild(d); consoleEl.scrollTop=consoleEl.scrollHeight; }
 
-  // FIX 5 jul 2026: el cache historico tiene el mismo parque guardado con
-  // dos nombres distintos ("Dodger Stadium" y "UNIQLO Field at Dodger
-  // Stadium"), segun que nombre devolvia la MLB API ese dia. venueCanon()
-  // traduce cualquiera de los dos al nombre canonico usando el mismo
-  // STADIUM_ALIAS_2026 de estadios.js. Se usa en LOS DOS LADOS de cada
-  // comparacion (el venue elegido en el <select> Y el g.venue de cada fila
-  // del cache) para que no importe con cual nombre quedo guardada cada fila.
+  // FIX 8 jul 2026: la version anterior de venueCanon() aqui hacia
+  // comparacion EXACTA de string contra las claves de STADIUM_ALIAS_2026
+  // (mayusculas/minusculas y espacios tenian que calzar caracter por
+  // caracter). stadiumCanonName() (definida en estadios.js, ya cargado en
+  // esta pagina) hace lo mismo pero ADEMAS normaliza (trim + minusculas)
+  // antes de comparar, y es la MISMA funcion que usan index.html y
+  // torear-ponches-test.html para canonizar nombres de parque. Esa
+  // discrepancia entre una version debil local y la maestra real era la
+  // causa de que un parque con historial real en cache mostrara "sin
+  // juegos en cache para este rango": el <select> agrupaba bajo un nombre
+  // y el filtro de la brujula buscaba con una variante que no calzaba
+  // exacto. Se deja el nombre venueCanon() igual para no tocar ningun otro
+  // punto de este archivo (todas las llamadas existentes se benefician
+  // automaticamente).
   function venueCanon(v) {
-    return (typeof STADIUM_ALIAS_2026 !== "undefined" && STADIUM_ALIAS_2026[v]) ? STADIUM_ALIAS_2026[v] : v;
+    return (typeof stadiumCanonName === "function") ? stadiumCanonName(v) : v;
   }
 
   function vientoFavorable(windDir, hpACF) {
