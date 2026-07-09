@@ -3,11 +3,26 @@
 // Usa scoreMatch (score-match.js) y el cache (clima-cache.js).
 // Replica tu logica: mapear con score, ordenar mayor a menor, top 5.
 // today = objeto clima del juego de hoy (con temperature_f, venueName, etc.)
+//
+// DIAGNOSTICO AGREGADO (no toca formula ni pesos):
+// cache_total_leido, mismo_parque, final_con_carreras, base_usada
+// Sirven para ver donde se recorta el cache antes de llegar al top 5.
 
 function calcularCoincidencia(today) {
   const hist = climaLeerCache();
+
+  const cacheTotalLeido = hist ? hist.length : 0;
+
   if (!hist || hist.length === 0) {
-    return { top: null, ranked: [], nota: "SIN CACHE - jala primero el historico" };
+    return {
+      top: null,
+      ranked: [],
+      nota: "SIN CACHE - jala primero el historico",
+      cache_total_leido: cacheTotalLeido,
+      mismo_parque: 0,
+      final_con_carreras: 0,
+      base_usada: 0
+    };
   }
 
   // mismo parque primero: filtra historicos del mismo venue si los hay
@@ -26,7 +41,9 @@ function calcularCoincidencia(today) {
 
   // solo juegos Final con carreras reales (excluye hoy y sin marcador)
   const baseFiltrada = base.filter(function(h){
-    return h.status === "Final" && h.home_runs !== null && h.home_runs !== undefined;
+    return h.status === "Final" &&
+      h.home_runs !== null && h.home_runs !== undefined &&
+      h.away_runs !== null && h.away_runs !== undefined;
   });
 
   // mapear cada historico con su score (tu logica linea 401-404)
@@ -48,5 +65,15 @@ function calcularCoincidencia(today) {
   const top = ranked[0] || null;
   const cls = top && top.score >= 80 ? "ok" : (top && top.score >= 60 ? "mid" : "bad");
 
-  return { top: top, ranked: ranked, cls: cls, base_usada: baseFiltrada.length };
+  return {
+    top: top,
+    ranked: ranked,
+    cls: cls,
+    base_usada: baseFiltrada.length,
+
+    // diagnostico de cache (agregado, no altera la logica de arriba)
+    cache_total_leido: cacheTotalLeido,
+    mismo_parque: mismoParque.length,
+    final_con_carreras: baseFiltrada.length
+  };
 }
