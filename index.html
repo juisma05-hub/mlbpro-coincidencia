@@ -508,8 +508,20 @@ if (lineasCache) {
                 var w=await climaFetchWeather(s,hoy,hoy);
         var keyTZ = climaKeyTZ(g.gameDate, s.timezone);
         var hit = w.get(keyTZ) || climaBuscarHoraCercana(w, keyTZ);
-
+        
+        if(!hit){
+          var cacheResp = climaLeerCache();
+          var respaldo = cacheResp.find(function(r){ return r.game_id === g.gamePk; });
+          if(!respaldo){
+            var venueHoyCanon = venueCanon(venue);
+            respaldo = cacheResp.find(function(r){ return r.date === hoy && venueCanon(r.venue) === venueHoyCanon; });
+          }
+          if(respaldo){
+            hit = { temperature_f: respaldo.temperature_f, windspeed_mph: respaldo.windspeed_mph, humidity_pct: respaldo.humidity_pct, precipitation_mm: respaldo.precipitation_mm, wind_dir: respaldo.wind_dir };
+          }
+        }
         if(!hit){ html+=tarjeta(away,home,venue,horaTxt,null,i,null,pitcherAway,pitcherHome,pitcherAwayId,pitcherHomeId,bloquesSerie,rosterMap,catcherAwayId,catcherHomeId,umpireHomeHoy,lineaMercado,factorH); continue; }
+
         var condHoy=await jalarCondition(g.gamePk);
         var today={temperature_f:hit.temperature_f,windspeed_mph:hit.windspeed_mph,humidity_pct:hit.humidity_pct,precipitation_mm:hit.precipitation_mm,wind_dir:hit.wind_dir,venueName:venue,condition:condHoy};
         log("condition "+venue+": "+condHoy);
