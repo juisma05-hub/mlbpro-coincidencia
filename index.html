@@ -189,9 +189,9 @@
 <script src="mlb-routes.js"></script>
 <script src="estadios.js"></script>
 <script src="clima-cache.js"></script>
+<script src="jalar-clima.js"></script>
 <script src="parques-orientacion.js?v=3"></script>
 <script src="rellenar-carreras.js"></script>
-<script src="jalar-clima.js"></script>
 <script src="score-match.js"></script>
 <script src="calcular-coincidencia.js"></script>
 <script src="jalar-condition.js"></script>
@@ -372,9 +372,14 @@
       var prom = carreras.length ? (carreras.reduce(function(a,b){return a+b;},0)/carreras.length) : null;
       var promV = vels.length ? (vels.reduce(function(a,b){return a+b;},0)/vels.length) : null;
       if(carrEl){
-        carrEl.textContent = juegos.length
-          ? prom.toFixed(1)+' carreras prom. ('+juegos.length+' juego(s)'+(promV!==null?' · '+promV.toFixed(1)+' mph avg':'')+')'
-          : 'sin juegos en cache para este rango';
+        if(!juegos.length){
+          carrEl.textContent = 'sin juegos en cache para este rango';
+        } else if(prom===null){
+          carrEl.textContent = juegos.length+' juego(s) en este rango · sin marcadores en cache'+(promV!==null?' · '+promV.toFixed(1)+' mph avg':'');
+        } else {
+          var sinMarcador = juegos.length - carreras.length;
+          carrEl.textContent = prom.toFixed(1)+' carreras prom. ('+carreras.length+' juego(s) con marcador'+(sinMarcador>0?' · '+sinMarcador+' sin marcador':'')+(promV!==null?' · '+promV.toFixed(1)+' mph avg':'')+')';
+        }
       }
     }catch(e){ if(carrEl) carrEl.textContent='ERROR: '+e.message; }
   }
@@ -618,14 +623,12 @@ if (lineasCache) {
 
     if (lineaMercado && (lineaMercado.moneyline_away_txt || lineaMercado.moneyline_home_txt)) {
       mercadoVal =
-        '<div style="font-size:11px;color:#c9d1d9;">' + away + '</div>' +
-        '<div style="font-size:18px;color:#ffd60a;font-weight:900;">' + (lineaMercado.moneyline_away_txt || "N/C") + '</div>' +
-        '<div style="font-size:11px;color:#c9d1d9;margin-top:4px;">' + home + '</div>' +
-        '<div style="font-size:18px;color:#ffd60a;font-weight:900;">' + (lineaMercado.moneyline_home_txt || "N/C") + '</div>' +
-        '<div style="font-size:9px;color:#6e7681;margin-top:4px;">O/U ' +
+        '<div style="font-size:20px;color:#ffd60a;font-weight:800;">' +
         (lineaMercado.total !== null && lineaMercado.total !== undefined ? lineaMercado.total : "N/C") +
-        (lineaMercado.moneyline_bookie ? ' · ' + lineaMercado.moneyline_bookie : '') +
-        '</div>';
+        '</div>' +
+        '<div style="font-size:10px;color:#c9d1d9;margin-top:4px;">' + away + ' <b style="color:#ffd60a;">' + (lineaMercado.moneyline_away_txt || "N/C") + '</b></div>' +
+        '<div style="font-size:10px;color:#c9d1d9;">' + home + ' <b style="color:#ffd60a;">' + (lineaMercado.moneyline_home_txt || "N/C") + '</b></div>' +
+        (lineaMercado.moneyline_bookie ? '<div style="font-size:9px;color:#6e7681;margin-top:3px;">' + lineaMercado.moneyline_bookie + '</div>' : '');
 
       mercadoClass = 'val';
     } else if (lineaMercado && lineaMercado.total !== null) {
