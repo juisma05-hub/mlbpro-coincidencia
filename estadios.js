@@ -36,9 +36,40 @@ const STADIUM_COORDS_2026 = [
   { venue:"Oracle Park", lat:37.7786, lon:-122.3893, timezone:"America/Los_Angeles", roof:"open" },
 ];
 
+// PIEZA AGREGADA 8 jul 2026: sedes especiales / neutral_site.
+// NO son parques estandar de las 30 franquicias. Se usan para que el clima,
+// viento, timezone y roof dejen de caer en ERR:VENUE_NOT_IN_TABLE cuando el
+// schedule trae un juego en una de estas sedes.
+//
+// especial:true marca explicitamente que NO deben tratarse como parque
+// estandar (no llevan park factor propio, no llevan orientacion medida).
+// No se agrega orientacion ni park_factor aqui: esos viven en
+// parques-orientacion.js y park-factors.js, que no se tocan. Al no aparecer
+// esos archivos con este venue, sus lookups devuelven NO_CONFIRMADO por
+// ausencia (comportamiento ya existente en index.html y
+// torear-ponches-test.html cuando getOrientacionParque devuelve undefined).
+//
+// Coordenadas verificadas (no aproximadas):
+// - Estadio Alfredo Harp Helu: Wikidata/Wikipedia (Serie Mexico, D-backs @ Padres, 25-26 abr 2026)
+// - Las Vegas Ballpark: Google Maps oficial (homestand Athletics, 8-14 jun 2026)
+// - Field of Dreams (Dyersville, Iowa): coordenadas cruzadas en 2 fuentes independientes (13 ago 2026, Twins vs Phillies)
+// - Historic Bowman Field (Williamsport, PA): latlong.net + direccion oficial (23 ago 2026, MLB Little League Classic)
+const STADIUM_ESPECIALES_2026 = [
+  { venue:"Estadio Alfredo Harp Helú", lat:19.4036, lon:-99.0853, timezone:"America/Mexico_City", roof:"open", especial:true, tipo:"neutral_site" },
+  { venue:"Las Vegas Ballpark", lat:36.1532, lon:-115.3310, timezone:"America/Los_Angeles", roof:"open", especial:true, tipo:"neutral_site" },
+  { venue:"Field of Dreams", lat:42.4980, lon:-91.0553, timezone:"America/Chicago", roof:"open", especial:true, tipo:"neutral_site" },
+  { venue:"Historic Bowman Field", lat:41.2423, lon:-77.0475, timezone:"America/New_York", roof:"open", especial:true, tipo:"neutral_site" },
+];
+
 const STADIUM_INDEX = new Map(
   STADIUM_COORDS_2026.map(function (s) { return [stadiumNorm(s.venue), s]; })
 );
+
+// las sedes especiales se agregan al mismo indice, sin mezclarse con el
+// array de los 30 parques estandar (STADIUM_COORDS_2026 queda intacto)
+STADIUM_ESPECIALES_2026.forEach(function (s) {
+  STADIUM_INDEX.set(stadiumNorm(s.venue), s);
+});
 
 // PIEZA AGREGADA 5 jul 2026: alias de venue por renombre de patrocinio.
 // Mantener este archivo como maestro de nombres para clima, lineas,
@@ -62,7 +93,14 @@ const STADIUM_ALIAS_2026 = {
   "Raley Field": "Sutter Health Park",
 
   "Camden Yards": "Oriole Park at Camden Yards",
-  "AT&T Park": "Oracle Park"
+  "AT&T Park": "Oracle Park",
+
+  // sedes especiales: variantes de nombre que puede traer el schedule de MLB
+  "Estadio Alfredo Harp Helu": "Estadio Alfredo Harp Helú",
+  "Alfredo Harp Helu Stadium": "Estadio Alfredo Harp Helú",
+  "Muncy Bank Ballpark at Historic Bowman Field": "Historic Bowman Field",
+  "Journey Bank Ballpark at Historic Bowman Field": "Historic Bowman Field",
+  "Bowman Field": "Historic Bowman Field"
 };
 
 Object.keys(STADIUM_ALIAS_2026).forEach(function(alias){
