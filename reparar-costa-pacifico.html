@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MLBPro · Reparar viento costa Pacífico</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:-apple-system,system-ui,sans-serif; background:#0d1117; color:#e6edf3; }
+  header { padding:14px 16px; border-bottom:1px solid #30363d; }
+  h1 { font-size:17px; margin:0; }
+  main { padding:16px; max-width:900px; margin:0 auto; }
+  .go { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#fff; background:#da3633; cursor:pointer; }
+  .go:disabled { background:#30363d; color:#8b949e; }
+  .go .sub2 { display:block; font-size:11px; font-weight:600; opacity:0.85; margin-top:3px; }
+  .aviso { background:#161b22; border:1px solid #30363d; border-radius:10px; padding:12px; font-size:13px; color:#c9d1d9; margin-top:12px; }
+  .aviso b { color:#ffd60a; }
+  #resumen { display:none; background:#161b22; border:1px solid #238636; border-radius:10px; padding:14px; margin-top:14px; }
+  #resumen .titulo { font-size:14px; font-weight:800; color:#3fb950; margin-bottom:8px; }
+  #resumen .fila { font-size:13px; color:#c9d1d9; padding:3px 0; }
+  #resumen .fila b { color:#fff; }
+  #console { margin-top:16px; background:#010409; border:1px solid #30363d; border-radius:8px; padding:12px; min-height:60px; max-height:50vh; overflow:auto; font-family:ui-monospace,monospace; font-size:12px; white-space:pre-wrap; }
+</style>
+</head>
+<body>
+<header><h1>Reparar viento · SOLO costa Pacífico (Dodgers, Oracle, Petco, T-Mobile)</h1></header>
+<main>
+  <button id="go" class="go">RESETEAR Y REPARAR 4 PARQUES<span class="sub2">Recupera gameDate real de MLB StatsAPI, convierte a hora local del estadio, rellena desde Open-Meteo Archive. No toca ningún otro parque.</span></button>
+
+  <div class="aviso">
+    Esta herramienta afecta <b>únicamente</b> filas cuyo estadio tenga <b>timezone === "America/Los_Angeles"</b>
+    (Dodger Stadium, Oracle Park, Petco Park, T-Mobile Park). Primero resetea a vacío
+    <b>wind_dir, windspeed_mph, temperature_f, humidity_pct, precipitation_mm</b> de esas filas
+    —porque un dato malo se ve igual que uno bueno—, luego las reconstruye desde cero usando
+    el <b>game_id</b> para pedir el <b>gameDate</b> real a MLB StatsAPI, convertirlo a hora local
+    del estadio, y buscar el clima real en Open-Meteo Archive. Lo que no se pueda confirmar
+    queda como <b>NO_CONFIRMADO</b>, nunca inventado. Ningún otro parque se toca.
+  </div>
+
+  <div id="resumen">
+    <div class="titulo">RESUMEN DE LA REPARACIÓN</div>
+    <div class="fila">Filas en scope (4 parques): <b id="rScope">—</b></div>
+    <div class="fila">✅ Reparadas con dato real: <b id="rOk">—</b></div>
+    <div class="fila">⛔ Sin gameDate recuperable (game_id no encontrado en StatsAPI): <b id="rSinGameDate">—</b></div>
+    <div class="fila">⛔ Sin dato en archive (exacto ni ±3h): <b id="rSinDato">—</b></div>
+    <div class="fila">Quedan sin wind_dir después: <b id="rRestan">—</b></div>
+  </div>
+
+  <div id="console">Pulsa el botón. Solo toca las 4 venues de la costa Pacífico.</div>
+</main>
+
+<!-- NO_CONFIRMADO: reemplaza por el script real que define MLB_ROUTES en tu proyecto -->
+<script src="mlb-routes.js"></script>
+<script src="estadios.js"></script>
+<script src="clima-cache.js"></script>
+<script>
+  var consoleEl = document.getElementById("console");
+  function log(t){ var d=document.createElement("div"); d.textContent=t; consoleEl.appendChild(d); consoleEl.scrollTop=consoleEl.scrollHeight; }
+
+  var SCOPE_TZ = "America/Los_Angeles";
+
+  function estadioDe(venue){
+    if (typeof stadiumGet === "function") return stadiumGet(venue);
+    if (typeof STADIUM_INDEX !== "undefined" && typeof stadiumNorm === "function") return STADIUM_INDEX.get(stadiumNorm(venue));
+    return null;
+  }
+
+  function enScope(r){
+    var s = estadioDe(r.venue);
+    return !!(s && s.timezone === SCOPE_TZ);
+  }
+
+  // Recupera gameDate (UTC) real desde MLB StatsAPI usando game_id.
+  // Se consulta en lotes de 25 para no exceder límites de URL.
+  async function recuperarGameDates(gameIds) {
+    var map = new Map();
+    var LOTE = 25;
+    for (var i = 0; i < gameIds.length; i += LOTE) {
+      var lote = gameIds.slice(i, i + LOTE);
+      var mlbUrl = "https://statsapi.mlb.com/api/v1/schedule?gamePks=" + lote.join(",");
+      var url = MLB_ROUTES.WORKER_BASE + encodeURIComponent(mlbUrl);
+      var res = await fetch(url);
+      if (!res.ok) { log("  ⛔ SCHEDULE HTTP " + res.status + " (lote " + (i/LOTE+1) + ")"); continue; }
+      var data = await res.json();
+      (data.dates || []).forEach(function(day){
+        (day.games || []).forEach(function(g){
+          map.set(g.gamePk, g.gameDate);
+        });
+      });
+    }
+    return map;
+  }
+
+  document.getElementById("go").addEventListener("click", async function(){
+    var btn = this; btn.disabled = true; btn.textContent = "REPARANDO…";
+    consoleEl.textContent = "";
+    document.getElementById("resumen").style.display = "none";
+
+    try {
+      var cache = climaLeerCache() || [];
+      var filas = cache.filter(enScope);
+      log("Filas en scope (4 parques Pacífico): " + filas.length);
+
+      if (!filas.length) {
+        log("No hay filas de Dodger/Oracle/Petco/T-Mobile en el cache. Nada que hacer.");
+        return;
+      }
+
+      // Paso 1: reset completo de las 5 columnas de clima SOLO en estas filas.
+      filas.forEach(function(r){
+        r.wind_dir = "";
+        r.windspeed_mph = "";
+        r.temperature_f = "";
+        r.humidity_pct = "";
+        r.precipitation_mm = "";
+      });
+      log("Reseteadas " + filas.length + " filas. Otros parques: intactos.");
+
+      // Paso 2: recuperar gameDate real por game_id.
+      var gameIds = filas.map(function(r){ return r.game_id; }).filter(function(id){ return id != null; });
+      log("Consultando gameDate real en StatsAPI para " + gameIds.length + " game_id...");
+      var gameDates = await recuperarGameDates(gameIds);
+      log("gameDate recuperados: " + gameDates.size + " / " + gameIds.length);
+
+      // Paso 3: agrupar por estadio para pedir UN archive por parque (no por fila).
+      var grupos = {}; // key: nombre canónico -> { stadium, fechas:Set, filas:[] }
+      var nSinGameDate = 0;
+
+      filas.forEach(function(r){
+        var gd = gameDates.get(r.game_id);
+        if (!gd) { nSinGameDate++; log("  ⛔ game_id " + r.game_id + " (" + r.date + " " + r.venue + ") → gameDate NO_CONFIRMADO"); return; }
+        r._gameDateTemp = gd; // temporal, se borra al final
+
+        var s = estadioDe(r.venue);
+        var k = s.name || s.venue || String(r.venue);
+        if (!grupos[k]) grupos[k] = { stadium: s, fechas: {}, filas: [] };
+        // Se agrupa por la fecha LOCAL del estadio, no por r.date (que puede ser fecha de calendario UTC).
+        var fechaLocal = climaKeyTZ(gd, s.timezone).slice(0, 10);
+        grupos[k].fechas[fechaLocal] = true;
+        grupos[k].filas.push(r);
+      });
+
+      var hoy = climaHoyISO();
+      var limiteArchive = climaSumarDias(hoy, -2);
+
+      var nOk = 0, nSinDato = 0;
+      var nombres = Object.keys(grupos);
+
+      for (var g = 0; g < nombres.length; g++) {
+        var grupo = grupos[nombres[g]];
+        var fechas = Object.keys(grupo.fechas).sort();
+        if (!fechas.length) continue;
+
+        var desde = fechas[0];
+        var hasta = fechas[fechas.length - 1];
+        if (hasta > limiteArchive) hasta = limiteArchive;
+        if (desde > hasta) {
+          log(nombres[g] + ": fechas muy recientes, archive aún no las tiene. Se saltan.");
+          nSinDato += grupo.filas.length;
+          continue;
+        }
+
+        log(nombres[g] + ": archive " + desde + " → " + hasta + " (" + grupo.filas.length + " fila(s))");
+
+        var m;
+        try {
+          m = await climaFetchArchive(grupo.stadium, desde, hasta);
+        } catch (eA) {
+          log("  ⛔ archive falló: " + (eA && eA.message ? eA.message : eA));
+          nSinDato += grupo.filas.length;
+          continue;
+        }
+
+        for (var f = 0; f < grupo.filas.length; f++) {
+          var fila = grupo.filas[f];
+          var keyLocal = climaKeyTZ(fila._gameDateTemp, grupo.stadium.timezone);
+
+          // Hora exacta primero; si no, ±3h con cruce de medianoche real (climaBuscarHoraCercana).
+          var hit = m.get(keyLocal) || climaBuscarHoraCercana(m, keyLocal);
+
+          if (!hit || hit.wind_dir === undefined || hit.wind_dir === null) {
+            nSinDato++;
+            log("  ⛔ " + fila.date + " " + (fila.away_team||"?") + " @ " + (fila.home_team||"?") + " → sin dato en archive");
+            continue;
+          }
+
+          fila.wind_dir = hit.wind_dir;
+          fila.windspeed_mph = hit.windspeed_mph;
+          fila.temperature_f = hit.temperature_f;
+          fila.humidity_pct = hit.humidity_pct;
+          fila.precipitation_mm = hit.precipitation_mm;
+          nOk++;
+        }
+      }
+
+      // Limpieza del campo temporal.
+      filas.forEach(function(r){ delete r._gameDateTemp; });
+
+      climaGuardarCache(cache);
+
+      var restan = 0;
+      filas.forEach(function(r){ if (r.wind_dir === "" || r.wind_dir === undefined || r.wind_dir === null) restan++; });
+
+      log("");
+      log("GUARDADO. Reparadas: " + nOk + " · sin gameDate: " + nSinGameDate + " · sin dato archive: " + nSinDato + " · restan sin viento: " + restan);
+      log("LISTO. Solo se tocaron filas de Dodger Stadium, Oracle Park, Petco Park y T-Mobile Park.");
+
+      document.getElementById("rScope").textContent = filas.length;
+      document.getElementById("rOk").textContent = nOk;
+      document.getElementById("rSinGameDate").textContent = nSinGameDate;
+      document.getElementById("rSinDato").textContent = nSinDato;
+      document.getElementById("rRestan").textContent = restan;
+      document.getElementById("resumen").style.display = "block";
+
+    } catch (e) {
+      log("ERROR: " + (e && e.message ? e.message : e));
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = 'RESETEAR Y REPARAR 4 PARQUES<span class="sub2">Recupera gameDate real de MLB StatsAPI, convierte a hora local del estadio, rellena desde Open-Meteo Archive. No toca ningún otro parque.</span>';
+    }
+  });
+</script>
+</body>
+</html>
