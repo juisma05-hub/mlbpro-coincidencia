@@ -11,6 +11,15 @@
 // CORREGIDO 9 jul 2026: gameDate de MLB viene en UTC. Para buscar clima
 // por hora, se convierte a hora local del parque usando climaKeyTZ().
 // Esto evita fallo de hora en costa oeste: San Francisco, Dodgers, Seattle.
+//
+// CORREGIDO 9 jul 2026 (segunda pasada): el match de hora era exacto
+// solamente (c.get(gameLocal)). Si la hora exacta no estaba en el mapa de
+// clima, el registro quedaba ERR:NO_HOUR_MATCH aunque hubiera dato real
+// 1-3 horas cerca. Se agrega climaBuscarHoraCercana() como respaldo, misma
+// función ya usada en clima-cache.js y en index.html. Ademas, ahora se
+// guarda game_time (gameDate en UTC) en cada fila del cache: sin esto,
+// rellenar-viento.html no tenia forma de saber la hora real del juego para
+// reparar filas viejas.
 
 async function jalarClima(logFn) {
   function log(t) { if (typeof logFn === "function") logFn(t); }
@@ -129,7 +138,7 @@ async function jalarClima(logFn) {
         // WeatherAPI guarda horas locales del parque.
         // Usar siempre la hora LOCAL del estadio para evitar fallo en costa oeste.
         const gameLocal = climaKeyTZ(g.gameDate, tz);
-        const hit = c.get(gameLocal);
+        const hit = c.get(gameLocal) || climaBuscarHoraCercana(c, gameLocal);
 
         if (!hit) {
           const e3 = "ERR:NO_HOUR_MATCH";
@@ -144,6 +153,7 @@ async function jalarClima(logFn) {
     const pit = pitchersMap.get(g.game_id);
     nuevos.push({
       date: g.date, game_id: g.game_id,
+      game_time: g.gameDate,
       home_team: g.home_team, away_team: g.away_team,
       venue: g.venue, status: g.status,
       temperature_f: w.temperature_f, windspeed_mph: w.windspeed_mph,
