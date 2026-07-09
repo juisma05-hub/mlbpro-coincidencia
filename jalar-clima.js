@@ -7,6 +7,10 @@
 // no guardaba esto, y por eso F5 (perfil pitcher histórico) no tenía forma
 // de armarse. Se pide solo para juegos Final (mismo patrón que las carreras),
 // para no gastar llamadas de más.
+//
+// CORREGIDO 9 jul 2026: gameDate de MLB viene en UTC. Para buscar clima
+// por hora, se convierte a hora local del parque usando climaKeyTZ().
+// Esto evita fallo de hora en costa oeste: San Francisco, Dodgers, Seattle.
 
 async function jalarClima(logFn) {
   function log(t) { if (typeof logFn === "function") logFn(t); }
@@ -121,9 +125,12 @@ async function jalarClima(logFn) {
         const e2 = "ERR:WEATHERAPI";
         w = { temperature_f: e2, windspeed_mph: e2, wind_dir: e2, precipitation_mm: e2, humidity_pct: e2 };
       } else {
-        // WeatherAPI da hora local — usar directamente sin convertir timezone
-        const gameLocal = g.gameDate.replace("Z","").slice(0,16); // "2026-06-29T14:00"
-        const hit = c.get(gameLocal) || c.get(climaKeyTZ(g.gameDate, tz));
+        // MLB gameDate viene en UTC.
+        // WeatherAPI guarda horas locales del parque.
+        // Usar siempre la hora LOCAL del estadio para evitar fallo en costa oeste.
+        const gameLocal = climaKeyTZ(g.gameDate, tz);
+        const hit = c.get(gameLocal);
+
         if (!hit) {
           const e3 = "ERR:NO_HOUR_MATCH";
           w = { temperature_f: e3, windspeed_mph: e3, wind_dir: e3, precipitation_mm: e3, humidity_pct: e3 };
