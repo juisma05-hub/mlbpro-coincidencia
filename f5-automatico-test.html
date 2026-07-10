@@ -22,6 +22,16 @@
   .proy { margin-top:8px; padding-top:8px; border-top:1px dashed #30363d; }
   .proy .lbl { color:#ffd60a; font-weight:800; }
   .detalle summary { cursor:pointer; color:#79c0ff; font-size:12px; margin-top:6px; }
+  .equipos { display:flex; justify-content:space-between; font-size:16px; font-weight:800; color:#e6edf3; margin-bottom:2px; }
+  .venue { font-size:11.5px; color:#8b949e; margin-bottom:8px; }
+  .congelada { font-size:11.5px; color:#79c0ff; margin-bottom:8px; }
+  .mercado { background:#0d1117; border:1px solid #30363d; border-radius:8px; padding:8px 10px; margin-bottom:8px; }
+  .mercado-titulo { font-size:11px; text-transform:uppercase; letter-spacing:0.4px; color:#8b949e; font-weight:700; margin-bottom:4px; }
+  .mercado-fila { display:flex; justify-content:space-between; font-size:13.5px; padding:2px 0; }
+  .mercado-fila span:first-child { color:#c9d1d9; }
+  .mercado-fila span:last-child { font-weight:800; color:#e6edf3; }
+  .reservado { background:#0d1117; border:1px dashed #30363d; border-radius:8px; padding:8px 10px; margin-bottom:8px; font-size:12px; color:#6e7681; }
+  .reservado div { padding:2px 0; }
 </style>
 </head>
 <body>
@@ -79,32 +89,69 @@
         var partes = r.juego.split(" @ ");
         var awayNombre = partes[0] || "Away";
         var homeNombre = partes[1] || "Home";
-        var favoritoTxt = "N/C";
-        if (lm && lm.moneylineF5 && typeof lm.moneylineF5.home_price === "number" && typeof lm.moneylineF5.away_price === "number") {
-          var hp = lm.moneylineF5.home_price, ap = lm.moneylineF5.away_price;
-          var favHome = hp < ap;
-          favoritoTxt = favHome ? (homeNombre + " favorito (" + hp + ")") : (awayNombre + " favorito (" + ap + ")");
+
+        function fmtAmerican(n) {
+          if (typeof n !== "number" || isNaN(n)) return "N/C";
+          return (n > 0 ? "+" : "") + n;
+        }
+        function fmtPoint(n) {
+          if (typeof n !== "number" || isNaN(n)) return "N/C";
+          return (n > 0 ? "+" : "") + n;
         }
 
-        var resumenHtml = '<div class="resumen">'+
-          '<div><b>⭐ Favorito (mercado)'+congelTxt+':</b> '+favoritoTxt+'</div>'+
-        '</div>';
+        var mlAwayTxt = (lm && lm.moneylineF5) ? fmtAmerican(lm.moneylineF5.away_price) : "N/C";
+        var mlHomeTxt = (lm && lm.moneylineF5) ? fmtAmerican(lm.moneylineF5.home_price) : "N/C";
 
-        /* ESPACIO RESERVADO: aquí van, cuando estén listos y confirmados uno
-           por uno (no se inventa nada todavía):
-             - Línea F5
-             - Proyección F5
-             - Clima
-             - Brújula
-             - Trayectoria del viento
-           Se quitó de aquí, a pedido explícito: el bloque de "Proyección
-           temprana" (xERA sin lineup) y el lean automático Over/Under que
-           se calculaba comparando esa proyección contra la línea de
-           mercado. Esa lógica no forma parte del F5 final (F5 se mide
-           desde el primer pitcheo hasta cerrar la baja de la 5ta, no antes
-           de que el juego empiece). */
+        // CONFIRMADO en jalar-linea-f5.js: runlineF5.point es el punto del
+        // HOME (se lee de outsR[o2].point cuando outsR[o2].name === home).
+        // El punto del away no se guarda como campo propio, pero en un
+        // mercado de spread de 2 vías el punto contrario es siempre la
+        // negación exacta del otro (estructura del mercado, no un dato
+        // inventado). rlHomePointTxt/rlAwayPointTxt usan ese único campo
+        // real (.point) tal cual, solo con el signo invertido para away.
+        var rlHomePointTxt = (lm && lm.runlineF5 && typeof lm.runlineF5.point === "number") ? fmtPoint(lm.runlineF5.point) : "N/C";
+        var rlAwayPointTxt = (lm && lm.runlineF5 && typeof lm.runlineF5.point === "number") ? fmtPoint(-lm.runlineF5.point) : "N/C";
 
-        html += '<div class="juego"><h3>'+r.juego+' — '+(r.venue||"?")+'</h3>'+
+        var totalPointTxt = (lm && lm.totalF5 && typeof lm.totalF5.point === "number") ? lm.totalF5.point : "N/C";
+        var totalOverTxt = (lm && lm.totalF5) ? fmtAmerican(lm.totalF5.over_price) : "N/C";
+        var totalUnderTxt = (lm && lm.totalF5) ? fmtAmerican(lm.totalF5.under_price) : "N/C";
+
+        var resumenHtml =
+          '<div class="equipos">'+
+            '<div class="equipo">'+awayNombre+'</div>'+
+            '<div class="equipo">'+homeNombre+'</div>'+
+          '</div>'+
+          '<div class="venue">'+(r.venue||"?")+'</div>'+
+          (congelTxt ? '<div class="congelada">🧊 línea CONGELADA pre-juego</div>' : '')+
+          '<div class="mercado">'+
+            '<div class="mercado-titulo">Moneyline F5</div>'+
+            '<div class="mercado-fila"><span>Away</span><span>'+mlAwayTxt+'</span></div>'+
+            '<div class="mercado-fila"><span>Home</span><span>'+mlHomeTxt+'</span></div>'+
+          '</div>'+
+          '<div class="mercado">'+
+            '<div class="mercado-titulo">Run Line F5</div>'+
+            '<div class="mercado-fila"><span>Away</span><span>'+rlAwayPointTxt+'</span></div>'+
+            '<div class="mercado-fila"><span>Home</span><span>'+rlHomePointTxt+'</span></div>'+
+          '</div>'+
+          '<div class="mercado">'+
+            '<div class="mercado-titulo">Total F5</div>'+
+            '<div class="mercado-fila"><span>O '+totalPointTxt+'</span><span>'+totalOverTxt+'</span></div>'+
+            '<div class="mercado-fila"><span>U '+totalPointTxt+'</span><span>'+totalUnderTxt+'</span></div>'+
+          '</div>'+
+          '<div class="reservado">'+
+            '<div>🌡️ Clima — pendiente</div>'+
+            '<div>🧭 Brújula — pendiente</div>'+
+            '<div>💨 Trayectoria del viento — pendiente</div>'+
+            '<div>📈 Línea MLBPro — pendiente</div>'+
+            '<div>🎯 Score proyectado — pendiente</div>'+
+          '</div>';
+
+        /* ESPACIO RESERVADO (ver arriba, sección .reservado): Clima,
+           Brújula, Trayectoria del viento, Línea MLBPro y Score proyectado
+           se agregan cuando cada pieza esté lista y confirmada, una por
+           una — no se inventa nada todavía. */
+
+        html += '<div class="juego">'+
           resumenHtml+
           '<details class="detalle"><summary>Ver detalle completo</summary>'+
           '<div><b>Coincidencia:</b> '+r.coincidencia.estado+' ('+r.coincidencia.confirmados+')</div>'+
