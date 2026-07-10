@@ -70,16 +70,6 @@
       var resultados = await f5AutomaticoHoy(log);
       var html = "";
       resultados.forEach(function(r){
-        var py = r.proyeccionTemprana;
-        var pyHtml = "";
-        if (py && py.estado === "PROYECTADO") {
-          pyHtml = '<div class="proy"><span class="lbl">PROYECCIÓN TEMPRANA (solo xERA, sin lineup):</span><br>'+
-            'Carreras proy. home: '+py.carrerasHomeProy+' · Carreras proy. away: '+py.carrerasAwayProy+' · Total proy.: '+py.totalProyectado+
-            '</div>';
-        } else {
-          pyHtml = '<div class="proy"><span class="lbl">PROYECCIÓN TEMPRANA:</span> '+(py?py.estado:'SIN_DATOS')+'</div>';
-        }
-
         var lm = r.lineaMercadoF5;
         var congelTxt = (lm && lm.congelada) ? " 🧊 (línea CONGELADA pre-juego)" : "";
         var mlTxt = (lm && lm.moneylineF5) ? ('Home '+lm.moneylineF5.home_price+' / Away '+lm.moneylineF5.away_price) : 'N/C';
@@ -95,17 +85,24 @@
           var favHome = hp < ap;
           favoritoTxt = favHome ? (homeNombre + " favorito (" + hp + ")") : (awayNombre + " favorito (" + ap + ")");
         }
-        var ouLeanTxt = "N/C";
-        if (py && py.estado === "PROYECTADO" && lm && lm.totalF5 && typeof lm.totalF5.point === "number") {
-          var dif = py.totalProyectado - lm.totalF5.point;
-          if (Math.abs(dif) < 0.3) ouLeanTxt = "cerca de la línea (" + py.totalProyectado + " vs " + lm.totalF5.point + ")";
-          else ouLeanTxt = (dif < 0 ? "UNDER" : "OVER") + " (proy. " + py.totalProyectado + " vs línea " + lm.totalF5.point + ")";
-        }
 
         var resumenHtml = '<div class="resumen">'+
           '<div><b>⭐ Favorito (mercado)'+congelTxt+':</b> '+favoritoTxt+'</div>'+
-          '<div><b>📊 Over/Under (proyección temprana vs mercado):</b> '+ouLeanTxt+'</div>'+
         '</div>';
+
+        /* ESPACIO RESERVADO: aquí van, cuando estén listos y confirmados uno
+           por uno (no se inventa nada todavía):
+             - Línea F5
+             - Proyección F5
+             - Clima
+             - Brújula
+             - Trayectoria del viento
+           Se quitó de aquí, a pedido explícito: el bloque de "Proyección
+           temprana" (xERA sin lineup) y el lean automático Over/Under que
+           se calculaba comparando esa proyección contra la línea de
+           mercado. Esa lógica no forma parte del F5 final (F5 se mide
+           desde el primer pitcheo hasta cerrar la baja de la 5ta, no antes
+           de que el juego empiece). */
 
         html += '<div class="juego"><h3>'+r.juego+' — '+(r.venue||"?")+'</h3>'+
           resumenHtml+
@@ -117,7 +114,6 @@
           '<div><b>Línea mercado F5 (Run Line):</b> '+rlTxt+'</div>'+
           '<div><b>Línea mercado F5 (Money Line):</b> '+mlTxt+'</div>'+
           '<div><b>Línea mercado F5 (Over/Under):</b> '+ouTxt+'</div>'+
-          pyHtml+
           '</details>'+
         '</div>';
       });
