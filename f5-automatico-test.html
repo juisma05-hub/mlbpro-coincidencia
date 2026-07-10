@@ -123,6 +123,20 @@
         }
         function nc(v) { return (v === null || v === undefined || v === "" || (typeof v === "number" && isNaN(v))); }
 
+        // Detalle real de Carreraje F5, tal cual lo devuelve f5-carreraje.js
+        // (no se toca ni se reinterpreta ese archivo). Se muestran solo los
+        // campos que el objeto realmente trae en cada estado: estado siempre
+        // existe; dominioPitcher/wobaEsperado solo cuando llegó a
+        // "PENDIENTE POR ACCESO"; detalle casi siempre viene.
+        function detalleCarreraje(c) {
+          if (!c) return "NO_CONFIRMADO";
+          var partes = [c.estado];
+          if (typeof c.dominioPitcher === "string" && c.dominioPitcher) partes.push("Dominio: " + c.dominioPitcher);
+          if (typeof c.wobaEsperado === "number" && !isNaN(c.wobaEsperado)) partes.push("wOBA esp.: " + c.wobaEsperado.toFixed(3));
+          if (typeof c.detalle === "string" && c.detalle) partes.push(c.detalle);
+          return partes.join("<br>");
+        }
+
         var mlAwayTxt = (lm && lm.moneylineF5) ? fmtAmerican(lm.moneylineF5.away_price) : "N/C";
         var mlHomeTxt = (lm && lm.moneylineF5) ? fmtAmerican(lm.moneylineF5.home_price) : "N/C";
 
@@ -186,8 +200,8 @@
         var medicionesHtml =
           '<div class="mediciones">'+
             '<div class="medicion"><div class="t">Coincidencia</div><div class="v">'+r.coincidencia.estado+' ('+r.coincidencia.confirmados+')</div></div>'+
-            '<div class="medicion"><div class="t">Carreraje Home</div><div class="v">'+r.carrerajeHome.estado+'</div></div>'+
-            '<div class="medicion"><div class="t">Carreraje Away</div><div class="v">'+r.carrerajeAway.estado+'</div></div>'+
+            '<div class="medicion"><div class="t">Carreraje Home</div><div class="v">'+detalleCarreraje(r.carrerajeHome)+'</div></div>'+
+            '<div class="medicion"><div class="t">Carreraje Away</div><div class="v">'+detalleCarreraje(r.carrerajeAway)+'</div></div>'+
             '<div class="medicion"><div class="t">Línea MLBPro</div><div class="v nc">'+mlbproLineaTxt+'</div></div>'+
             '<div class="medicion"><div class="t">Score proyectado</div><div class="v nc">'+scoreProyectadoTxt+'</div></div>'+
             '<div class="medicion"><div class="t">Trayectoria del viento</div><div class="v nc">'+trayectoriaTxt+'</div></div>'+
