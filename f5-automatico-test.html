@@ -18,20 +18,43 @@
   #console { margin-top:10px; background:#010409; border:1px solid #30363d; border-radius:8px; padding:12px; min-height:60px; max-height:70vh; overflow:auto; font-family:ui-monospace,monospace; font-size:12px; white-space:pre-wrap; word-break:break-word; }
   .juego { background:#161b22; border:1px solid #30363d; border-radius:10px; padding:12px; margin-bottom:10px; }
   .juego h3 { margin:0 0 6px; font-size:14px; color:#79c0ff; }
-  .resumen { background:#0d1117; border:1px solid #30363d; border-radius:8px; padding:8px 10px; margin-bottom:8px; }
-  .proy { margin-top:8px; padding-top:8px; border-top:1px dashed #30363d; }
-  .proy .lbl { color:#ffd60a; font-weight:800; }
   .detalle summary { cursor:pointer; color:#79c0ff; font-size:12px; margin-top:6px; }
-  .equipos { display:flex; justify-content:space-between; font-size:16px; font-weight:800; color:#e6edf3; margin-bottom:2px; }
-  .venue { font-size:11.5px; color:#8b949e; margin-bottom:8px; }
-  .congelada { font-size:11.5px; color:#79c0ff; margin-bottom:8px; }
-  .mercado { background:#0d1117; border:1px solid #30363d; border-radius:8px; padding:8px 10px; margin-bottom:8px; }
-  .mercado-titulo { font-size:11px; text-transform:uppercase; letter-spacing:0.4px; color:#8b949e; font-weight:700; margin-bottom:4px; }
-  .mercado-fila { display:flex; justify-content:space-between; font-size:13.5px; padding:2px 0; }
-  .mercado-fila span:first-child { color:#c9d1d9; }
-  .mercado-fila span:last-child { font-weight:800; color:#e6edf3; }
-  .reservado { background:#0d1117; border:1px dashed #30363d; border-radius:8px; padding:8px 10px; margin-bottom:8px; font-size:12px; color:#6e7681; }
-  .reservado div { padding:2px 0; }
+  .venue { font-size:11.5px; color:#8b949e; margin-bottom:8px; text-align:center; }
+  .congelada { font-size:11.5px; color:#79c0ff; margin-bottom:8px; text-align:center; }
+
+  /* ── 1. Equipos + Moneyline F5 + favorito ── */
+  .equipos-cabecera { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:10px; }
+  .equipo-col { flex:1; text-align:center; background:#0d1117; border:1px solid #30363d; border-radius:10px; padding:10px 6px; }
+  .equipo-col .nombre { font-size:14px; font-weight:800; color:#e6edf3; line-height:1.2; min-height:34px; display:flex; align-items:center; justify-content:center; }
+  .equipo-col .cuota { font-size:20px; font-weight:800; color:#79c0ff; margin-top:6px; }
+  .equipo-col .fav { display:inline-block; margin-top:6px; font-size:10px; font-weight:800; letter-spacing:0.4px; padding:3px 8px; border-radius:20px; }
+  .equipo-col .fav.si { background:#0d2818; color:#3fb950; border:1px solid #238636; }
+  .equipo-col .fav.no { background:#21262d; color:#8b949e; border:1px solid #30363d; }
+  .equipo-col .fav.nc { background:#21262d; color:#6e7681; border:1px solid #30363d; }
+
+  /* ── 2. Total F5 central ── */
+  .total-central { background:#0d1117; border:1px solid #30363d; border-radius:10px; padding:8px 10px; margin-bottom:10px; }
+  .total-central .tit { text-align:center; font-size:10.5px; text-transform:uppercase; letter-spacing:0.4px; color:#8b949e; font-weight:700; margin-bottom:4px; }
+  .total-central .filas { display:flex; justify-content:center; gap:18px; }
+  .total-central .fila { text-align:center; font-size:13px; }
+  .total-central .fila b { color:#e6edf3; }
+
+  /* ── 3. Clima horizontal ── */
+  .clima-fila { display:flex; justify-content:space-between; gap:6px; background:#0d1117; border:1px solid #30363d; border-radius:10px; padding:8px 6px; margin-bottom:10px; }
+  .clima-item { flex:1; text-align:center; font-size:11px; color:#8b949e; }
+  .clima-item .v { display:block; font-size:13px; font-weight:800; color:#e6edf3; margin-top:2px; }
+  .clima-item .v.nc { color:#6e7681; font-weight:700; }
+
+  /* ── 4. Brújula grande ── */
+  .brujula-wrap { display:flex; justify-content:center; margin:6px 0 10px; }
+  .brujula-cap { text-align:center; font-size:11px; color:#6e7681; margin-top:4px; }
+
+  /* ── 5. Panel de mediciones alrededor de la brújula ── */
+  .mediciones { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:6px; }
+  .medicion { background:#0d1117; border:1px solid #30363d; border-radius:8px; padding:8px 10px; }
+  .medicion .t { font-size:10px; text-transform:uppercase; letter-spacing:0.4px; color:#8b949e; font-weight:700; margin-bottom:3px; }
+  .medicion .v { font-size:12.5px; font-weight:700; color:#e6edf3; }
+  .medicion .v.nc { color:#6e7681; font-weight:600; }
 </style>
 </head>
 <body>
@@ -98,58 +121,113 @@
           if (typeof n !== "number" || isNaN(n)) return "N/C";
           return (n > 0 ? "+" : "") + n;
         }
+        function nc(v) { return (v === null || v === undefined || v === "" || (typeof v === "number" && isNaN(v))); }
 
         var mlAwayTxt = (lm && lm.moneylineF5) ? fmtAmerican(lm.moneylineF5.away_price) : "N/C";
         var mlHomeTxt = (lm && lm.moneylineF5) ? fmtAmerican(lm.moneylineF5.home_price) : "N/C";
 
-        // CONFIRMADO en jalar-linea-f5.js: runlineF5.point es el punto del
-        // HOME (se lee de outsR[o2].point cuando outsR[o2].name === home).
-        // El punto del away no se guarda como campo propio, pero en un
-        // mercado de spread de 2 vías el punto contrario es siempre la
-        // negación exacta del otro (estructura del mercado, no un dato
-        // inventado). rlHomePointTxt/rlAwayPointTxt usan ese único campo
-        // real (.point) tal cual, solo con el signo invertido para away.
-        var rlHomePointTxt = (lm && lm.runlineF5 && typeof lm.runlineF5.point === "number") ? fmtPoint(lm.runlineF5.point) : "N/C";
-        var rlAwayPointTxt = (lm && lm.runlineF5 && typeof lm.runlineF5.point === "number") ? fmtPoint(-lm.runlineF5.point) : "N/C";
+        // ── 1. FAVORITO / NO FAVORITO por equipo, usando Moneyline F5 real ──
+        var favAwayTxt = "NO_CONFIRMADO", favHomeTxt = "NO_CONFIRMADO";
+        var favAwayClase = "nc", favHomeClase = "nc";
+        if (lm && lm.moneylineF5 && typeof lm.moneylineF5.home_price === "number" && typeof lm.moneylineF5.away_price === "number") {
+          var hp = lm.moneylineF5.home_price, ap = lm.moneylineF5.away_price;
+          var favHome = hp < ap;
+          favAwayTxt = favHome ? "NO FAVORITO" : "FAVORITO";
+          favHomeTxt = favHome ? "FAVORITO" : "NO FAVORITO";
+          favAwayClase = favHome ? "no" : "si";
+          favHomeClase = favHome ? "si" : "no";
+        }
 
+        // ── 2. Total F5 (Over/Under con línea y cuota) ──
         var totalPointTxt = (lm && lm.totalF5 && typeof lm.totalF5.point === "number") ? lm.totalF5.point : "N/C";
         var totalOverTxt = (lm && lm.totalF5) ? fmtAmerican(lm.totalF5.over_price) : "N/C";
         var totalUnderTxt = (lm && lm.totalF5) ? fmtAmerican(lm.totalF5.under_price) : "N/C";
 
-        var resumenHtml =
-          '<div class="equipos">'+
-            '<div class="equipo">'+awayNombre+'</div>'+
-            '<div class="equipo">'+homeNombre+'</div>'+
-          '</div>'+
-          '<div class="venue">'+(r.venue||"?")+'</div>'+
-          (congelTxt ? '<div class="congelada">🧊 línea CONGELADA pre-juego</div>' : '')+
-          '<div class="mercado">'+
-            '<div class="mercado-titulo">Moneyline F5</div>'+
-            '<div class="mercado-fila"><span>Away</span><span>'+mlAwayTxt+'</span></div>'+
-            '<div class="mercado-fila"><span>Home</span><span>'+mlHomeTxt+'</span></div>'+
-          '</div>'+
-          '<div class="mercado">'+
-            '<div class="mercado-titulo">Run Line F5</div>'+
-            '<div class="mercado-fila"><span>Away</span><span>'+rlAwayPointTxt+'</span></div>'+
-            '<div class="mercado-fila"><span>Home</span><span>'+rlHomePointTxt+'</span></div>'+
-          '</div>'+
-          '<div class="mercado">'+
-            '<div class="mercado-titulo">Total F5</div>'+
-            '<div class="mercado-fila"><span>O '+totalPointTxt+'</span><span>'+totalOverTxt+'</span></div>'+
-            '<div class="mercado-fila"><span>U '+totalPointTxt+'</span><span>'+totalUnderTxt+'</span></div>'+
-          '</div>'+
-          '<div class="reservado">'+
-            '<div>🌡️ Clima — pendiente</div>'+
-            '<div>🧭 Brújula — pendiente</div>'+
-            '<div>💨 Trayectoria del viento — pendiente</div>'+
-            '<div>📈 Línea MLBPro — pendiente</div>'+
-            '<div>🎯 Score proyectado — pendiente</div>'+
+        // ── 3. Clima horizontal ──
+        // IMPORTANTE (hallazgo, no invención): f5-automatico.js SÍ calcula
+        // tempF/vientoMph/direccionViento internamente (variable `today`),
+        // pero nunca los agrega al objeto de resultados.push(...) — por eso
+        // r.tempF, r.humedad, r.vientoMph, r.direccionViento y r.roof no
+        // existen todavía en este resultado. Se conecta a esos nombres de
+        // campo exactos para que funcione solo el día que se expongan desde
+        // f5-automatico.js; mientras tanto, correctamente, sale NO_CONFIRMADO.
+        var tempTxt = !nc(r.tempF) ? (r.tempF + "°F") : "NO_CONFIRMADO";
+        var humedadTxt = !nc(r.humedad) ? (r.humedad + "%") : "NO_CONFIRMADO";
+        var vientoMphTxt = !nc(r.vientoMph) ? (r.vientoMph + " mph") : "NO_CONFIRMADO";
+        var direccionTxt = !nc(r.direccionViento) ? (r.direccionViento + "°") : "NO_CONFIRMADO";
+        var techoTxt = !nc(r.roof) ? r.roof : "NO_CONFIRMADO";
+
+        // ── 4. Brújula grande ──
+        // Sin dirección de viento confirmada (ver punto 3), la brújula se
+        // dibuja neutra (sin aguja activa) pero al tamaño grande pedido —
+        // el tamaño no depende de si hay dato, solo la aguja.
+        var tieneDireccion = !nc(r.direccionViento) && typeof r.direccionViento === "number";
+        var grados = tieneDireccion ? r.direccionViento : 0;
+        var brujulaSvg =
+          '<svg width="150" height="150" viewBox="0 0 150 150">'+
+            '<circle cx="75" cy="75" r="70" fill="#0d1117" stroke="#30363d" stroke-width="2"/>'+
+            '<text x="75" y="18" text-anchor="middle" fill="#8b949e" font-size="12" font-weight="800">N</text>'+
+            '<text x="132" y="79" text-anchor="middle" fill="#8b949e" font-size="12" font-weight="800">E</text>'+
+            '<text x="75" y="140" text-anchor="middle" fill="#8b949e" font-size="12" font-weight="800">S</text>'+
+            '<text x="18" y="79" text-anchor="middle" fill="#8b949e" font-size="12" font-weight="800">O</text>'+
+            (tieneDireccion
+              ? '<g transform="rotate('+grados+' 75 75)"><line x1="75" y1="75" x2="75" y2="24" stroke="#79c0ff" stroke-width="4" stroke-linecap="round"/><circle cx="75" cy="75" r="5" fill="#79c0ff"/></g>'
+              : '<circle cx="75" cy="75" r="5" fill="#30363d"/>')+
+          '</svg>';
+        var brujulaHtml =
+          '<div class="brujula-wrap">'+brujulaSvg+'</div>'+
+          '<div class="brujula-cap">'+(tieneDireccion ? (grados+'° — '+direccionTxt) : 'Dirección de viento: NO_CONFIRMADO')+'</div>';
+
+        // ── 5. Mediciones alrededor de la brújula ──
+        var mlbproLineaTxt = "PENDIENTE"; // no existe todavía ninguna pieza "Línea MLBPro"
+        var scoreProyectadoTxt = "PENDIENTE"; // no existe todavía ninguna pieza "Score proyectado"
+        var trayectoriaTxt = "PENDIENTE"; // viento-trayectoria-7h.js no está conectado a este flujo todavía
+
+        var medicionesHtml =
+          '<div class="mediciones">'+
+            '<div class="medicion"><div class="t">Coincidencia</div><div class="v">'+r.coincidencia.estado+' ('+r.coincidencia.confirmados+')</div></div>'+
+            '<div class="medicion"><div class="t">Carreraje Home</div><div class="v">'+r.carrerajeHome.estado+'</div></div>'+
+            '<div class="medicion"><div class="t">Carreraje Away</div><div class="v">'+r.carrerajeAway.estado+'</div></div>'+
+            '<div class="medicion"><div class="t">Línea MLBPro</div><div class="v nc">'+mlbproLineaTxt+'</div></div>'+
+            '<div class="medicion"><div class="t">Score proyectado</div><div class="v nc">'+scoreProyectadoTxt+'</div></div>'+
+            '<div class="medicion"><div class="t">Trayectoria del viento</div><div class="v nc">'+trayectoriaTxt+'</div></div>'+
           '</div>';
 
-        /* ESPACIO RESERVADO (ver arriba, sección .reservado): Clima,
-           Brújula, Trayectoria del viento, Línea MLBPro y Score proyectado
-           se agregan cuando cada pieza esté lista y confirmada, una por
-           una — no se inventa nada todavía. */
+        var resumenHtml =
+          '<div class="venue">'+(r.venue||"?")+'</div>'+
+          (congelTxt ? '<div class="congelada">🧊 línea CONGELADA pre-juego</div>' : '')+
+
+          '<div class="equipos-cabecera">'+
+            '<div class="equipo-col">'+
+              '<div class="nombre">'+awayNombre+'</div>'+
+              '<div class="cuota">'+mlAwayTxt+'</div>'+
+              '<div class="fav '+favAwayClase+'">'+favAwayTxt+'</div>'+
+            '</div>'+
+            '<div class="equipo-col">'+
+              '<div class="nombre">'+homeNombre+'</div>'+
+              '<div class="cuota">'+mlHomeTxt+'</div>'+
+              '<div class="fav '+favHomeClase+'">'+favHomeTxt+'</div>'+
+            '</div>'+
+          '</div>'+
+
+          '<div class="total-central">'+
+            '<div class="tit">Total F5</div>'+
+            '<div class="filas">'+
+              '<div class="fila">OVER <b>'+totalPointTxt+'</b><br>'+totalOverTxt+'</div>'+
+              '<div class="fila">UNDER <b>'+totalPointTxt+'</b><br>'+totalUnderTxt+'</div>'+
+            '</div>'+
+          '</div>'+
+
+          '<div class="clima-fila">'+
+            '<div class="clima-item">Temp.<span class="v'+(tempTxt==="NO_CONFIRMADO"?" nc":"")+'">'+tempTxt+'</span></div>'+
+            '<div class="clima-item">Humedad<span class="v'+(humedadTxt==="NO_CONFIRMADO"?" nc":"")+'">'+humedadTxt+'</span></div>'+
+            '<div class="clima-item">Viento<span class="v'+(vientoMphTxt==="NO_CONFIRMADO"?" nc":"")+'">'+vientoMphTxt+'</span></div>'+
+            '<div class="clima-item">Dirección<span class="v'+(direccionTxt==="NO_CONFIRMADO"?" nc":"")+'">'+direccionTxt+'</span></div>'+
+            '<div class="clima-item">Techo<span class="v'+(techoTxt==="NO_CONFIRMADO"?" nc":"")+'">'+techoTxt+'</span></div>'+
+          '</div>'+
+
+          medicionesHtml+
+          brujulaHtml;
 
         html += '<div class="juego">'+
           resumenHtml+
