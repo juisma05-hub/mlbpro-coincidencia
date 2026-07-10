@@ -7,6 +7,15 @@
 // el cruce era por venue, y el venue del cache de líneas F5 venía null
 // (ODDS_TEAM_TO_VENUE no encontraba el equipo). Ahora se cruza por nombre de
 // equipo (home/away), que sí coincide siempre entre The Odds API y MLB StatsAPI.
+//
+// CORREGIDO 10 jul 2026: el clima de hoy (tempF, vientoMph, direccionViento,
+// roof) se calculaba en la variable `today` pero nunca se agregaba al objeto
+// de resultados.push(...) — se descartaba después de usarse solo para
+// f5Coincidencia. Ahora se expone en el resultado para que
+// f5-automatico-test.html pueda leerlo. Se agrega también `humedad`
+// (hit.humidity_pct), que `today` no capturaba antes: es el mismo patrón
+// exacto que ya usan tempF/vientoMph/direccionViento sobre el mismo objeto
+// `hit`, no un cálculo nuevo ni una conversión inventada.
 
 async function f5AutomaticoHoy(logFn) {
   function log(t) { if (typeof logFn === "function") logFn(t); }
@@ -47,15 +56,16 @@ async function f5AutomaticoHoy(logFn) {
 
     // --- clima de hoy ---
     var s = STADIUM_INDEX.get(stadiumNorm(venue));
-    var today = { venue: venue, roof: s?s.roof:null, tempF: null, vientoMph: null, direccionViento: null };
+    var today = { venue: venue, roof: s?s.roof:null, tempF: null, humedad: null, vientoMph: null, direccionViento: null };
     if (s) {
       try {
         var w = await climaFetchWeather(s, hoy, hoy);
         var hit = w.get(climaKeyTZ(g.gameDate, s.timezone));
         if (hit) {
           today.tempF = (typeof hit.temperature_f === "number") ? hit.temperature_f : null;
+          today.humedad = (typeof hit.humidity_pct === "number") ? hit.humidity_pct : null;
           today.vientoMph = (typeof hit.windspeed_mph === "number") ? hit.windspeed_mph : null;
-          today.direccionViento = hit.wind_dir || null;
+          today.direccionViento = (typeof hit.wind_dir === "number") ? hit.wind_dir : null;
         }
       } catch(e) { log("AVISO clima hoy: "+(e&&e.message?e.message:e)); }
     }
@@ -134,7 +144,12 @@ async function f5AutomaticoHoy(logFn) {
       carrerajeAway: carrerajeAway,
       moneyline: moneyline,
       lineaMercadoF5: lineaF5Juego,
-      proyeccionTemprana: proyeccionTemprana
+      proyeccionTemprana: proyeccionTemprana,
+      tempF: today.tempF,
+      humedad: today.humedad,
+      vientoMph: today.vientoMph,
+      direccionViento: today.direccionViento,
+      roof: today.roof
     });
   }
 
