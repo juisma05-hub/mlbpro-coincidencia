@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>MLBPro · Trayectoria de Viento 7h TEST</title>
+<style>
+:root { color-scheme: dark; }
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body { margin:0; font-family:-apple-system,system-ui,sans-serif; background:#0d1117; color:#e6edf3; }
+header { padding:14px 16px; border-bottom:1px solid #30363d; }
+h1 { font-size:16px; margin:0; }
+h1 small { display:block; font-size:11px; color:#8b949e; font-weight:400; margin-top:3px; }
+main { padding:16px; max-width:960px; margin:0 auto; }
+label { font-size:12px; color:#8b949e; display:block; margin:10px 0 4px; }
+select, input[type=number], input[type=datetime-local], textarea {
+  width:100%; padding:12px; font-size:14px; background:#161b22; color:#e6edf3;
+  border:1px solid #30363d; border-radius:8px; font-family:ui-monospace,monospace;
+}
+textarea { min-height:140px; }
+.fila-check { display:flex; align-items:center; gap:8px; margin-top:10px; }
+.fila-check input { width:auto; }
+.fila-check label { margin:0; }
+.go { width:100%; border:0; border-radius:10px; padding:15px; font-size:15px; font-weight:800; color:#fff; background:#1f6feb; cursor:pointer; margin-top:14px; }
+.go.manual { background:#8957e5; }
+.go:disabled { background:#30363d; color:#8b949e; }
+.bloque { background:#161b22; border:1px solid #30363d; border-radius:12px; padding:14px; margin-top:16px; }
+.bloque h2 { font-size:13px; margin:0 0 10px; color:#79c0ff; text-transform:uppercase; letter-spacing:0.4px; }
+table { width:100%; border-collapse:collapse; font-size:11.5px; }
+th, td { padding:6px 5px; text-align:center; border-bottom:1px solid #21262d; white-space:nowrap; }
+th { color:#8b949e; font-weight:700; font-size:10px; text-transform:uppercase; }
+td.offset { font-weight:800; color:#79c0ff; }
+.efecto { font-weight:800; padding:2px 6px; border-radius:5px; font-size:10.5px; }
+.efecto.OUT { background:#1a2f1e; color:#3fb950; }
+.efecto.IN { background:#2f1a1a; color:#f85149; }
+.efecto.CROSS { background:#2d2410; color:#d29922; }
+.efecto.NEUTRAL { background:#21262d; color:#8b949e; }
+.aprox-si { color:#d29922; font-weight:700; }
+.aprox-no { color:#3fb950; }
+.na { color:#6e7681; }
+.resumen-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:6px; }
+.resumen-card { background:#0d1117; border:1px solid #30363d; border-radius:8px; padding:10px; font-size:12px; }
+.resumen-card .t { font-size:10px; color:#8b949e; text-transform:uppercase; margin-bottom:6px; }
+.resumen-card .l { padding:2px 0; }
+.resumen-card .l b { color:#fff; }
+.badge { display:inline-block; padding:2px 8px; border-radius:20px; font-size:10px; font-weight:800; }
+.badge.real { background:#0d2818; color:#3fb950; border:1px solid #238636; }
+.badge.proyectado { background:#2d1e0d; color:#ffa657; border:1px solid #9e6a03; }
+.badge.pass { background:#0d2818; color:#3fb950; border:1px solid #238636; }
+.badge.fail { background:#2f1a1a; color:#f85149; border:1px solid #f85149; }
+.advertencia { color:#d29922; font-size:11.5px; margin-top:8px; }
+#console { margin-top:16px; background:#010409; border:1px solid #30363d; border-radius:8px; padding:12px; min-height:60px; max-height:35vh; overflow:auto; font-family:ui-monospace,monospace; font-size:11.5px; white-space:pre-wrap; word-break:break-word; }
+.checkfila { display:flex; justify-content:space-between; padding:3px 0; font-size:12px; }
+.aviso-caja { background:#161b22; border:1px solid #30363d; border-radius:10px; padding:12px; font-size:12px; color:#c9d1d9; margin-top:10px; }
+.aviso-caja b { color:#ffd60a; }
+</style>
+</head>
+<body>
+<header>
+  <h1>MLBPro · Trayectoria de Viento 7h (TEST / AUDITORÍA)
+  <small>Página aislada. NO está conectada a index.html ni a casar-series-test.html. No toca jalar-clima.js ni clima-cache.js.</small>
+  </h1>
+</header>
+<a href="index.html" style="display:block; text-align:center; color:#5b9fd8; font-size:13px; padding:8px; text-decoration:none;">← Volver al inicio</a>
+
+<main>
+
+  <!-- ── AUTOCHEQUEO: corre solo, sin red, apenas carga la página ── -->
+  <div class="bloque">
+    <h2>1. Autochequeo de dirección (sin red, corre solo)</h2>
+    <div id="autochequeo"></div>
+  </div>
+
+  <!-- ── MODO REAL: usa climaFetchWeather de verdad, sobre un juego real del cache ── -->
+  <div class="bloque">
+    <h2>2. Prueba con datos reales (climaFetchWeather + climaKeyTZ, sin modificar nada)</h2>
+    <div class="aviso-caja">
+      Esto llama <b>climaFetchWeather(stadium, start, end)</b> tal cual está en el proyecto — no se
+      reimplementa. Si esa función no existe todavía en <b>clima-cache.js</b> tal como se asumió leyendo
+      <b>jalar-clima.js</b>, esta prueba lo va a decir explícitamente en la consola de abajo, en vez de
+      fabricar un resultado.
+    </div>
+
+    <label>Juego (de lo que haya en cache, climaLeerCache):</label>
+    <select id="selJuego"><option value="">— elegir —</option></select>
+
+    <label for="permitirAprox">Permitir hora aproximada de respaldo:</label>
+    <div class="fila-check">
+      <input type="checkbox" id="permitirAprox" />
+      <label for="permitirAprox" style="margin:0;">Sí, permitir (acotado a maxHorasRespaldo)</label>
+    </div>
+
+    <label for="maxHoras">maxHorasRespaldo (horas de tolerancia si el respaldo está permitido):</label>
+    <input type="number" id="maxHoras" value="2" min="1" max="4" />
+
+    <label for="horaFinF5">horaFinF5UTC real (opcional — ISO UTC, ej: 2026-07-10T04:40:00Z). Vacío = F5_PROYECTADO:</label>
+    <input type="text" id="horaFinF5" placeholder="vacío = usa respaldo heurístico (F5_PROYECTADO)" />
+
+    <div class="fila-check">
+      <input type="checkbox" id="f5Desarrollo" />
+      <label for="f5Desarrollo" style="margin:0;">F5 aún en desarrollo (solo aplica si NO hay horaFinF5UTC)</label>
+    </div>
+
+    <button id="btnReal" class="go">ANALIZAR TRAYECTORIA (datos reales)</button>
+  </div>
+
+  <!-- ── MODO MANUAL: sin red, para auditar la lógica con casos a mano ── -->
+  <div class="bloque">
+    <h2>3. Prueba manual (sin red — pega tus propias 7 horas)</h2>
+    <div class="aviso-caja">
+      Sirve para auditar la lógica del módulo sin depender de la red ni de climaFetchWeather.
+      Pega un array JSON con hasta 7 objetos <code>{offsetHoras, wind_dir, windspeed_mph}</code>.
+      Los offsets válidos son -2,-1,0,1,2,3,4. Los que falten quedan NO_CONFIRMADO (null), tal
+      como pasaría con datos reales incompletos.
+    </div>
+    <label>gameDateUTC (ISO, referencia solamente para mostrar la hora de inicio):</label>
+    <input type="text" id="manualGameDate" value="2026-07-10T02:10:00Z" />
+    <label>Timezone del estadio (IANA, ej: America/Los_Angeles):</label>
+    <input type="text" id="manualTz" value="America/Los_Angeles" />
+    <label>hpACF (grados home→jardín central, vacío = NO_CONFIRMADO):</label>
+    <input type="number" id="manualHpACF" value="30" />
+    <label>Horas (JSON):</label>
+    <textarea id="manualHoras">[
+  { "offsetHoras": -2, "wind_dir": 190, "windspeed_mph": 4 },
+  { "offsetHoras": -1, "wind_dir": 200, "windspeed_mph": 5 },
+  { "offsetHoras": 0,  "wind_dir": 210, "windspeed_mph": 6 },
+  { "offsetHoras": 1,  "wind_dir": 215, "windspeed_mph": 7 },
+  { "offsetHoras": 2,  "wind_dir": 220, "windspeed_mph": 8 },
+  { "offsetHoras": 3,  "wind_dir": 225, "windspeed_mph": 8 },
+  { "offsetHoras": 4,  "wind_dir": 230, "windspeed_mph": 9 }
+]</textarea>
+    <button id="btnManual" class="go manual">ANALIZAR TRAYECTORIA (datos manuales)</button>
+  </div>
+
+  <!-- ── RESULTADO: tabla de 7 horas + resúmenes ── -->
+  <div class="bloque" id="bloqueResultado" style="display:none;">
+    <h2>Resultado — 7 horas (−2h a +4h)</h2>
+    <div style="overflow-x:auto;">
+      <table id="tablaHoras">
+        <thead>
+          <tr>
+            <th>Offset</th>
+            <th>Hora solicitada</th>
+            <th>Hora usada</th>
+            <th>WindFrom</th>
+            <th>WindTo</th>
+            <th>MPH</th>
+            <th>Efecto</th>
+            <th>Exacta?</th>
+            <th>Desfase</th>
+            <th>Motivo</th>
+          </tr>
+        </thead>
+        <tbody id="tbodyHoras"></tbody>
+      </table>
+    </div>
+
+    <div class="resumen-grid">
+      <div class="resumen-card">
+        <div class="t">Prejuego (-2 → -1)</div>
+        <div id="resPreJuego"></div>
+      </div>
+      <div class="resumen-card">
+        <div class="t">F5 <span id="badgeF5"></span></div>
+        <div id="resF5"></div>
+      </div>
+      <div class="resumen-card">
+        <div class="t">Juego completo (0 → +4)</div>
+        <div id="resCompleto"></div>
+      </div>
+      <div class="resumen-card">
+        <div class="t">Trayectoria general</div>
+        <div id="resTrayectoria"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="console">Cargando…</div>
+</main>
+
+<script src="mlb-routes.js"></script>
+<script src="estadios.js"></script>
+<script src="clima-cache.js"></script>
+<script src="jalar-clima.js"></script>
+<script src="parques-orientacion.js"></script>
+<script src="viento-trayectoria-7h.js"></script>
+<script>
+var consoleEl = document.getElementById("console");
+function log(t) { var d = document.createElement("div"); d.textContent = t; consoleEl.appendChild(d); consoleEl.scrollTop = consoleEl.scrollHeight; }
+
+// ─────────────────────────────────────────────────────────
+// 1) AUTOCHEQUEO — corre solo, sin red, valida los 3 casos
+// obligatorios de windFrom -> windTo y la clasificación IN/OUT/CROSS.
+// ─────────────────────────────────────────────────────────
+(function autochequeo() {
+  var el = document.getElementById("autochequeo");
+  if (typeof window.MLBPRO_VIENTO_TRAYECTORIA === "undefined") {
+    el.innerHTML = '<div class="checkfila"><span>viento-trayectoria-7h.js no cargó</span><span class="badge fail">FAIL</span></div>';
+    log("ERROR: viento-trayectoria-7h.js no se cargó. Revisa la ruta del script.");
+    return;
+  }
+  var M = window.MLBPRO_VIENTO_TRAYECTORIA;
+  var casos = [
+    { nombre: "wind_dir=270 (viene del Oeste) -> vaHacia=90 (Este)", got: M.calcularVaHacia(270), esperado: 90 },
+    { nombre: "wind_dir=0 (viene del Norte) -> vaHacia=180 (Sur)", got: M.calcularVaHacia(0), esperado: 180 },
+    { nombre: "wind_dir=180 (viene del Sur) -> vaHacia=0 (Norte)", got: M.calcularVaHacia(180), esperado: 0 },
+    { nombre: "hpACF=30, wind_dir=210 (empuja a 30=hpACF) -> OUT", got: M.calcularEfectoParque(210, 30, 10), esperado: "OUT" },
+    { nombre: "hpACF=30, wind_dir=30 (empuja a 210=opuesto) -> IN", got: M.calcularEfectoParque(30, 30, 10), esperado: "IN" },
+    { nombre: "hpACF=30, wind_dir=300 (empuja a 120=perpendicular) -> CROSS", got: M.calcularEfectoParque(300, 30, 10), esperado: "CROSS" }
+  ];
+  var html = "";
+  var todoPass = true;
+  casos.forEach(function (c) {
+    var pass = c.got === c.esperado;
+    if (!pass) todoPass = false;
+    html += '<div class="checkfila"><span>' + c.nombre + ' (obtuvo: ' + c.got + ')</span>' +
+      '<span class="badge ' + (pass ? "pass" : "fail") + '">' + (pass ? "PASS" : "FAIL") + '</span></div>';
+  });
+  el.innerHTML = html;
+  log(todoPass ? "Autochequeo: los 6 casos obligatorios pasaron." : "Autochequeo: ALGO FALLÓ — revisar antes de confiar en el módulo.");
+})();
+
+// ─────────────────────────────────────────────────────────
+// 2) MODO REAL — llena el selector desde climaLeerCache() (sin tocar
+// el cache), y al analizar llama climaFetchWeather de verdad.
+// ─────────────────────────────────────────────────────────
+var JUEGOS_CACHE = [];
+(function llenarSelector() {
+  try {
+    if (typeof climaLeerCache !== "function") { log("AVISO: climaLeerCache no está cargada (clima-cache.js)."); return; }
+    var cache = climaLeerCache() || [];
+    var vistos = {};
+    JUEGOS_CACHE = cache.filter(function (g) {
+      if (!g || !g.game_time || !g.venue) return false;
+      var k = g.game_id || (g.venue + g.game_time);
+      if (vistos[k]) return false;
+      vistos[k] = true;
+      return true;
+    }).sort(function (a, b) { return a.game_time < b.game_time ? 1 : -1; });
+
+    var sel = document.getElementById("selJuego");
+    JUEGOS_CACHE.forEach(function (g, idx) {
+      var o = document.createElement("option");
+      o.value = idx;
+      o.textContent = g.date + " · " + g.away_team + " @ " + g.home_team + " (" + g.venue + ")";
+      sel.appendChild(o);
+    });
+    log("Juegos con game_time+venue en cache: " + JUEGOS_CACHE.length + " (de " + cache.length + " filas totales).");
+  } catch (e) {
+    log("ERROR leyendo cache: " + e.message);
+  }
+})();
+
+document.getElementById("btnReal").addEventListener("click", async function () {
+  var btn = this;
+  var idx = document.getElementById("selJuego").value;
+  if (idx === "") { log("Elige un juego primero."); return; }
+  var g = JUEGOS_CACHE[idx];
+
+  if (typeof climaFetchWeather !== "function") {
+    log("NO SE PUEDE PROBAR CON DATOS REALES: climaFetchWeather no está definida en esta página.");
+    log("Eso confirma que esa función NO vive en clima-cache.js (o no se cargó). Habría que ampliar");
+    log("clima-cache.js (o el archivo donde realmente esté) para exponerla, o pasar mapaClima a mano.");
+    return;
+  }
+  if (typeof stadiumNorm !== "function" || typeof STADIUM_INDEX === "undefined") {
+    log("ERROR: estadios.js no está cargado (stadiumNorm/STADIUM_INDEX).");
+    return;
+  }
+
+  var stadium = STADIUM_INDEX.get(stadiumNorm(g.venue));
+  if (!stadium) { log("ERROR: '" + g.venue + "' no está en STADIUM_INDEX (estadio NO_CONFIRMADO)."); return; }
+
+  btn.disabled = true; btn.textContent = "CONSULTANDO CLIMA…";
+  try {
+    // Rango generoso (día anterior a día siguiente de la fecha del juego)
+    // para asegurar que -2h/+4h no se salgan del rango pedido, incluso
+    // si el juego empieza cerca de medianoche local.
+    var fechaJuego = g.date;
+    var desde = (typeof climaSumarDias === "function") ? climaSumarDias(fechaJuego, -1) : fechaJuego;
+    var hasta = (typeof climaSumarDias === "function") ? climaSumarDias(fechaJuego, 1) : fechaJuego;
+
+    log("Llamando climaFetchWeather(" + stadium.venue + ", " + desde + ", " + hasta + ")…");
+    var mapaClima = await climaFetchWeather(stadium, desde, hasta);
+    log("climaFetchWeather respondió. Tamaño del Map: " + (mapaClima && mapaClima.size !== undefined ? mapaClima.size : "desconocido (no es un Map estándar)"));
+
+    var hpACF = null;
+    if (typeof getOrientacionParque === "function") {
+      var orient = getOrientacionParque(g.venue);
+      hpACF = orient && typeof orient.hpACF === "number" ? orient.hpACF : null;
+    }
+    if (hpACF === null) log("AVISO: hpACF NO_CONFIRMADO para " + g.venue + " — efectoParque quedará NEUTRAL en todas las horas.");
+
+    var horaFinF5 = document.getElementById("horaFinF5").value.trim();
+    var resultado = window.MLBPRO_VIENTO_TRAYECTORIA.analizarJuego({
+      gamePk: g.game_id,
+      venue: g.venue,
+      gameDateUTC: g.game_time,
+      stadium: stadium,
+      mapaClima: mapaClima,
+      hpACF: hpACF,
+      permitirHoraAproximada: document.getElementById("permitirAprox").checked,
+      maxHorasRespaldo: Number(document.getElementById("maxHoras").value) || 2,
+      horaFinF5UTC: horaFinF5 || null,
+      f5AunEnDesarrollo: document.getElementById("f5Desarrollo").checked
+    });
+
+    pintarResultado(resultado);
+    log("LISTO (datos reales).");
+  } catch (e) {
+    log("ERROR: " + (e && e.message ? e.message : e));
+  } finally {
+    btn.disabled = false; btn.textContent = "ANALIZAR TRAYECTORIA (datos reales)";
+  }
+});
+
+// ─────────────────────────────────────────────────────────
+// 3) MODO MANUAL — construye un Map falso pero honesto: usa
+// climaKeyTZ de verdad (no inventa el formato de llave), solo
+// simula los VALORES horarios que el usuario pega a mano.
+// ─────────────────────────────────────────────────────────
+document.getElementById("btnManual").addEventListener("click", function () {
+  try {
+    if (typeof climaKeyTZ !== "function") { log("ERROR: climaKeyTZ no está cargada (clima-cache.js)."); return; }
+
+    var gameDateUTC = document.getElementById("manualGameDate").value.trim();
+    var tz = document.getElementById("manualTz").value.trim();
+    var hpACFraw = document.getElementById("manualHpACF").value;
+    var hpACF = hpACFraw === "" ? null : Number(hpACFraw);
+    var horasInput = JSON.parse(document.getElementById("manualHoras").value);
+
+    var gameMs = new Date(gameDateUTC).getTime();
+    if (isNaN(gameMs)) { log("ERROR: gameDateUTC inválido."); return; }
+
+    var mapaClima = new Map();
+    horasInput.forEach(function (h) {
+      var iso = new Date(gameMs + h.offsetHoras * 3600000).toISOString();
+      var clave = climaKeyTZ(iso, tz);
+      mapaClima.set(clave, {
+        wind_dir: h.wind_dir,
+        windspeed_mph: h.windspeed_mph,
+        temperature_f: h.temperature_f !== undefined ? h.temperature_f : null,
+        humidity_pct: h.humidity_pct !== undefined ? h.humidity_pct : null,
+        precipitation_mm: h.precipitation_mm !== undefined ? h.precipitation_mm : null
+      });
+    });
+
+    var horaFinF5 = document.getElementById("horaFinF5").value.trim();
+    var resultado = window.MLBPRO_VIENTO_TRAYECTORIA.analizarJuego({
+      gamePk: "MANUAL",
+      venue: "MANUAL (" + tz + ")",
+      gameDateUTC: gameDateUTC,
+      stadium: { timezone: tz },
+      mapaClima: mapaClima,
+      hpACF: hpACF,
+      permitirHoraAproximada: document.getElementById("permitirAprox").checked,
+      maxHorasRespaldo: Number(document.getElementById("maxHoras").value) || 2,
+      horaFinF5UTC: horaFinF5 || null,
+      f5AunEnDesarrollo: document.getElementById("f5Desarrollo").checked
+    });
+
+    pintarResultado(resultado);
+    log("LISTO (datos manuales, sin red).");
+  } catch (e) {
+    log("ERROR: " + (e && e.message ? e.message : e));
+  }
+});
+
+// ─────────────────────────────────────────────────────────
+// Pintado de resultados — igual para modo real y modo manual.
+// ─────────────────────────────────────────────────────────
+function celda(v) { return (v === null || v === undefined) ? '<span class="na">—</span>' : v; }
+
+function pintarResultado(r) {
+  document.getElementById("bloqueResultado").style.display = "block";
+
+  if (r.estado === "SIN_DATOS_SUFICIENTES") {
+    document.getElementById("tbodyHoras").innerHTML = '<tr><td colspan="10" class="na">SIN_DATOS_SUFICIENTES (' + r.horasValidasEncontradas + ' de 7 horas válidas)</td></tr>';
+    document.getElementById("resPreJuego").innerHTML = document.getElementById("resF5").innerHTML =
+      document.getElementById("resCompleto").innerHTML = document.getElementById("resTrayectoria").innerHTML = '<span class="na">SIN_DATOS_SUFICIENTES</span>';
+    document.getElementById("badgeF5").innerHTML = "";
+    return;
+  }
+
+  var filas = "";
+  r.horas.forEach(function (h) {
+    filas += "<tr>" +
+      '<td class="offset">' + (h.offset > 0 ? "+" + h.offset : h.offset) + "h</td>" +
+      "<td>" + celda(h.horaSolicitada) + "</td>" +
+      "<td>" + celda(h.horaUsada) + "</td>" +
+      "<td>" + (h.windFromDeg !== null ? h.windFromDeg + "° " + h.windFromCardinal : '<span class="na">—</span>') + "</td>" +
+      "<td>" + (h.windToDeg !== null ? h.windToDeg + "° " + h.windToCardinal : '<span class="na">—</span>') + "</td>" +
+      "<td>" + celda(h.velocidadMph) + "</td>" +
+      '<td><span class="efecto ' + h.efectoParque + '">' + h.efectoParque + "</span></td>" +
+      "<td>" + (h.horaUsada ? (h.esAproximada ? '<span class="aprox-si">APROX</span>' : '<span class="aprox-no">EXACTA</span>') : '<span class="na">—</span>') + "</td>" +
+      "<td>" + (h.desfaseMinutos ? h.desfaseMinutos + " min" : '<span class="na">—</span>') + "</td>" +
+      '<td style="white-space:normal;font-size:10.5px;color:#8b949e;">' + celda(h.motivo) + "</td>" +
+      "</tr>";
+  });
+  document.getElementById("tbodyHoras").innerHTML = filas;
+
+  document.getElementById("resPreJuego").innerHTML = r.preJuego
+    ? '<div class="l">Tendencia: <b>' + r.preJuego.tendencia + "</b></div>" +
+      '<div class="l">Giro: <b>' + celda(r.preJuego.giroGrados) + "°</b></div>"
+    : '<span class="na">NO_CONFIRMADO</span>';
+
+  document.getElementById("badgeF5").innerHTML = r.f5 && r.f5.estado
+    ? '<span class="badge ' + (r.f5.estado === "F5_REAL" ? "real" : "proyectado") + '">' + r.f5.estado + "</span>"
+    : "";
+  document.getElementById("resF5").innerHTML = r.f5 ? (
+    '<div class="l">Horas usadas: <b>' + JSON.stringify(r.f5.horasUtilizadas) + "</b></div>" +
+    '<div class="l">IN/OUT/CROSS: <b>' + celda(r.f5.porcentajeIN) + "% / " + celda(r.f5.porcentajeOUT) + "% / " + celda(r.f5.porcentajeCROSS) + "%</b></div>" +
+    '<div class="l">Velocidad prom: <b>' + celda(r.f5.velocidadPromedio) + " mph</b></div>" +
+    '<div class="l">Giro total: <b>' + celda(r.f5.giroTotal) + "°</b></div>" +
+    (r.f5.advertencia ? '<div class="advertencia">⚠ ' + r.f5.advertencia + "</div>" : "")
+  ) : '<span class="na">NO_CONFIRMADO</span>';
+
+  document.getElementById("resCompleto").innerHTML = r.juegoCompleto ? (
+    '<div class="l">Horas usadas: <b>' + JSON.stringify(r.juegoCompleto.horasUtilizadas) + "</b></div>" +
+    '<div class="l">IN/OUT/CROSS: <b>' + celda(r.juegoCompleto.porcentajeIN) + "% / " + celda(r.juegoCompleto.porcentajeOUT) + "% / " + celda(r.juegoCompleto.porcentajeCROSS) + "%</b></div>" +
+    '<div class="l">Velocidad prom: <b>' + celda(r.juegoCompleto.velocidadPromedio) + " mph</b></div>" +
+    '<div class="l">Giro total: <b>' + celda(r.juegoCompleto.giroTotal) + "°</b></div>"
+  ) : '<span class="na">NO_CONFIRMADO</span>';
+
+  document.getElementById("resTrayectoria").innerHTML = r.trayectoria ? (
+    '<div class="l">Clasificación: <b>' + r.trayectoria.clasificacion + "</b></div>" +
+    '<div class="l">Impacto: <b>' + r.trayectoria.impacto + "</b></div>" +
+    '<div class="l">Giro total: <b>' + celda(r.trayectoria.giroTotalGrados) + "°</b></div>" +
+    '<div class="l">Cambio de cuadrante: <b>' + (r.trayectoria.cambioCuadrante ? "SÍ" : "NO") + "</b></div>"
+  ) : '<span class="na">NO_CONFIRMADO</span>';
+}
+
+log("Página lista. Corre el autochequeo arriba, luego prueba con datos reales o manuales.");
+</script>
+</body>
+</html>
