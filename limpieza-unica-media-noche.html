@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MLBPro · Limpieza única medianoche</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:-apple-system,system-ui,sans-serif; background:#0d1117; color:#e6edf3; }
+  header { padding:14px 16px; border-bottom:1px solid #30363d; }
+  h1 { font-size:16px; margin:0; }
+  main { padding:16px; max-width:900px; margin:0 auto; }
+  .estado { background:#161b22; border:1px solid #30363d; border-radius:10px; padding:14px; font-size:14px; margin-bottom:14px; }
+  .estado.hecha { border-color:#3fb950; }
+  .estado.esperando { border-color:#d29922; }
+  .go { width:100%; border:0; border-radius:10px; padding:16px; font-size:15px; font-weight:800; color:#fff; background:#da3633; cursor:pointer; margin-top:10px; }
+  .go:disabled { background:#30363d; color:#6e7681; cursor:not-allowed; }
+  #console { margin-top:16px; background:#010409; border:1px solid #30363d; border-radius:8px; padding:12px; min-height:60px; max-height:50vh; overflow:auto; font-family:ui-monospace,monospace; font-size:11px; white-space:pre-wrap; }
+</style>
+</head>
+<body>
+<header><h1>Limpieza única medianoche · SOLO juegos de hoy (2026-07-09)</h1></header>
+<main>
+  <div id="estadoBox" class="estado">Verificando...</div>
+  <button id="goForzar" class="go" style="display:none;">FORZAR EJECUCIÓN AHORA (manual)</button>
+  <div id="console"></div>
+</main>
+
+<script src="clima-cache.js"></script>
+<script>
+  var FLAG_KEY = "MLBPRO_LIMPIEZA_UNICA_2026_HECHA";
+  var TARGET_DATE = "2026-07-09"; // fecha fija de "hoy" — no cambia aunque se abra mañana o después
+  var CAMPOS_CLIMA = ["wind_dir","windspeed_mph","temperature_f","humidity_pct","total_runs"];
+
+  var consoleEl = document.getElementById("console");
+  var estadoBox = document.getElementById("estadoBox");
+  var btnForzar = document.getElementById("goForzar");
+
+  function log(t){ var d=document.createElement("div"); d.textContent=t; consoleEl.appendChild(d); consoleEl.scrollTop=consoleEl.scrollHeight; }
+
+  function esNumeroValido(v){ return typeof v === "number" && isFinite(v); }
+
+  function camposMalos(r){
+    var malos = [];
+    for (var i=0; i<CAMPOS_CLIMA.length; i++){
+      var campo = CAMPOS_CLIMA[i];
+      if (!esNumeroValido(r[campo])) malos.push(campo);
+    }
+    return malos;
+  }
+
+  function ejecutarLimpieza(motivo){
+    log("Ejecutando limpieza única (" + motivo + ") — SOLO fecha " + TARGET_DATE + "...");
+    try {
+      var cache = climaLeerCache() || [];
+
+      var otrasFechas = [];   // cualquier fecha distinta a TARGET_DATE — NUNCA se tocan
+      var noFinalHoy = [];    // TARGET_DATE, pero no Final — se conservan intactos
+      var buenosHoy = [];     // TARGET_DATE, Final, clima válido — se conservan
+      var malosHoy = 0;       // TARGET_DATE, Final, contaminado — se elimina
+
+      cache.forEach(function(r){
+        if (!r || r.date !== TARGET_DATE) { otrasFechas.push(r); return; }
+        if (r.status !== "Final") { noFinalHoy.push(r); return; }
+        var mc = camposMalos(r);
+        if (mc.length === 0) {
+          buenosHoy.push(r);
+        } else {
+          malosHoy++;
+          log("  ⛔ eliminado: " + r.date + " · " + (r.away_team||"?") + " @ " + (r.home_team||"?") + " · " + r.venue + " → " + mc.join(", "));
+        }
+      });
+
+      var cacheNuevo = otrasFechas.concat(noFinalHoy, buenosHoy);
+      climaGuardarCache(cacheNuevo);
+
+      log("");
+      log("Total antes: " + cache.length + " · otras fechas intactas: " + otrasFechas.length + " · hoy no-Final intactos: " + noFinalHoy.length + " · hoy Final válidos: " + buenosHoy.length + " · hoy eliminados: " + malosHoy);
+      log("GUARDADO en MLBPRO_CLIMA_CACHE_2026.");
+
+      localStorage.setItem(FLAG_KEY, JSON.stringify({
+        ejecutada: true,
+        fecha_ejecucion: new Date().toISOString(),
+        fecha_objetivo: TARGET_DATE,
+        motivo: motivo,
+        eliminados: malosHoy,
+        total_final: cacheNuevo.length
+      }));
+
+      log("Marca guardada. Esta herramienta no volverá a ejecutarse.");
+      mostrarEstado();
+    } catch(e){
+      log("ERROR: " + (e && e.message ? e.message : e));
+    }
+  }
+
+  function mostrarEstado(){
+    var flagRaw = localStorage.getItem(FLAG_KEY);
+    if (flagRaw) {
+      var flag = null;
+      try { flag = JSON.parse(flagRaw); } catch(e){}
+      estadoBox.className = "estado hecha";
+      estadoBox.innerHTML = "✅ Ya se ejecutó." +
+        (flag ? "<br>Fecha objetivo limpiada: " + flag.fecha_objetivo + "<br>Ejecutada: " + flag.fecha_ejecucion + "<br>Eliminados: " + flag.eliminados : "") +
+        "<br>No se ejecutará de nuevo.";
+      btnForzar.style.display = "none";
+      return;
+    }
+
+    var ahora = new Date();
+    var medianocheHoy = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 0, 0, 0, 0);
+
+    if (ahora >= medianocheHoy) {
+      // ya pasó medianoche del dia que sea que se abra esta pagina —
+      // corre inmediatamente, filtrando SOLO TARGET_DATE (2026-07-09),
+      // sin importar que dia sea "hoy" al momento de abrir.
+      estadoBox.className = "estado esperando";
+      estadoBox.textContent = "Ejecutando limpieza de " + TARGET_DATE + " ahora...";
+      ejecutarLimpieza("automática al abrir la página");
+    } else {
+      var msFalta = medianocheHoy.getTime() - ahora.getTime();
+      estadoBox.className = "estado esperando";
+      estadoBox.textContent = "Esperando a las 12:00 AM (faltan " + Math.round(msFalta/60000) + " min). Deja esta página abierta, o ábrela después de medianoche y se ejecutará sola.";
+      btnForzar.style.display = "block";
+      setTimeout(function(){ ejecutarLimpieza("automática, disparada a medianoche"); }, msFalta);
+    }
+  }
+
+  btnForzar.addEventListener("click", function(){
+    if (!confirm("¿Ejecutar la limpieza única ahora mismo, solo para " + TARGET_DATE + "?")) return;
+    ejecutarLimpieza("manual, forzada");
+  });
+
+  mostrarEstado();
+</script>
+</body>
+</html>
