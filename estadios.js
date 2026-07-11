@@ -1,4 +1,48 @@
 // estadios.js
+//
+// RUTA: Fuente única de datos de estadios (coordenadas, timezone, roof,
+//   alias de nombre de parque, y funciones de resolución de venue). Está
+//   en la BASE de la cadena — se carga antes que clima-cache.js,
+//   jalar-clima.js, score-match.js, casar-series-test.html y
+//   calcular-coincidencia.js.
+//
+// RECIBE DE: nada. Es dato estático (hardcodeado), sin fetch ni
+//   dependencia de otros archivos.
+//
+// ENTREGA A: jalar-clima.js (stadiumNorm, STADIUM_INDEX), clima-cache.js
+//   (indirectamente, vía el objeto "s" que jalar-clima.js le pasa a sus
+//   funciones), score-match.js (stadiumGet, STADIUM_INDEX, stadiumNorm,
+//   stadiumCanonName), calcular-coincidencia.js (stadiumGet),
+//   casar-series-test.html (stadiumCanonName, stadiumGet), y
+//   transitivamente index.html, F5, K6, Moneyline y cualquier módulo que
+//   necesite resolver o comparar nombres de parque.
+//
+// NO TOCA: clima, carreras, score, series ni Data Madre. No hace fetch, no
+//   escribe caché, no escribe localStorage.
+//
+// REGLA MADRE: Este archivo es el ÚNICO lugar donde debe vivir el mapeo
+//   canónico de nombres de parque (alias -> canónico). Ningún otro archivo
+//   debe mantener su propio mapeo de alias de parque en paralelo — todos
+//   deben resolver el parque a través de stadiumGet()/stadiumCanonName().
+//
+// DEPENDENCIAS OBLIGATORIAS: ninguna (es la base de la cadena). Debe
+//   cargarse ANTES que cualquier archivo que use stadiumNorm(),
+//   stadiumGet(), stadiumCanonName() o STADIUM_INDEX.
+//
+// SALIDA: STADIUM_COORDS_2026 (array de los 30 parques estándar),
+//   STADIUM_ESPECIALES_2026 (array de sedes neutrales/especiales),
+//   STADIUM_INDEX (Map venue-normalizado -> objeto estadio, incluye
+//   estándar + especiales + alias), STADIUM_ALIAS_2026 (mapa alias ->
+//   nombre canónico), stadiumNorm(), stadiumCanonName(), stadiumGet().
+//
+// SI ESTE ARCHIVO FALLA: se cae toda la cadena — clima-cache.js /
+//   jalar-clima.js no pueden resolver coordenadas/timezone/roof,
+//   score-match.js no puede aplicar el interruptor de domo fijo,
+//   calcular-coincidencia.js y casar-series-test.html no pueden confirmar
+//   "mismo parque" (todo devuelve SIN_HISTORICO_MISMO_PARQUE /
+//   VENUE_HOY_NO_RECONOCIDO), y F5/K6/Moneyline pierden la fuente única de
+//   nombres de parque.
+//
 // PIEZA 4a - datos de estadios 2026 (coordenadas + roof).
 // Copiados IDENTICOS de la app JALAR historial. No se cambio ningun valor.
 // Dato centralizado, no suelto dentro del jalador.
