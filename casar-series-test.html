@@ -1,3 +1,29 @@
+<!--
+  casar-series-test.html
+
+  RUTA: Pantalla de auditoría del histórico por parque, series y dirección
+  de viento. Está fuera de la cadena de producción.
+
+  RECIBE DE: estadios.js, clima-cache.js y parques-orientacion.js.
+
+  ENTREGA A: únicamente la pantalla de auditoría. No alimenta ningún motor.
+
+  NO TOCA: histórico, localStorage, jalar-clima.js, Coincidencia, K6, F5,
+  Moneyline ni Over/Under.
+
+  REGLA MADRE: Solo procesa fechas ISO reales anteriores a hoy, juegos
+  Final, carreras finitas y parques reconocidos. Toda dirección de viento
+  se normaliza a 0–359 antes de calcular promedios o favorable/desfavorable.
+
+  DEPENDENCIAS OBLIGATORIAS: climaLeerCache(), climaHoyISO(),
+  stadiumGet(), stadiumCanonName() y getOrientacionParque().
+
+  SALIDA: series agrupadas, rangos de viento, brújula, conclusión general
+  y exportación del caché para auditoría.
+
+  SI ESTE ARCHIVO FALLA: solo se pierde la herramienta de auditoría; no
+  afecta Coincidencia, Over/Under, K6, F5 ni Moneyline.
+-->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -117,6 +143,79 @@
     return (typeof stadiumCanonName === "function") ? stadiumCanonName(v) : v;
   }
 
+  // Valida que una fecha "YYYY-MM-DD" sea una fecha REAL, no una que
+  // Date() haya normalizado (ej. "2026-02-30" -> 2026-03-02).
+  function fechaISOValida(iso) {
+    if (typeof iso !== "string") return false;
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+    if (!m) return false;
+    var y = parseInt(m[1], 10), mo = parseInt(m[2], 10), d = parseInt(m[3], 10);
+    if (mo < 1 || mo > 12) return false;
+    if (d < 1 || d > 31) return false;
+    var dt = new Date(Date.UTC(y, mo - 1, d));
+    if (isNaN(dt.getTime())) return false;
+    return dt.getUTCFullYear() === y && (dt.getUTCMonth() + 1) === mo && dt.getUTCDate() === d;
+  }
+
+  // ===== BARRERA DEFENSIVA (agregada 11 jul 2026, auditoría casar-series) =====
+  // Antes de agrupar cualquier serie o rango de viento, todo registro del
+  // cache debe volver a cumplir la regla madre, sin confiar en que
+  // clima-cache.js/jalar-clima.js ya lo hicieron (defensa en profundidad
+  // contra cache contaminado que haya quedado de antes de esas reparaciones).
+  //
+  // Exige:
+  //   - r.date es una fecha ISO REAL (fechaISOValida) y < hoy MLB (climaHoyISO())
+  //   - status === "Final"
+  //   - home_runs y away_runs numéricos Y finitos (Number.isFinite)
+  //   - parque reconocido, vía stadiumGet() (definida en estadios.js)
+  //
+  // No se toca jalar-clima.js, clima-cache.js, K6, F5 ni Moneyline: esta
+  // barrera vive solo aquí, en la puerta de entrada de esta página.
+  function climaHistoricoValido(r, hoyISO) {
+    if (!r || !fechaISOValida(r.date)) return false;
+    if (r.date >= hoyISO) return false;
+    if (r.status !== "Final") return false;
+    if (typeof r.home_runs !== "number" || !Number.isFinite(r.home_runs)) return false;
+    if (typeof r.away_runs !== "number" || !Number.isFinite(r.away_runs)) return false;
+    if (typeof stadiumGet !== "function") return false; // sin validador real, no se puede confirmar parque
+    var st = stadiumGet(r.venue);
+    if (!st) return false; // VENUE_NO_RECONOCIDO
+    return true;
+  }
+
+  // Devuelve el cache ya filtrado por la barrera defensiva.
+  // Confirma que climaLeerCache() devuelva un ARRAY antes de procesarlo
+  // (si devolviera otra cosa, .length/for lo tratarian mal o tronarian).
+  // Si climaHoyISO() o stadiumGet() no están disponibles, devuelve vacío
+  // en vez de arriesgar mezclar datos no validados (NO_CONFIRMADO explícito
+  // por consola, no silencioso).
+  function cacheHistoricoFiltrado() {
+    var cache = (typeof climaLeerCache === "function") ? climaLeerCache() : [];
+    if (!Array.isArray(cache)) {
+      log("ERROR: climaLeerCache() no devolvió un array. Se trata como vacío.");
+      cache = [];
+    }
+    if (typeof climaHoyISO !== "function") {
+      log("ERROR: climaHoyISO() no disponible (clima-cache.js no cargó). No se puede filtrar con seguridad.");
+      return [];
+    }
+    if (typeof stadiumGet !== "function") {
+      log("ERROR: stadiumGet() no disponible (estadios.js no cargó o no expone stadiumGet). No se puede confirmar parque.");
+      return [];
+    }
+    var hoyISO = climaHoyISO();
+    var out = [];
+    var rechazados = 0;
+    for (var i=0;i<cache.length;i++){
+      if (climaHistoricoValido(cache[i], hoyISO)) out.push(cache[i]);
+      else rechazados++;
+    }
+    if (rechazados > 0) {
+      log("BARRERA DEFENSIVA: " + rechazados + " fila(s) del cache descartada(s) (no cumplen fecha ISO real y anterior a hoy, Final, carreras finitas o parque reconocido).");
+    }
+    return out;
+  }
+
   function vientoFavorable(windDir, hpACF) {
     if (hpACF===null || hpACF===undefined) return null;
     var opuesto = (hpACF + 180) % 360;
@@ -127,8 +226,8 @@
 
   (function llenarParques(){
     try {
-      var cache = (typeof climaLeerCache==="function") ? climaLeerCache() : [];
-      if(!cache.length){ log("CACHE VACIO. Abre el index y pulsa COINCIDENCIA para llenar el cache."); return; }
+      var cache = cacheHistoricoFiltrado();
+      if(!cache.length){ log("CACHE VACIO (tras barrera defensiva). Abre el index y pulsa COINCIDENCIA para llenar el cache."); return; }
       var set={};
       for(var i=0;i<cache.length;i++){
         if(cache[i]&&cache[i].venue&&cache[i].home_team){
@@ -141,7 +240,7 @@
         var o=document.createElement("option"); o.value=parques[j];
         o.textContent=set[parques[j]]+" · "+parques[j]; selParque.appendChild(o);
       }
-      log("Equipos en cache: "+parques.length+". Filas totales: "+cache.length);
+      log("Equipos en cache: "+parques.length+". Filas válidas: "+cache.length);
     } catch(e){ log("ERROR llenando parques: "+e.message); }
   })();
 
@@ -164,13 +263,13 @@
   }
 
   function diffDias(d1,d2){
-    var a=new Date(d1+"T00:00:00"),b=new Date(d2+"T00:00:00");
+    var a=new Date(d1+"T00:00:00Z"),b=new Date(d2+"T00:00:00Z");
     return Math.abs((b-a)/(1000*60*60*24));
   }
 
   function carrerasDe(g){
     var ar=g.away_runs,hr=g.home_runs;
-    if(ar!==null&&ar!==undefined&&hr!==null&&hr!==undefined) return Number(ar)+Number(hr);
+    if(typeof ar==="number"&&Number.isFinite(ar)&&typeof hr==="number"&&Number.isFinite(hr)) return ar+hr;
     return null;
   }
 
@@ -247,7 +346,7 @@
     var venue=selParque.value;
     if(!venue){ log("Elige un parque."); return; }
     try {
-      var cache=climaLeerCache();
+      var cache=cacheHistoricoFiltrado();
       var series=casarSeries(cache,venue);
       log(venue+": "+series.length+" series encontradas.");
       if(!series.length){ log("Sin series para este parque."); return; }
@@ -258,7 +357,7 @@
           var g=se.juegos[k],c=carrerasDe(g);
           var marc=(g.away_runs!==undefined&&g.away_runs!==null&&g.home_runs!==undefined&&g.home_runs!==null)?(g.away_runs+"-"+g.home_runs):"—";
           if(c!==null){sumC+=c;nC++;carrerasArr.push(c);}
-          if(typeof g.windspeed_mph==="number"){sumV+=g.windspeed_mph;nV++;}
+          if(typeof g.windspeed_mph==="number"&&Number.isFinite(g.windspeed_mph)){sumV+=g.windspeed_mph;nV++;}
           if(typeof g.temperature_f==="number"){sumT+=g.temperature_f;nT++;}
           var dirTxt=(g.wind_dir!==undefined&&g.wind_dir!==null&&g.wind_dir!=="")?"dir "+g.wind_dir:"dir —";
           filas+='<div class="jrow"><span class="f">'+g.date+'</span>'+
@@ -293,7 +392,7 @@
     var venue=selParque.value;
     if(!venue){ log("Elige un parque."); return; }
     try {
-      var cache=climaLeerCache();
+      var cache=cacheHistoricoFiltrado();
       var hpACF=(typeof getOrientacionParque==="function")?getOrientacionParque(venue):null;
 
       var homeTeam="";
@@ -335,8 +434,17 @@
           var gk=gs[k],c=carrerasDe(gk);
           if(c!==null){sumC+=c;nC++;}
           if(typeof gk.temperature_f==="number"){sumT+=gk.temperature_f;nT++;}
-          if(!isNaN(Number(gk.wind_dir))){sumDir+=Number(gk.wind_dir);nDir++;}
-          if(typeof gk.windspeed_mph==="number"){sumV+=gk.windspeed_mph;nV++;}
+          var gkWindDirNum = Number(gk.wind_dir);
+          if(Number.isFinite(gkWindDirNum)){
+            // Normalizar a 0-359 ANTES de sumar (mismo criterio que el
+            // agrupamiento por bucket arriba). Sin esto, un wind_dir crudo
+            // fuera de rango (ej. -10, que agrupa igual que 350) sumaba
+            // -10 en vez de 350, desfasando el promedio 360 grados y
+            // pudiendo voltear FAVORABLE/DESFAVORABLE en vientoFavorable().
+            var dirNorm = ((gkWindDirNum%360)+360)%360;
+            sumDir+=dirNorm;nDir++;
+          }
+          if(typeof gk.windspeed_mph==="number"&&Number.isFinite(gk.windspeed_mph)){sumV+=gk.windspeed_mph;nV++;}
         }
         var promC=nC>0?(sumC/nC).toFixed(1):"—";
         var promDir=nDir>0?sumDir/nDir:parseInt(lbl)+15;
@@ -348,7 +456,7 @@
           else if(sumC/nC<8) colorCls="rojo";
         }
 
-        var esFavor = vientoFavorable(promDir, hpACF);
+        var esFavor = vientoFavorable(((Number(promDir)%360)+360)%360, hpACF);
         var favorHtml;
         if (esFavor===null) {
           favorHtml = '<div class="rv-favor nc">NO_CONFIRMADO (orientación de parque sin medir)</div>';
@@ -407,36 +515,37 @@
     consoleEl.textContent=""; listaEl.innerHTML="";
     try {
       var cache = climaLeerCache();
+      if (!Array.isArray(cache)) {
+        log("ERROR: climaLeerCache() no devolvió un array. Se trata como vacío.");
+        cache = [];
+      }
       var texto = JSON.stringify(cache);
       listaEl.innerHTML = '<textarea readonly style="width:100%;height:300px;background:#161b22;color:#e6edf3;border:1px solid #30363d;border-radius:8px;padding:10px;font-size:11px;box-sizing:border-box;" onclick="this.select()">'+texto+'</textarea>';
-      log("Cache exportado: "+cache.length+" filas. Toca el cuadro de texto, selecciona todo y copia.");
+      log("Cache exportado (SIN filtrar, para auditoría): "+cache.length+" filas. Toca el cuadro de texto, selecciona todo y copia.");
     } catch(e){ log("ERROR: "+e.message); }
   });
   document.getElementById("goConclusion").addEventListener("click", function(){
     consoleEl.textContent=""; listaEl.innerHTML="";
     try {
-      var cache = climaLeerCache();
+      var cache = cacheHistoricoFiltrado();
       var vientoMin = Number(document.getElementById("vientoMin").value) || 0;
-      if (typeof PARQUES_ORIENTACION === "undefined" || typeof getOrientacionParque !== "function") {
-        log("ERROR: parques-orientacion.js no está cargado en esta página.");
+      if (typeof getOrientacionParque !== "function") {
+        log("ERROR: parques-orientacion.js no está cargado en esta página (getOrientacionParque no disponible).");
         return;
       }
       var favJuegos = [], desfJuegos = [], excluidos = [];
       for (var i=0; i<cache.length; i++) {
         var g = cache[i];
         if (g.status !== "Final") continue;
-        if (typeof g.total_runs !== "number") continue;
+        if (typeof g.total_runs !== "number" || !Number.isFinite(g.total_runs)) continue;
         if (g.roof === "fixed_dome") { excluidos.push(g); continue; }
-        if (typeof g.wind_dir !== "number") { excluidos.push(g); continue; }
-        if (typeof g.windspeed_mph === "number" && g.windspeed_mph < vientoMin) { excluidos.push(g); continue; }
-        var hpACF = null;
-        for (var key in PARQUES_ORIENTACION) {
-          if (g.venue && (g.venue.toLowerCase().indexOf(key.toLowerCase())>=0 || key.toLowerCase().indexOf(g.venue.toLowerCase())>=0)) {
-            hpACF = PARQUES_ORIENTACION[key].hpACF; break;
-          }
-        }
-        if (hpACF === null) { excluidos.push(g); continue; }
-        if (vientoFavorable(g.wind_dir, hpACF)) favJuegos.push(g);
+        if (typeof g.wind_dir !== "number" || !Number.isFinite(g.wind_dir)) { excluidos.push(g); continue; }
+        if (typeof g.windspeed_mph !== "number" || !Number.isFinite(g.windspeed_mph)) { excluidos.push(g); continue; }
+        if (g.windspeed_mph < vientoMin) { excluidos.push(g); continue; }
+        var hpACF = getOrientacionParque(venueCanon(g.venue));
+        if (hpACF === null || hpACF === undefined) { excluidos.push(g); continue; }
+        var windDirNorm = ((g.wind_dir%360)+360)%360;
+        if (vientoFavorable(windDirNorm, hpACF)) favJuegos.push(g);
         else desfJuegos.push(g);
       }
       function prom(arr){ if(!arr.length) return 0; var s=0; for(var i=0;i<arr.length;i++) s+=arr[i].total_runs; return (s/arr.length); }
