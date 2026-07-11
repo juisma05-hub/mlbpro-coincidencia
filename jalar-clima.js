@@ -1,31 +1,78 @@
 // jalar-clima.js
-// PIEZA 4c - jalado completo: schedule + clima + carreras + cache.
 //
-// REGLA MADRE:
-// El juego de hoy JAMAS entra al historico.
-// Solo se guarda en Data Madre:
-// 1. juego de fecha anterior a hoy;
-// 2. estado Final;
-// 3. carreras finales disponibles.
+// RUTA: Orquestador que jala el schedule de MLB, cruza clima (vía
+//   clima-cache.js) y carreras/pitchers (vía MLB StatsAPI), y alimenta
+//   tanto el histórico como el clima de hoy en memoria. Se ubica entre
+//   MLB StatsAPI/clima-cache.js/estadios.js y el resto de la cadena de
+//   Coincidencia (casar-series-test.html, calcular-coincidencia.js).
 //
-// Los juegos de hoy pueden consultarse para clima en vivo,
-// pero NO se guardan en MLBPRO_CLIMA_CACHE_2026.
+// RECIBE DE: MLB_ROUTES.WORKER_BASE (proxy para StatsAPI
+//   schedule/linescore/boxscore); clima-cache.js (climaHoyISO,
+//   climaLeerCache, climaStartDesde, climaFetchWeather, climaKeyTZ,
+//   climaBuscarHoraCercana, climaHoyGuardar, climaGuardarCache,
+//   climaMerge); estadios.js (stadiumNorm, STADIUM_INDEX — el índice ya
+//   incluye alias resueltos por estadios.js al cargar, así que
+//   STADIUM_INDEX.get(stadiumNorm(venue)) resuelve el mismo nombre maestro
+//   que stadiumGet(venue); confirmado por auditoría, ver DEPENDENCIAS).
 //
-// CORREGIDO 6 jul 2026: se agrega el pitcher abridor (home/away) de cada
-// juego Final, jalado del boxscore de MLB StatsAPI.
+// ENTREGA A: climaGuardarCache() (histórico persistido en
+//   MLBPRO_CLIMA_CACHE_2026) y climaHoyGuardar() (memoria temporal de
+//   hoy), que a su vez alimentan casar-series-test.html,
+//   calcular-coincidencia.js (y transitivamente score-match.js), y
+//   Over/Under. F5 puede leer climaHoyLeer() si lo necesita.
 //
-// CORREGIDO 9 jul 2026: gameDate de MLB viene en UTC. Para buscar clima
-// por hora, se convierte a hora local del parque usando climaKeyTZ().
+// NO TOCA: K6, F5, Moneyline directamente (solo deja el clima de hoy
+//   disponible en memoria para que esos módulos lo lean si quieren; no
+//   escribe ni modifica nada de esos módulos).
 //
-// CORREGIDO 9 jul 2026: si la hora exacta no existe, se busca una hora
-// cercana dentro de un maximo de ±3 horas.
+// REGLA MADRE: El juego de hoy JAMÁS entra al histórico — solo pasa por
+//   climaHoyGuardar() (memoria temporal), nunca por climaGuardarCache().
+//   Al histórico (climaGuardarCache()) solo puede llegar un candidato que
+//   cumpla TODAS estas condiciones:
+//     - fecha (date) anterior a hoy (comparación de string ISO, más la
+//       barrera propia de climaGuardarCache() en clima-cache.js);
+//     - status === "Final";
+//     - home_runs y away_runs numéricos Y finitos (Number.isFinite, no
+//       solo typeof "number" — NaN también es typeof "number");
+//     - parque resuelto contra el nombre maestro de estadios.js (si no se
+//       resuelve, el registro queda con marcadores ERR:VENUE_NOT_IN_TABLE
+//       en los campos de clima y es rechazado aguas abajo por
+//       climaGuardarCache()/climaRegistroValido() como
+//       VENUE_NO_RECONOCIDO — nunca se persiste en localStorage).
+//   Ningún registro mezcla datos de un parque con el clima/orientación de
+//   otro: el clima se busca siempre con la clave del propio parque del
+//   juego (stadiumNorm(g.venue)).
 //
-// CORRECCION CRITICA 10 jul 2026:
-// - Se elimina del cache cualquier juego de hoy o futuro.
-// - Se elimina cualquier registro que no tenga estado Final.
-// - Se impide guardar nuevamente juegos de hoy.
-// - Se exigen carreras finales numericas antes de incorporar un juego.
-// - No se toca la conversion horaria, clima, viento ni pitchers.
+// DEPENDENCIAS OBLIGATORIAS: MLB_ROUTES.WORKER_BASE; stadiumNorm() y
+//   STADIUM_INDEX (de estadios.js — confirmado que STADIUM_INDEX ya trae
+//   los alias de STADIUM_ALIAS_2026 fusionados al cargar, por lo que
+//   equivale a stadiumGet() para resolver nombre maestro); climaHoyISO,
+//   climaLeerCache, climaStartDesde, climaFetchWeather, climaKeyTZ,
+//   climaBuscarHoraCercana, climaHoyGuardar, climaGuardarCache,
+//   climaMerge (de clima-cache.js).
+//
+// SALIDA: array totalHistorico (el mismo que queda guardado en el caché
+//   histórico tras climaGuardarCache(), ya filtrado por su propia
+//   barrera). Efecto secundario: los registros de hoy quedan en memoria
+//   vía climaHoyGuardar().
+//
+// SI ESTE ARCHIVO FALLA: el histórico no se actualiza
+//   (casar-series-test.html y calcular-coincidencia.js siguen con datos
+//   viejos), y el clima de hoy no llega a memoria (F5 y pantallas de hoy
+//   pueden quedarse sin clima actual, repitiendo el cruce original).
+//
+// HISTORIAL: pitcher abridor desde boxscore (6 jul); gameDate UTC ->
+//   climaKeyTZ() (9 jul); hora cercana ±3h (9 jul); limpieza crítica de
+//   hoy/futuro/no-Final/carreras incompletas (10 jul); climaHoyGuardar()
+//   agregado para juegos de hoy sin tocar el filtro histórico ni
+//   climaGuardarCache() (11 jul, aprobado); CORREGIDO 11 jul 2026
+//   (auditoría de integración completa): las tres validaciones de
+//   carreras que solo comprobaban typeof "number" (en runsMap, en el
+//   guardia de nuevosHistoricos, y en el filtro final de totalHistorico)
+//   ahora exigen además Number.isFinite() — un NaN sigue siendo typeof
+//   "number" y antes podía colarse en teoría. Ningún otro comportamiento
+//   cambia: misma fecha de corte, mismo criterio Final, mismo manejo de
+//   clima/pitchers/venue no reconocido.
 
 async function jalarClima(logFn) {
   function log(t) {
@@ -37,7 +84,7 @@ async function jalarClima(logFn) {
 
   // LIMPIEZA CRITICA:
   // El cache historico solo puede contener juegos anteriores a hoy,
-  // Final y con carreras completas.
+  // Final y con carreras completas y finitas.
   const cacheViejo = cacheOriginal.filter(function(r) {
     if (!r || !r.date) return false;
     if (r.date >= hoy) return false;
@@ -45,11 +92,11 @@ async function jalarClima(logFn) {
 
     const homeRunsValidas =
       typeof r.home_runs === "number" &&
-      !isNaN(r.home_runs);
+      Number.isFinite(r.home_runs);
 
     const awayRunsValidas =
       typeof r.away_runs === "number" &&
-      !isNaN(r.away_runs);
+      Number.isFinite(r.away_runs);
 
     return homeRunsValidas && awayRunsValidas;
   });
@@ -232,10 +279,10 @@ async function jalarClima(logFn) {
       const ar = dLs.teams.away.runs;
 
       if (
-        typeof hr !== "number" ||
-        typeof ar !== "number"
+        typeof hr !== "number" || !Number.isFinite(hr) ||
+        typeof ar !== "number" || !Number.isFinite(ar)
       ) {
-        throw new Error("runs no numerico");
+        throw new Error("runs no numerico o no finito");
       }
 
       runsMap.set(g.game_id, {
@@ -313,6 +360,140 @@ async function jalarClima(logFn) {
     }
   }
 
+  // ===== NUEVO 11 jul 2026: HOY -> climaHoyGuardar() (memoria temporal) =====
+  // Solo juegos de hoy (g.date === hoy). No toca el filtro historico de arriba,
+  // no llama climaGuardarCache(), no cambia runsMap/pitchersMap ni su logica.
+  // Reusa el mismo mapa "weather" y la misma resolucion de hora ya calculados.
+  let hoyGuardados = 0;
+
+  games.forEach(function(g) {
+    if (!g.date || g.date !== hoy) {
+      return;
+    }
+
+    const k = stadiumNorm(g.venue);
+    const s = STADIUM_INDEX.get(k);
+
+    let w = {
+      temperature_f: "",
+      windspeed_mph: "",
+      wind_dir: "",
+      precipitation_mm: "",
+      humidity_pct: ""
+    };
+
+    let roof = "";
+    let tz = "";
+
+    if (!s) {
+      const e1 = "ERR:VENUE_NOT_IN_TABLE";
+
+      w = {
+        temperature_f: e1,
+        windspeed_mph: e1,
+        wind_dir: e1,
+        precipitation_mm: e1,
+        humidity_pct: e1
+      };
+    } else {
+      roof = s.roof;
+      tz = s.timezone;
+
+      const c = weather.get(k);
+
+      if (c && c.error) {
+        const e2 = "ERR:WEATHERAPI";
+
+        w = {
+          temperature_f: e2,
+          windspeed_mph: e2,
+          wind_dir: e2,
+          precipitation_mm: e2,
+          humidity_pct: e2
+        };
+      } else if (c && typeof c.get === "function") {
+        const gameLocal = climaKeyTZ(g.gameDate, tz);
+
+        const hit =
+          c.get(gameLocal) ||
+          climaBuscarHoraCercana(
+            c,
+            gameLocal
+          );
+
+        if (!hit) {
+          const e3 = "ERR:NO_HOUR_MATCH";
+
+          w = {
+            temperature_f: e3,
+            windspeed_mph: e3,
+            wind_dir: e3,
+            precipitation_mm: e3,
+            humidity_pct: e3
+          };
+        } else {
+          w = hit;
+        }
+      } else {
+        const e4 = "ERR:WEATHER_MAP";
+
+        w = {
+          temperature_f: e4,
+          windspeed_mph: e4,
+          wind_dir: e4,
+          precipitation_mm: e4,
+          humidity_pct: e4
+        };
+      }
+    }
+
+    // Pitchers: solo si ya vienen disponibles (este loop no los busca,
+    // el boxscore de hoy normalmente aun no tiene abridores confirmados).
+    const pit = pitchersMap.get(g.game_id);
+
+    const registroHoy = {
+      game_id: g.game_id,
+      date: g.date,
+      status: g.status,
+      venue: g.venue,
+      gameDate: g.gameDate,
+
+      temperature_f: w.temperature_f,
+      windspeed_mph: w.windspeed_mph,
+      wind_dir: w.wind_dir,
+      precipitation_mm: w.precipitation_mm,
+      humidity_pct: w.humidity_pct,
+
+      roof: roof,
+      timezone: tz,
+
+      home_team: g.home_team,
+      away_team: g.away_team,
+
+      home_pitcher_id:
+        pit
+          ? pit.home_pitcher_id
+          : null,
+
+      away_pitcher_id:
+        pit
+          ? pit.away_pitcher_id
+          : null
+    };
+
+    if (climaHoyGuardar(registroHoy)) {
+      hoyGuardados++;
+    }
+  });
+
+  if (hoyGuardados > 0) {
+    log(
+      "HOY: " +
+      hoyGuardados +
+      " juego(s) guardado(s) en memoria temporal (climaHoyGuardar), no en historico."
+    );
+  }
+
   const nuevosHistoricos = [];
 
   games.forEach(function(g) {
@@ -328,11 +509,11 @@ async function jalarClima(logFn) {
 
     const rc = runsMap.get(g.game_id);
 
-    // Un juego no entra hasta tener carreras finales completas.
+    // Un juego no entra hasta tener carreras finales completas y finitas.
     if (
       !rc ||
-      typeof rc.home_runs !== "number" ||
-      typeof rc.away_runs !== "number"
+      typeof rc.home_runs !== "number" || !Number.isFinite(rc.home_runs) ||
+      typeof rc.away_runs !== "number" || !Number.isFinite(rc.away_runs)
     ) {
       log(
         "NO INCORPORADO " +
@@ -471,8 +652,8 @@ async function jalarClima(logFn) {
         r.date &&
         r.date < hoy &&
         r.status === "Final" &&
-        typeof r.home_runs === "number" &&
-        typeof r.away_runs === "number"
+        typeof r.home_runs === "number" && Number.isFinite(r.home_runs) &&
+        typeof r.away_runs === "number" && Number.isFinite(r.away_runs)
       );
     });
 
