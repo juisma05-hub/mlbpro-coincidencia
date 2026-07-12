@@ -26,6 +26,23 @@
   clima-cache.js, jalar-clima.js, score-match.js, calcular-coincidencia.js,
   jalar-linea.js (mercado), jalar-lineup.js, K6, F5. No escribe cache.
 
+  UTC / HORA LOCAL DEL ESTADIO:
+  No aplica. Este archivo no usa horarios ni timezone en ningún cálculo
+  — solo lee un campo de texto (gameData.weather.condition) del feed en
+  vivo de MLB, sin fecha ni hora involucrada en la lógica.
+
+  QUÉ HACE: lee y devuelve la condición climática real reportada por MLB
+  para un juego puntual, o NO_CONFIRMADO/ERR según corresponda.
+
+  QUÉ NO HACE: no calcula nada, no combina con otros datos de clima, no
+  decide qué mostrar — solo entrega el valor crudo o su ausencia.
+
+  QUÉ AFECTA: el texto de "condición" que se muestra junto al clima de
+  hoy en index.html (chip informativo).
+
+  QUÉ NO AFECTA: la Data Madre, el histórico, Coincidencia, F5, K6,
+  MoneyLine, lineups, mercado.
+
   CORRECCIÓN ACTUAL:
   El endpoint ya era el correcto (sin cambios). Se corrigió únicamente la
   etiqueta de ausencia de dato: antes devolvía "ERR:NO_CONDITION" (sonaba a
