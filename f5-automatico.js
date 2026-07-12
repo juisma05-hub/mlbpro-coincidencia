@@ -42,29 +42,46 @@
   (mercado de línea completa, distinto de jalar-linea-f5.js). No escribe
   ninguna caché directamente.
 
-  CORRECCIÓN ACTUAL:
+  CORRECCIÓN ANTERIOR (misma cadena, sesión previa):
   jalarLineup(g.gamePk) se llamaba SIN awayTeamId/homeTeamId, así que el
   fallback real LINEUP_ULTIMO_CONFIRMADO (ya existente en jalar-lineup.js)
-  nunca se activaba para F5: si el lineup de HOY no estaba confirmado,
-  lineup_away/lineup_home quedaban vacíos aunque el equipo tuviera un
-  último lineup Final real disponible. Esto producía "CARRERAJE: SIN_DATOS"
-  y "Sin pitcher o lineup rival" en juegos que sí tenían datos reales
-  utilizables. Se agregó la extracción de homeTeamId/awayTeamId (mismo
-  patrón que ya usa index.html) y ahora se llama jalarLineup(g.gamePk,
-  awayTeamId, homeTeamId). Las condiciones que deciden si hay lineup rival
-  usable pasan de mirar solo ".length" a mirar lineup_disponible_away /
-  lineup_disponible_home (el campo pensado exactamente para esto: "hay 9
-  titulares reales, sea de hoy o del último Final confirmado"). Si de
-  verdad no hay ningún lineup real disponible (ni de hoy ni el último
-  Final), sigue quedando SIN_DATOS — nunca se inventa un lineup ni un
-  número de carreras.
+  nunca se activaba para F5. Se agregó la extracción de homeTeamId/
+  awayTeamId y ahora se llama jalarLineup(g.gamePk, awayTeamId, homeTeamId).
+  Las condiciones que deciden si hay lineup rival usable pasan de mirar
+  solo ".length" a mirar lineup_disponible_away / lineup_disponible_home.
+  Confirmado: ya no es el cuello de botella (evidencia: aparecen casos
+  "PENDIENTE POR ACCESO" con wOBA/Dominio calculados).
+
+  DIAGNÓSTICO TEMPORAL (agregado esta sesión, AÚN NO ES UNA CORRECCIÓN):
+  Se detectó un mismatch real y confirmado entre las dos tablas maestras
+  que cruza calcularFactorArsenalLineup() (factor-arsenal-lineup.js): los
+  códigos de pitcheo FS y SV existen en ARSENAL_MASTER_2026 pero no se
+  encontraron como clave en ningún bateador de BATTERS_VSPITCH_2026 (base
+  de datos revisada parcialmente, sin conteo total todavía). Para
+  confirmar si esto es lo que produce el SIN_DATOS restante en la mayoría
+  de los juegos, o si hay otra causa, se agregó diagnosticoArsenalLineup():
+  una función de SOLO LECTURA que no cambia ninguna fórmula ni dato
+  maestro, y que por cada juego imprime en consola:
+    - si el pitcher de hoy tiene o no arsenal confirmado;
+    - bateadores encontrados en BATTERS_VSPITCH_2026 / total del lineup;
+    - qué códigos del arsenal del pitcher no encuentran NINGÚN bateador
+      del lineup con ese código y pa>=5 (los "códigos sin cruce" reales de
+      ESE juego, no una muestra ni una suposición);
+    - bateadores_usados y nota, tal como los devuelve
+      calcularFactorArsenalLineup() de verdad (sin reinterpretarlos).
+  Este diagnóstico es temporal: no toca Moneyline, clima, línea de
+  mercado, K6 ni brújula, y no modifica factor-arsenal-lineup.js,
+  f5-carreraje.js, arsenal-master.js ni batters-vspitch.js. Debe quitarse
+  (o dejarse silenciado) una vez identificada la causa real, en la
+  siguiente corrección.
 
   FECHA:
   12 jul 2026.
 
   ESTADO:
-  NO_CONFIRMADO — pendiente de que se ejecute F5 Automático con juegos
-  reales de hoy y se confirme carreraje/Línea MLBPro/score proyectado.
+  NO_CONFIRMADO — con diagnóstico temporal agregado. Pendiente de una
+  corrida real de F5 Automático para identificar la causa exacta del
+  SIN_DATOS antes de tocar cualquier fórmula o dato maestro.
 */
 
 // f5-automatico.js — MLBPro F5 · Pieza Automática
@@ -85,6 +102,54 @@
 // (hit.humidity_pct), que `today` no capturaba antes: es el mismo patrón
 // exacto que ya usan tempF/vientoMph/direccionViento sobre el mismo objeto
 // `hit`, no un cálculo nuevo ni una conversión inventada.
+// DIAGNÓSTICO TEMPORAL — SOLO LECTURA.
+// No modifica ARSENAL_MASTER_2026, BATTERS_VSPITCH_2026 ni
+// calcularFactorArsenalLineup(). Solo inspecciona los mismos datos que esa
+// función ya usa, para imprimir en consola por qué un cruce puede quedar
+// sin bateadores válidos. Se puede quitar sin afectar ningún cálculo real.
+function diagnosticoArsenalLineup(pitcherId, lineupRival, etiqueta, logFn) {
+  function log(t) { if (typeof logFn === "function") logFn(t); }
+
+  if (!pitcherId) {
+    log("  DIAGNOSTICO ARSENAL [" + etiqueta + "]: sin pitcherId (probable pitcher no confirmado).");
+    return;
+  }
+
+  const arsenalData = (typeof ARSENAL_MASTER_2026 !== "undefined") ? ARSENAL_MASTER_2026[pitcherId] : null;
+  const tieneArsenal = !!(arsenalData && arsenalData.arsenal && arsenalData.arsenal.length);
+
+  const totalLineup = lineupRival ? lineupRival.length : 0;
+  let bateadoresEncontrados = 0;
+  if (lineupRival && typeof BATTERS_VSPITCH_2026 !== "undefined") {
+    for (let i = 0; i < lineupRival.length; i++) {
+      if (BATTERS_VSPITCH_2026[lineupRival[i].player_id]) bateadoresEncontrados++;
+    }
+  }
+
+  // Códigos del arsenal de ESTE pitcher que, cruzando contra ESTE lineup
+  // real, no encuentran ningún bateador con ese código y pa>=5. Esto es
+  // lectura pura, con los mismos criterios que ya usa
+  // calcularFactorArsenalLineup() (pa>=5), no un criterio nuevo.
+  let codigosSinCruce = [];
+  if (tieneArsenal && lineupRival && lineupRival.length && typeof BATTERS_VSPITCH_2026 !== "undefined") {
+    arsenalData.arsenal.forEach(function (pitch) {
+      let encontrado = false;
+      for (let i = 0; i < lineupRival.length; i++) {
+        const bd = BATTERS_VSPITCH_2026[lineupRival[i].player_id];
+        if (bd && bd.vs && bd.vs[pitch.pt] && bd.vs[pitch.pt].pa >= 5) { encontrado = true; break; }
+      }
+      if (!encontrado) codigosSinCruce.push(pitch.pt + "(" + pitch.usage + "%)");
+    });
+  }
+
+  log(
+    "  DIAGNOSTICO ARSENAL [" + etiqueta + "] pitcherId=" + pitcherId +
+    " | pitcher_sin_arsenal=" + (!tieneArsenal) +
+    " | bateadores_encontrados=" + bateadoresEncontrados + "/" + totalLineup +
+    " | codigos_arsenal_sin_cruce=" + (codigosSinCruce.length ? codigosSinCruce.join(", ") : "ninguno")
+  );
+}
+
 async function f5AutomaticoHoy(logFn) {
   function log(t) { if (typeof logFn === "function") logFn(t); }
 
@@ -189,12 +254,19 @@ async function f5AutomaticoHoy(logFn) {
     var carrerajeHome = { pieza:"F5_CARRERAJE", estado:"SIN_DATOS", detalle:"Sin pitcher o lineup rival." };
     var carrerajeAway = { pieza:"F5_CARRERAJE", estado:"SIN_DATOS", detalle:"Sin pitcher o lineup rival." };
 
+    // --- DIAGNOSTICO TEMPORAL (solo lectura, ver prólogo) ---
+    log("DIAGNOSTICO F5 [" + away + " @ " + home + "]:");
+    diagnosticoArsenalLineup(pitcherHomeId, lineupData ? lineupData.lineup_away : null, "carrerajeHome: pitcher HOME vs lineup AWAY", log);
+    diagnosticoArsenalLineup(pitcherAwayId, lineupData ? lineupData.lineup_home : null, "carrerajeAway: pitcher AWAY vs lineup HOME", log);
+    // --- FIN DIAGNOSTICO TEMPORAL ---
+
     // lineup_disponible_away/home = hay 9 titulares reales (de hoy o del
     // ULTIMO_CONFIRMADO real), sin importar la fuente. Antes se miraba solo
     // ".length", que quedaba vacío si jalarLineup() no recibía los teamId
     // (por eso nunca activaba el fallback real y quedaba SIN_DATOS).
     if (pitcherHomeId && lineupData && lineupData.lineup_disponible_away) {
       var cruceHome = calcularFactorArsenalLineup(pitcherHomeId, lineupData.lineup_away);
+      log("  DIAGNOSTICO CRUCE [carrerajeHome] bateadores_usados=" + cruceHome.bateadores_usados + "/" + cruceHome.bateadores_total + " | nota=" + cruceHome.nota);
       var cruceArsenalHome = cruceHome.confirmado
         ? { estado:"OK", woba_esperado: cruceHome.woba_esperado }
         : { estado: cruceHome.bateadores_usados>0 ? "PENDIENTE" : "NO_CONFIRMADO", woba_esperado: cruceHome.woba_esperado };
@@ -202,6 +274,7 @@ async function f5AutomaticoHoy(logFn) {
     }
     if (pitcherAwayId && lineupData && lineupData.lineup_disponible_home) {
       var cruceAway = calcularFactorArsenalLineup(pitcherAwayId, lineupData.lineup_home);
+      log("  DIAGNOSTICO CRUCE [carrerajeAway] bateadores_usados=" + cruceAway.bateadores_usados + "/" + cruceAway.bateadores_total + " | nota=" + cruceAway.nota);
       var cruceArsenalAway = cruceAway.confirmado
         ? { estado:"OK", woba_esperado: cruceAway.woba_esperado }
         : { estado: cruceAway.bateadores_usados>0 ? "PENDIENTE" : "NO_CONFIRMADO", woba_esperado: cruceAway.woba_esperado };
