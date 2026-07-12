@@ -41,7 +41,7 @@
     <div class="fila">Sin wind_dir antes de empezar: <b id="rSinDir">—</b></div>
     <div class="fila">✅ Rellenados con dato real: <b id="rOk">—</b></div>
     <div class="fila">⛔ Sin estadio reconocido (alias): <b id="rSinEstadio">—</b></div>
-    <div class="fila">⛔ Sin hora de juego guardada: <b id="rSinHora">—</b></div>
+    <div class="fila">⛔ Sin hora de juego guardada (o sin zona horaria del parque): <b id="rSinHora">—</b></div>
     <div class="fila">⛔ Sin dato en archivo Open-Meteo (±3h): <b id="rSinDato">—</b></div>
     <div class="fila">Quedan sin wind_dir después: <b id="rRestan">—</b></div>
   </div>
@@ -65,11 +65,23 @@
     return null;
   }
 
-  // Saca "YYYY-MM-DDTHH" del registro. Usa game_time si existe; si no, no inventa.
-  function horaDelRegistro(r){
+  // CORREGIDO: r.game_time se guarda en jalar-clima.js como g.gameDate,
+  // que es UTC crudo (viene de MLB StatsAPI con "Z"). climaFetchArchive()
+  // en clima-cache.js le pide a Open-Meteo el archivo con &timezone=<tz del parque>,
+  // por lo que el mapa que devuelve queda indexado en HORA LOCAL del parque, no en UTC.
+  // Antes esta función cortaba el UTC crudo y lo trataba como si ya fuera local:
+  // para parques del Pacífico (UTC-7/8) eso desalinea la hora buscada por 7-8h,
+  // muy fuera del margen de ±3h de buscarEnArchive(), y contamina o vacía el dato.
+  // Ahora se convierte con climaKeyTZ() (la misma función que usa jalar-clima.js
+  // para el mismo propósito), pasando la zona horaria real del estadio.
+  function horaDelRegistro(r, stadium){
     var gt = r.game_time;
-    if (typeof gt === "string" && gt.length >= 13) return gt.slice(0, 13); // "YYYY-MM-DDTHH"
-    return null;
+    if (typeof gt !== "string" || !gt.length) return null;
+    var tz = stadium && stadium.timezone ? stadium.timezone : null;
+    if (!tz) return null;
+    var keyTZ = climaKeyTZ(gt, tz); // "YYYY-MM-DDTHH:00" en hora local del parque
+    if (!keyTZ) return null;
+    return keyTZ.slice(0, 13); // "YYYY-MM-DDTHH"
   }
 
   function claveHora(fecha, hh){
@@ -155,9 +167,9 @@
 
         for (var f = 0; f < grupo.filas.length; f++) {
           var fila = grupo.filas[f];
-          var horaBase = horaDelRegistro(fila);
+          var horaBase = horaDelRegistro(fila, grupo.stadium);
 
-          if (!horaBase) { nSinHora++; log("  ⛔ " + fila.date + " " + (fila.away_team||"?") + " @ " + (fila.home_team||"?") + " → sin hora de juego guardada, NO_CONFIRMADO"); continue; }
+          if (!horaBase) { nSinHora++; log("  ⛔ " + fila.date + " " + (fila.away_team||"?") + " @ " + (fila.home_team||"?") + " → sin hora de juego guardada o sin zona horaria del parque, NO_CONFIRMADO"); continue; }
 
           var fecha = horaBase.slice(0, 10);
           var hh = parseInt(horaBase.slice(11, 13), 10);
