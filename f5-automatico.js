@@ -52,36 +52,35 @@
   Confirmado: ya no es el cuello de botella (evidencia: aparecen casos
   "PENDIENTE POR ACCESO" con wOBA/Dominio calculados).
 
-  DIAGNÓSTICO TEMPORAL (agregado esta sesión, AÚN NO ES UNA CORRECCIÓN):
-  Se detectó un mismatch real y confirmado entre las dos tablas maestras
-  que cruza calcularFactorArsenalLineup() (factor-arsenal-lineup.js): los
-  códigos de pitcheo FS y SV existen en ARSENAL_MASTER_2026 pero no se
-  encontraron como clave en ningún bateador de BATTERS_VSPITCH_2026 (base
-  de datos revisada parcialmente, sin conteo total todavía). Para
-  confirmar si esto es lo que produce el SIN_DATOS restante en la mayoría
-  de los juegos, o si hay otra causa, se agregó diagnosticoArsenalLineup():
-  una función de SOLO LECTURA que no cambia ninguna fórmula ni dato
-  maestro, y que por cada juego imprime en consola:
-    - si el pitcher de hoy tiene o no arsenal confirmado;
-    - bateadores encontrados en BATTERS_VSPITCH_2026 / total del lineup;
-    - qué códigos del arsenal del pitcher no encuentran NINGÚN bateador
-      del lineup con ese código y pa>=5 (los "códigos sin cruce" reales de
-      ESE juego, no una muestra ni una suposición);
-    - bateadores_usados y nota, tal como los devuelve
-      calcularFactorArsenalLineup() de verdad (sin reinterpretarlos).
-  Este diagnóstico es temporal: no toca Moneyline, clima, línea de
-  mercado, K6 ni brújula, y no modifica factor-arsenal-lineup.js,
-  f5-carreraje.js, arsenal-master.js ni batters-vspitch.js. Debe quitarse
-  (o dejarse silenciado) una vez identificada la causa real, en la
-  siguiente corrección.
+  DIAGNÓSTICO TEMPORAL — RONDA 1 (sesión anterior, CERRADA):
+  Se agregó diagnosticoArsenalLineup() para revisar si el mismatch de
+  códigos FS/SV entre ARSENAL_MASTER_2026 y BATTERS_VSPITCH_2026 explicaba
+  el SIN_DATOS. Evidencia real de la corrida: pitcher_sin_arsenal=false en
+  los casos revisados, bateadores_encontrados y bateadores_usados en
+  7/9, 8/9 y 9/9, nota=OK. CONFIRMADO: el cruce arsenal-vs-lineup sí se
+  ejecuta correctamente. factor-arsenal-lineup.js queda descartado como
+  cuello de botella — no se toca.
+
+  DIAGNÓSTICO TEMPORAL — RONDA 2 (esta sesión, EN CURSO):
+  Con factor-arsenal-lineup.js descartado, el diagnóstico se mueve a la
+  entrada/salida real de f5Carreraje() (f5-carreraje.js), que es el
+  siguiente eslabón de la cadena. Se agregó logging de: cruce.confirmado,
+  cruce.woba_esperado, el objeto exacto que se envía a f5Carreraje()
+  (cruceArsenalHome/cruceArsenalAway + lineaCarreraje), y el objeto
+  completo que f5Carreraje() devuelve (carrerajeHome/carrerajeAway). No se
+  modifica ninguna fórmula de f5-carreraje.js, factor-arsenal-lineup.js,
+  Moneyline, clima, línea de mercado, K6 ni brújula. Todo el logging de la
+  Ronda 1 se deja intacto para no perder el rastro completo de la cadena
+  en una sola corrida.
 
   FECHA:
   12 jul 2026.
 
   ESTADO:
-  NO_CONFIRMADO — con diagnóstico temporal agregado. Pendiente de una
-  corrida real de F5 Automático para identificar la causa exacta del
-  SIN_DATOS antes de tocar cualquier fórmula o dato maestro.
+  NO_CONFIRMADO — con diagnóstico de entrada/salida de f5Carreraje()
+  agregado. Pendiente de una corrida real de F5 Automático para ver el
+  objeto exacto que devuelve f5Carreraje() y confirmar si el corte está
+  ahí o más adelante en la cadena (f5MoneyLine()).
 */
 
 // f5-automatico.js — MLBPro F5 · Pieza Automática
@@ -270,7 +269,12 @@ async function f5AutomaticoHoy(logFn) {
       var cruceArsenalHome = cruceHome.confirmado
         ? { estado:"OK", woba_esperado: cruceHome.woba_esperado }
         : { estado: cruceHome.bateadores_usados>0 ? "PENDIENTE" : "NO_CONFIRMADO", woba_esperado: cruceHome.woba_esperado };
+      // --- DIAGNOSTICO TEMPORAL: entrada/salida real de f5Carreraje() ---
+      log("  DIAGNOSTICO F5CARRERAJE [carrerajeHome] cruce.confirmado=" + cruceHome.confirmado + " | cruce.woba_esperado=" + cruceHome.woba_esperado);
+      log("  DIAGNOSTICO F5CARRERAJE [carrerajeHome] ENVIADO=" + JSON.stringify(cruceArsenalHome) + " | lineaCarreraje=" + lineaCarreraje);
       carrerajeHome = f5Carreraje(cruceArsenalHome, lineaCarreraje);
+      log("  DIAGNOSTICO F5CARRERAJE [carrerajeHome] DEVUELTO=" + JSON.stringify(carrerajeHome));
+      // --- FIN DIAGNOSTICO TEMPORAL ---
     }
     if (pitcherAwayId && lineupData && lineupData.lineup_disponible_home) {
       var cruceAway = calcularFactorArsenalLineup(pitcherAwayId, lineupData.lineup_home);
@@ -278,7 +282,12 @@ async function f5AutomaticoHoy(logFn) {
       var cruceArsenalAway = cruceAway.confirmado
         ? { estado:"OK", woba_esperado: cruceAway.woba_esperado }
         : { estado: cruceAway.bateadores_usados>0 ? "PENDIENTE" : "NO_CONFIRMADO", woba_esperado: cruceAway.woba_esperado };
+      // --- DIAGNOSTICO TEMPORAL: entrada/salida real de f5Carreraje() ---
+      log("  DIAGNOSTICO F5CARRERAJE [carrerajeAway] cruce.confirmado=" + cruceAway.confirmado + " | cruce.woba_esperado=" + cruceAway.woba_esperado);
+      log("  DIAGNOSTICO F5CARRERAJE [carrerajeAway] ENVIADO=" + JSON.stringify(cruceArsenalAway) + " | lineaCarreraje=" + lineaCarreraje);
       carrerajeAway = f5Carreraje(cruceArsenalAway, lineaCarreraje);
+      log("  DIAGNOSTICO F5CARRERAJE [carrerajeAway] DEVUELTO=" + JSON.stringify(carrerajeAway));
+      // --- FIN DIAGNOSTICO TEMPORAL ---
     }
 
     var moneyline = f5MoneyLine(carrerajeHome, carrerajeAway);
