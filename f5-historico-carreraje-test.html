@@ -1,0 +1,126 @@
+<!--
+  MLBPro · f5-historico-carreraje-test.html
+
+  FUNCIÓN:
+  Página de prueba independiente. Su único propósito es ejecutar
+  jalarF5HistoricoCarreraje() (de f5-historico-carreraje.js) y mostrar en
+  pantalla cuántos juegos F5 reales capturó, cuántos quedaron rechazados
+  y por qué motivo exacto. No calcula nada propio, no define ninguna
+  fórmula: solo llama a la pieza de captura y pinta su resultado.
+
+  ENTRADAS:
+  Botón "CORRER CAPTURA F5 HISTÓRICO" (click). Internamente, todo lo que
+  jalarF5HistoricoCarreraje() necesite (ver su propio prólogo).
+
+  SALIDAS / MODIFICACIONES:
+  Solo pinta HTML en #resumen y #console. La única escritura real de datos
+  ocurre dentro de f5-historico-carreraje.js, en su propia caché
+  "F5_HISTORICO_CARRERAJE_2026" — esta página no escribe nada por su
+  cuenta.
+
+  DEPENDENCIAS:
+  mlb-routes.js, f5-historico-carreraje.js (los dos únicos <script> que
+  carga). No carga clima-cache.js, jalar-clima.js, estadios.js,
+  f5-carreraje.js, factor-arsenal-lineup.js, f5-automatico.js, ni ningún
+  archivo de K6 o brújula — a propósito, para que esta prueba no pueda
+  cruzarse por accidente con esas cadenas.
+
+  NO TOCA:
+  clima-cache.js, jalar-clima.js, f5-carreraje.js, factor-arsenal-lineup.js,
+  MoneyLine, K6, brújula. No los carga ni los referencia.
+
+  UTC / HORA LOCAL DEL ESTADIO:
+  No aplica — esta página no maneja horarios ni timezone; eso vive
+  enteramente dentro de f5-historico-carreraje.js (ver su prólogo).
+
+  ESTADO:
+  Página de prueba de una pieza de captura de datos, no de una fórmula.
+
+  FECHA:
+  12 jul 2026.
+-->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MLBPro · Prueba F5 Histórico Carreraje</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:-apple-system,system-ui,sans-serif; background:#0d1117; color:#e6edf3; }
+  header { padding:14px 16px; border-bottom:1px solid #30363d; }
+  h1 { font-size:15px; margin:0; }
+  main { padding:14px; max-width:900px; margin:0 auto; }
+  .go { width:100%; border:0; border-radius:10px; padding:16px; font-size:15px; font-weight:800; color:#fff; background:#2563eb; cursor:pointer; margin-bottom:10px; }
+  .go:disabled { background:#30363d; color:#8b949e; }
+  #resumen { display:none; background:#161b22; border:1px solid #238636; border-radius:10px; padding:14px; margin-bottom:14px; }
+  #resumen .titulo { font-size:14px; font-weight:800; color:#3fb950; margin-bottom:8px; }
+  #resumen .fila { font-size:13px; color:#c9d1d9; padding:3px 0; }
+  #resumen .fila b { color:#fff; }
+  #motivos { margin-top:8px; }
+  #motivos .m { font-size:12px; color:#ffd60a; padding:2px 0; }
+  #console { margin-top:10px; background:#010409; border:1px solid #30363d; border-radius:8px; padding:12px; min-height:60px; max-height:60vh; overflow:auto; font-family:ui-monospace,monospace; font-size:12px; white-space:pre-wrap; word-break:break-word; }
+</style>
+</head>
+<body>
+<header><h1>MLBPro · Prueba F5 Histórico Carreraje</h1></header>
+<main>
+  <button id="btnCorrer" class="go">CORRER CAPTURA F5 HISTÓRICO</button>
+
+  <div id="resumen">
+    <div class="titulo">RESUMEN DE LA CAPTURA</div>
+    <div class="fila">Rango recorrido: <b id="rRango">—</b></div>
+    <div class="fila">Juegos nuevos guardados: <b id="rGuardados">—</b></div>
+    <div class="fila">Total real en cache F5 histórico: <b id="rTotal">—</b></div>
+    <div class="fila">Rechazados: <b id="rRechazados">—</b></div>
+    <div id="motivos"></div>
+  </div>
+
+  <div id="console">Pulsa el botón.</div>
+</main>
+
+<script src="mlb-routes.js"></script>
+<script src="f5-historico-carreraje.js"></script>
+<script>
+  var consoleEl = document.getElementById("console");
+  function log(t){ var d=document.createElement("div"); d.textContent=t; consoleEl.appendChild(d); consoleEl.scrollTop=consoleEl.scrollHeight; }
+
+  document.getElementById("btnCorrer").addEventListener("click", async function(){
+    var btn = this; btn.disabled = true; btn.textContent = "CAPTURANDO…";
+    consoleEl.textContent = "";
+    document.getElementById("resumen").style.display = "none";
+
+    try {
+      var reporte = await jalarF5HistoricoCarreraje(log);
+
+      document.getElementById("rRango").textContent = reporte.rango.desde + " → " + reporte.rango.hasta;
+      document.getElementById("rGuardados").textContent = reporte.guardados;
+      document.getElementById("rTotal").textContent = reporte.total_en_cache;
+      document.getElementById("rRechazados").textContent = reporte.rechazados.length;
+
+      var motivosEl = document.getElementById("motivos");
+      motivosEl.innerHTML = "";
+      var conteoMotivos = {};
+      reporte.rechazados.forEach(function(r){
+        conteoMotivos[r.motivo] = (conteoMotivos[r.motivo] || 0) + 1;
+      });
+      Object.keys(conteoMotivos).forEach(function(m){
+        var d = document.createElement("div");
+        d.className = "m";
+        d.textContent = "⚠️ " + m + ": " + conteoMotivos[m];
+        motivosEl.appendChild(d);
+      });
+
+      document.getElementById("resumen").style.display = "block";
+      log("LISTO.");
+    } catch(e) {
+      log("ERROR: " + (e && e.message ? e.message : e));
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "CORRER CAPTURA F5 HISTÓRICO";
+    }
+  });
+</script>
+</body>
+</html>
