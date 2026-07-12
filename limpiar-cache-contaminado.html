@@ -1,3 +1,91 @@
+<!--
+  MLBPro · limpiar-cache-contaminado.html
+
+  FUNCIÓN:
+  Herramienta de un solo uso: recorre la Data Madre, separa filas
+  climáticamente contaminadas (3 códigos de error exactos) de las
+  limpias, y escribe SOLO las limpias directamente en localStorage.
+  Verifica el resultado leyendo la caché real después de escribir —
+  nunca reporta éxito sin comprobarlo.
+
+  ENTRADAS:
+  Botón "LIMPIAR CACHE CONTAMINADO" (click). Internamente: climaLeerCache()
+  (clima-cache.js).
+
+  SALIDAS / MODIFICACIONES:
+  Escribe localStorage[CLIMA_CACHE_KEY] DIRECTAMENTE (localStorage.setItem,
+  sin pasar por climaGuardarCache()) con el array de filas limpias.
+  Justificación de por qué NO se usa climaGuardarCache() aquí: ver
+  "CORRECCIÓN CRÍTICA #2" abajo.
+
+  DEPENDENCIAS:
+  mlb-routes.js, estadios.js, clima-cache.js — EN ESE ORDEN. estadios.js
+  es obligatorio porque clima-cache.js lo requiere para operar en
+  general en la página (climaLeerCache no lo necesita, pero mantener el
+  orden estándar del proyecto evita que falte si esta página se reutiliza
+  o se copia como base de otra herramienta). CLIMA_CACHE_KEY se usa tal
+  cual lo expone clima-cache.js (const de nivel superior, visible a los
+  scripts cargados después en la misma página).
+
+  NO TOCA:
+  Carreras, pitchers, lineups, K6, F5, MoneyLine, mercado, Coincidencia.
+  No hace ningún fetch — solo lee/escribe localStorage.
+
+  UTC / HORA LOCAL:
+  No aplica.
+
+  QUÉ HACE: cuenta filas antes, detecta contaminadas por los 3 códigos
+  exactos, escribe DIRECTO a localStorage solo las limpias, vuelve a leer
+  la caché real después de escribir, y confirma con evidencia (filas
+  antes, contaminadas detectadas, filas después, contaminadas restantes).
+  Si la verificación no cuadra, muestra ERROR y NO reporta éxito.
+
+  QUÉ NO HACE: no detecta códigos de error distintos a esos 3 exactos.
+  No repara la fila (no la deja con NO_CONFIRMADO): la elimina por
+  completo. No usa climaGuardarCache() para escribir (ver corrección #2).
+
+  QUÉ AFECTA: la limpieza puntual de contaminación climática ya existente
+  en la Data Madre.
+
+  QUÉ NO AFECTA: todo lo demás — carreras, pitchers, lineups, K6,
+  MoneyLine, mercado.
+
+  CORRECCIÓN CRÍTICA #1 (dependencias, ya corregida en una revisión
+  anterior de esta misma auditoría): faltaban mlb-routes.js y estadios.js.
+  Sin estadios.js, cualquier llamada a climaGuardarCache() habría
+  rechazado TODAS las filas (DEPENDENCIA_STADIUMGET_FALTANTE) y vaciado
+  la Data Madre completa. Ya no aplica porque esta versión ni siquiera
+  llama climaGuardarCache() para escribir (ver corrección #2), pero se
+  mantiene el orden de carga por consistencia con el resto del proyecto.
+
+  CORRECCIÓN CRÍTICA #2 (esta revisión, confirmada con simulación fiel
+  del código real antes de corregir):
+  La función climaGuardarCache de clima-cache.js NO reemplaza la caché
+  desde cero cuando se le pasa el arreglo limpio — siempre vuelve a leer
+  climaLeerCache() (la caché VIEJA, todavía contaminada) y la fusiona por
+  game_id con lo que se le pase. Como climaRegistroValido no revisa el
+  contenido de los campos climáticos (mismo hueco del Problema #4 de
+  clima-cache.js), la fila contaminada pasa esa validación durante la
+  fusión con la base vieja y VUELVE A ENTRAR, sin importar que no esté en
+  el arreglo limpio. Simulación con el código real confirmó esto
+  exactamente: una fila contaminada seguía presente después de intentar
+  "borrarla" pasándola a esa función.
+  Corregido de raíz: esta herramienta NO llama a esa función de
+  clima-cache.js en ningún punto de su código. Escribe directo con
+  localStorage.setItem(CLIMA_CACHE_KEY, JSON.stringify(limpio))
+  desde el primer y único intento — sin paso intermedio, sin fallback — y
+  verifica leyendo climaLeerCache() otra vez después de escribir. Si las
+  filas después no coinciden con "limpio" o si sigue habiendo
+  contaminadas, se muestra ERROR y no se reporta éxito.
+
+  ESTADO:
+  NO_CONFIRMADO — corregidas ambas fallas (dependencias y borrado real,
+  esta vez sin paso intermedio innecesario), pendiente de ejecución real
+  en el repo para confirmar con evidencia.
+
+  FECHA:
+  12 jul 2026.
+-->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -16,8 +104,10 @@
 <body>
 <h1>MLBPro · Limpiar filas contaminadas (ERR:VENUE_NOT_IN_TABLE / ERR:WEATHERAPI / ERR:NO_HOUR_MATCH)</h1>
 <button id="go" class="go">LIMPIAR CACHE CONTAMINADO</button>
-<div id="console">Pulsa el botón. Solo borra filas con esos 3 códigos de error exactos en cualquier campo de clima. No borra ni modifica ninguna otra fila.</div>
+<div id="console">Pulsa el botón. Solo borra filas con esos 3 códigos de error exactos en cualquier campo de clima. No borra ni modifica ninguna otra fila. Verifica leyendo la caché real después de escribir.</div>
 
+<script src="mlb-routes.js"></script>
+<script src="estadios.js"></script>
 <script src="clima-cache.js"></script>
 <script>
   var consoleEl = document.getElementById("console");
@@ -36,26 +126,65 @@
   document.getElementById("go").addEventListener("click", function(){
     consoleEl.textContent = "";
     try {
+      // 1. Leer la caché real, tal como está ahora.
       var cache = climaLeerCache();
-      log("Cache actual: " + cache.length + " filas.");
+      var totalAntes = cache.length;
+      log("Filas antes: " + totalAntes);
 
+      // 2. Separar limpias y contaminadas.
       var limpio = [];
-      var borradas = [];
+      var contaminadas = [];
       cache.forEach(function(g){
-        if (filaContaminada(g)) borradas.push(g);
+        if (filaContaminada(g)) contaminadas.push(g);
         else limpio.push(g);
       });
 
-      log("Filas contaminadas encontradas: " + borradas.length);
-      borradas.forEach(function(g){
-        log("  BORRADA: " + g.date + " · " + g.venue + " · game_id " + g.game_id);
+      log("Contaminadas detectadas: " + contaminadas.length);
+      contaminadas.forEach(function(g){
+        log("  CONTAMINADA: " + g.date + " · " + g.venue + " · game_id " + g.game_id);
       });
 
-      climaGuardarCache(limpio);
-      log("LISTO. Cache guardado con " + limpio.length + " filas (antes " + cache.length + ").");
+      if (contaminadas.length === 0) {
+        log("Nada que limpiar. La Data Madre no tiene filas con esos códigos de error.");
+        return;
+      }
+
+      // 3. Escribir SOLO las limpias, directo a localStorage.
+      //    NO se usa climaGuardarCache() aquí -- esa función fusiona con
+      //    la caché vieja (todavía contaminada) por game_id, y como
+      //    climaRegistroValido() no revisa el contenido de los campos
+      //    climáticos, la fila contaminada vuelve a entrar. Ver prólogo,
+      //    Corrección Crítica #2.
+      localStorage.setItem(CLIMA_CACHE_KEY, JSON.stringify(limpio));
+
+      // 4. Volver a leer la caché real después de escribir.
+      var restanReal = climaLeerCache();
+      var siguenContaminadas = restanReal.filter(filaContaminada);
+
+      // 5. Confirmar con evidencia real, no con lo esperado.
+      log("");
+      log("VERIFICACIÓN (leyendo la caché real después de escribir):");
+      log("  Filas antes: " + totalAntes);
+      log("  Contaminadas detectadas: " + contaminadas.length);
+      log("  Filas después: " + restanReal.length);
+      log("  Contaminadas restantes: " + siguenContaminadas.length);
+
+      // 6. Si la verificación no cuadra, ERROR -- nunca reportar éxito.
+      var esperado = totalAntes - contaminadas.length;
+      if (restanReal.length !== esperado || siguenContaminadas.length !== 0) {
+        log("");
+        log("⛔ ERROR: la verificación NO cuadra. Se esperaban " + esperado +
+            " filas y 0 contaminadas; hay " + restanReal.length + " filas y " +
+            siguenContaminadas.length + " contaminadas restantes. NO se reporta éxito.");
+        return;
+      }
+
+      log("");
+      log("LISTO. Borrado confirmado con evidencia real: " + contaminadas.length +
+          " fila(s) contaminada(s) eliminada(s), " + restanReal.length + " filas limpias restantes.");
       log("La próxima vez que abras index.html y pulses COINCIDENCIA, jalarClima() va a volver a traer esos juegos limpios (si siguen dentro del rango de re-jalado).");
     } catch(e) {
-      log("ERROR: " + e.message);
+      log("ERROR: " + (e && e.message ? e.message : e));
     }
   });
 </script>
