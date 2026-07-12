@@ -1,0 +1,168 @@
+<!--
+  MLBPro · rellenar-carreras-test.html
+
+  FUNCIÓN:
+  Página de prueba independiente para rellenar-carreras.js. Su único
+  propósito es ejecutar rellenarCarreras(logFn) con las dependencias
+  reales cargadas, mostrar la consola completa, y mostrar un resumen
+  (total cache, pendientes, rellenados, fallos, total final) leyendo
+  los mismos mensajes que la función ya emite — sin tocar su lógica ni
+  reimplementar nada de su cálculo.
+
+  ENTRADAS:
+  Botón "EJECUTAR RELLENAR CARRERAS" (click). Internamente, todo lo que
+  rellenarCarreras() necesite (ver su propio prólogo): climaLeerCache(),
+  climaGuardarCache(), MLB_ROUTES.WORKER_BASE.
+
+  SALIDAS / MODIFICACIONES:
+  Solo pinta HTML en #resumen y #console. La única escritura real de
+  datos ocurre dentro de rellenar-carreras.js, en la Data Madre
+  ("MLBPRO_CLIMA_CACHE_2026") — esta página no escribe nada por su
+  cuenta.
+
+  DEPENDENCIAS:
+  mlb-routes.js, estadios.js, clima-cache.js, rellenar-carreras.js — en
+  ese orden exacto. No carga jalar-clima.js, calcular-coincidencia.js,
+  score-match.js, f5-carreraje.js, factor-arsenal-lineup.js, K6, ni
+  brújula — a propósito, para que esta prueba no pueda cruzarse con
+  esas cadenas.
+
+  NO TOCA:
+  clima-cache.js, jalar-clima.js, calcular-coincidencia.js, K6, F5,
+  MoneyLine, brújula. No los carga ni los referencia.
+
+  UTC / HORA LOCAL DEL ESTADIO:
+  No aplica — esta página no maneja horarios ni timezone; eso vive
+  enteramente dentro de clima-cache.js/rellenar-carreras.js.
+
+  QUÉ HACE: ejecuta rellenarCarreras(logFn) real, muestra su consola
+  completa, y extrae el resumen (total cache, pendientes, rellenados,
+  fallos, total final) PARSEANDO los mismos mensajes de texto que la
+  función ya imprime — nunca recalcula ni asume un número que la función
+  no haya dicho explícitamente.
+
+  QUÉ NO HACE: no modifica rellenarCarreras(), no cambia su criterio de
+  qué es "pendiente", no inventa un resumen si el formato del log
+  cambiara (en ese caso el panel queda con "—" en vez de un número
+  inventado).
+
+  QUÉ AFECTA: nada por sí sola. Solo dispara la función real, que si
+  encuentra pendientes, sí modifica la Data Madre (home_runs/away_runs/
+  total_runs de juegos ya guardados).
+
+  QUÉ NO AFECTA: clima, brújula, K6, MoneyLine, lineups, pitchers,
+  mercado.
+
+  ESTADO:
+  Página de prueba, no una fórmula ni una corrección. NO_CONFIRMADO —
+  pendiente de ejecutarse en el repo real.
+
+  FECHA:
+  12 jul 2026.
+-->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MLBPro · Prueba Rellenar Carreras</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:-apple-system,system-ui,sans-serif; background:#0d1117; color:#e6edf3; }
+  header { padding:14px 16px; border-bottom:1px solid #30363d; }
+  h1 { font-size:15px; margin:0; }
+  main { padding:14px; max-width:900px; margin:0 auto; }
+  .go { width:100%; border:0; border-radius:10px; padding:16px; font-size:15px; font-weight:800; color:#fff; background:#238636; cursor:pointer; margin-bottom:10px; }
+  .go:disabled { background:#30363d; color:#8b949e; }
+  #resumen { display:none; background:#161b22; border:1px solid #30363d; border-radius:10px; padding:14px; margin-bottom:14px; }
+  #resumen .titulo { font-size:14px; font-weight:800; color:#3fb950; margin-bottom:8px; }
+  #resumen .fila { font-size:13px; color:#c9d1d9; padding:3px 0; }
+  #resumen .fila b { color:#fff; }
+  #console { margin-top:10px; background:#010409; border:1px solid #30363d; border-radius:8px; padding:12px; min-height:60px; max-height:60vh; overflow:auto; font-family:ui-monospace,monospace; font-size:12px; white-space:pre-wrap; word-break:break-word; }
+</style>
+</head>
+<body>
+<header><h1>MLBPro · Prueba Rellenar Carreras</h1></header>
+<main>
+  <button id="btnCorrer" class="go">EJECUTAR RELLENAR CARRERAS</button>
+
+  <div id="resumen">
+    <div class="titulo">RESUMEN</div>
+    <div class="fila">Total en cache: <b id="rTotal">—</b></div>
+    <div class="fila">Pendientes (Final sin carreras): <b id="rPendientes">—</b></div>
+    <div class="fila">Rellenados: <b id="rRellenados">—</b></div>
+    <div class="fila">Fallaron: <b id="rFallaron">—</b></div>
+    <div class="fila">Total final en cache: <b id="rTotalFinal">—</b></div>
+  </div>
+
+  <div id="console">Pulsa el botón.</div>
+</main>
+
+<script src="mlb-routes.js"></script>
+<script src="estadios.js"></script>
+<script src="clima-cache.js"></script>
+<script src="rellenar-carreras.js"></script>
+<script>
+  var consoleEl = document.getElementById("console");
+  function log(t){ var d=document.createElement("div"); d.textContent=t; consoleEl.appendChild(d); consoleEl.scrollTop=consoleEl.scrollHeight; }
+
+  document.getElementById("btnCorrer").addEventListener("click", async function(){
+    var btn = this; btn.disabled = true; btn.textContent = "EJECUTANDO…";
+    consoleEl.textContent = "";
+    document.getElementById("resumen").style.display = "none";
+
+    // Valores del resumen: se extraen PARSEANDO los mismos mensajes que
+    // rellenarCarreras() ya emite via logFn, sin tocar ni recalcular su
+    // logica. Si el formato del mensaje no coincide, el campo queda "—".
+    var vTotal = null, vPendientes = null, vRellenados = null, vFallaron = null, vTotalFinal = null;
+
+    function logYParsear(t) {
+      log(t);
+
+      var mCache = /^Cache:\s*(\d+)\s*juegos\.\s*Por rellenar:\s*(\d+)$/.exec(t);
+      if (mCache) {
+        vTotal = parseInt(mCache[1], 10);
+        vPendientes = parseInt(mCache[2], 10);
+      }
+
+      if (/^Nada pendiente\. Todos ya tienen carreras\.$/.test(t)) {
+        vRellenados = 0;
+        vFallaron = 0;
+        vTotalFinal = vTotal;
+      }
+
+      var mListo = /^LISTO\. Rellenados:\s*(\d+)\s*·\s*Fallaron:\s*(\d+)\s*·\s*Total cache:\s*(\d+)$/.exec(t);
+      if (mListo) {
+        vRellenados = parseInt(mListo[1], 10);
+        vFallaron = parseInt(mListo[2], 10);
+        vTotalFinal = parseInt(mListo[3], 10);
+      }
+    }
+
+    try {
+      if (typeof rellenarCarreras !== "function") {
+        throw new Error("rellenarCarreras() no está disponible. Falta cargar rellenar-carreras.js.");
+      }
+
+      await rellenarCarreras(logYParsear);
+
+      document.getElementById("rTotal").textContent = (vTotal !== null ? vTotal : "—");
+      document.getElementById("rPendientes").textContent = (vPendientes !== null ? vPendientes : "—");
+      document.getElementById("rRellenados").textContent = (vRellenados !== null ? vRellenados : "—");
+      document.getElementById("rFallaron").textContent = (vFallaron !== null ? vFallaron : "—");
+      document.getElementById("rTotalFinal").textContent = (vTotalFinal !== null ? vTotalFinal : "—");
+      document.getElementById("resumen").style.display = "block";
+
+      log("");
+      log("LISTO (prueba).");
+    } catch (e) {
+      log("ERROR: " + (e && e.message ? e.message : e));
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "EJECUTAR RELLENAR CARRERAS";
+    }
+  });
+</script>
+</body>
+</html>
