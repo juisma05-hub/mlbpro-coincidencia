@@ -3,7 +3,7 @@
 
   FUNCIÓN:
   Herramienta de un solo uso: recorre la Data Madre, separa filas
-  climáticamente contaminadas (3 códigos de error exactos) de las
+  climáticamente contaminadas (4 códigos de error exactos) de las
   limpias, y escribe SOLO las limpias directamente en localStorage.
   Verifica el resultado leyendo la caché real después de escribir —
   nunca reporta éxito sin comprobarlo.
@@ -28,26 +28,34 @@
   scripts cargados después en la misma página).
 
   NO TOCA:
-  Carreras, pitchers, lineups, K6, F5, MoneyLine, mercado, Coincidencia.
-  No hace ningún fetch — solo lee/escribe localStorage.
+  pitchers, lineups, K6, F5, MoneyLine, mercado, Coincidencia. No hace
+  ningún fetch — solo lee/escribe localStorage. IMPORTANTE: no es exacto
+  decir que "no toca carreras" — al borrar una fila contaminada completa,
+  sus home_runs/away_runs/total_runs guardados desaparecen junto con el
+  resto de la fila (el borrado es de la fila entera, no solo de los
+  campos climáticos). Esa fila queda ausente del histórico hasta que
+  jalarClima() la vuelva a traer completa y limpia.
 
   UTC / HORA LOCAL:
   No aplica.
 
-  QUÉ HACE: cuenta filas antes, detecta contaminadas por los 3 códigos
+  QUÉ HACE: cuenta filas antes, detecta contaminadas por los 4 códigos
   exactos, escribe DIRECTO a localStorage solo las limpias, vuelve a leer
   la caché real después de escribir, y confirma con evidencia (filas
   antes, contaminadas detectadas, filas después, contaminadas restantes).
   Si la verificación no cuadra, muestra ERROR y NO reporta éxito.
 
-  QUÉ NO HACE: no detecta códigos de error distintos a esos 3 exactos.
+  QUÉ NO HACE: no detecta códigos de error distintos a esos 4 exactos.
   No repara la fila (no la deja con NO_CONFIRMADO): la elimina por
-  completo. No usa climaGuardarCache() para escribir (ver corrección #2).
+  completo — incluidas las carreras que esa fila ya tuviera guardadas.
+  No usa climaGuardarCache() para escribir (ver corrección #2).
 
   QUÉ AFECTA: la limpieza puntual de contaminación climática ya existente
-  en la Data Madre.
+  en la Data Madre. Al borrar la fila completa, también borra las
+  carreras/pitchers que esa fila tuviera guardados — no solo el clima.
 
-  QUÉ NO AFECTA: todo lo demás — carreras, pitchers, lineups, K6,
+  QUÉ NO AFECTA: todo lo demás — filas que no tengan ninguno de los 4
+  códigos exactos, K6,
   MoneyLine, mercado.
 
   CORRECCIÓN CRÍTICA #1 (dependencias, ya corregida en una revisión
@@ -78,10 +86,18 @@
   filas después no coinciden con "limpio" o si sigue habiendo
   contaminadas, se muestra ERROR y no se reporta éxito.
 
+  CORRECCIÓN CRÍTICA #3 (Bloque 2, Problema #8 — confirmado por código):
+  jalar-clima.js puede emitir un 4° código de contaminación que esta
+  herramienta no buscaba: "ERR:WEATHER_MAP" (cuando el mapa de clima
+  existe pero no tiene .get como función — rama defensiva, poco probable
+  hoy pero real en el código). Se agregó a la lista ERRORES[]. Sin este
+  4° código, una fila contaminada con ERR:WEATHER_MAP habría pasado
+  desapercibida para esta herramienta indefinidamente.
+
   ESTADO:
-  NO_CONFIRMADO — corregidas ambas fallas (dependencias y borrado real,
-  esta vez sin paso intermedio innecesario), pendiente de ejecución real
-  en el repo para confirmar con evidencia.
+  NO_CONFIRMADO — corregidas las tres fallas (dependencias, borrado real,
+  y ahora el 4° código de contaminación), pendiente de ejecución real en
+  el repo para confirmar con evidencia.
 
   FECHA:
   12 jul 2026.
@@ -102,9 +118,9 @@
 </style>
 </head>
 <body>
-<h1>MLBPro · Limpiar filas contaminadas (ERR:VENUE_NOT_IN_TABLE / ERR:WEATHERAPI / ERR:NO_HOUR_MATCH)</h1>
+<h1>MLBPro · Limpiar filas contaminadas (ERR:VENUE_NOT_IN_TABLE / ERR:WEATHERAPI / ERR:NO_HOUR_MATCH / ERR:WEATHER_MAP)</h1>
 <button id="go" class="go">LIMPIAR CACHE CONTAMINADO</button>
-<div id="console">Pulsa el botón. Solo borra filas con esos 3 códigos de error exactos en cualquier campo de clima. No borra ni modifica ninguna otra fila. Verifica leyendo la caché real después de escribir.</div>
+<div id="console">Pulsa el botón. Solo borra filas con esos 4 códigos de error exactos en cualquier campo de clima. No borra ni modifica ninguna otra fila. Verifica leyendo la caché real después de escribir.</div>
 
 <script src="mlb-routes.js"></script>
 <script src="estadios.js"></script>
@@ -113,7 +129,7 @@
   var consoleEl = document.getElementById("console");
   function log(t){ var d=document.createElement("div"); d.textContent=t; consoleEl.appendChild(d); consoleEl.scrollTop=consoleEl.scrollHeight; }
 
-  var ERRORES = ["ERR:VENUE_NOT_IN_TABLE", "ERR:WEATHERAPI", "ERR:NO_HOUR_MATCH"];
+  var ERRORES = ["ERR:VENUE_NOT_IN_TABLE", "ERR:WEATHERAPI", "ERR:NO_HOUR_MATCH", "ERR:WEATHER_MAP"];
 
   function filaContaminada(g){
     return ERRORES.indexOf(g.temperature_f) !== -1 ||
