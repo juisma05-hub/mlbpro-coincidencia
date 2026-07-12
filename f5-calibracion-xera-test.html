@@ -1,0 +1,124 @@
+<!--
+  MLBPro · f5-calibracion-xera-test.html
+
+  FUNCIÓN:
+  Ejecuta calcularF5CalibracionXera() y muestra el backtest real de xERA
+  vs carreras de F5.
+
+  ENTRADAS:
+  Botón "CORRER BACKTEST xERA F5" (click). No hace ningún fetch: todo sale
+  de localStorage ("F5_HISTORICO_CARRERAJE_2026") y de PITCHERS_MASTER_2026
+  ya cargado en la página vía pitchers-master.js.
+
+  SALIDAS / MODIFICACIONES:
+  Solo pinta HTML en #resultado y #console. No escribe ninguna caché ni
+  localStorage — la página es de solo lectura/visualización.
+
+  DEPENDENCIAS:
+  pitchers-master.js, f5-calibracion-xera.js. No carga arsenal-master.js,
+  batters-vspitch.js, factor-arsenal-lineup.js, mlb-routes.js, clima,
+  f5-carreraje.js, K6 ni brújula.
+
+  NO TOCA:
+  f5-carreraje.js, f5-moneyline.js, f5-automatico.js, factor-arsenal-
+  lineup.js, arsenal-master.js, batters-vspitch.js, clima-cache.js,
+  jalar-clima.js, K6, brújula.
+
+  UTC / HORA LOCAL: no aplica.
+
+  ESTADO: página de prueba de un backtest, no de fórmula aprobada.
+  FECHA: 12 jul 2026.
+-->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MLBPro · Backtest xERA F5</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:-apple-system,system-ui,sans-serif; background:#0d1117; color:#e6edf3; }
+  header { padding:14px 16px; border-bottom:1px solid #30363d; }
+  h1 { font-size:15px; margin:0; }
+  main { padding:14px; max-width:900px; margin:0 auto; }
+  .go { width:100%; border:0; border-radius:10px; padding:16px; font-size:15px; font-weight:800; color:#fff; background:#e0823d; cursor:pointer; margin-bottom:10px; }
+  .go:disabled { background:#30363d; color:#8b949e; }
+  #resultado { display:none; background:#161b22; border:1px solid #30363d; border-radius:10px; padding:14px; margin-bottom:14px; }
+  .estado { font-size:15px; font-weight:800; margin-bottom:8px; }
+  .estado.BACKTEST_CALCULADO { color:#3fb950; }
+  .estado.SIN_MUESTRA_SUFICIENTE, .estado.SIN_VARIACION_SUFICIENTE, .estado.SIN_DEPENDENCIA_CARGADA { color:#ffd60a; }
+  .detalle { font-size:13px; color:#c9d1d9; margin-bottom:10px; }
+  .bloque { background:#0d1117; border:1px solid #21262d; border-radius:8px; padding:10px; margin-top:10px; }
+  .fila { font-size:13px; color:#c9d1d9; padding:2px 0; }
+  .fila b { color:#fff; }
+  #console { margin-top:10px; background:#010409; border:1px solid #30363d; border-radius:8px; padding:12px; min-height:60px; max-height:60vh; overflow:auto; font-family:ui-monospace,monospace; font-size:12px; white-space:pre-wrap; word-break:break-word; }
+</style>
+</head>
+<body>
+<header><h1>MLBPro · Backtest xERA F5</h1></header>
+<main>
+  <button id="btnCorrer" class="go">CORRER BACKTEST xERA F5</button>
+
+  <div id="resultado">
+    <div class="estado" id="rEstado">—</div>
+    <div class="detalle" id="rDetalle"></div>
+    <div class="fila">Muestras: <b id="rN">—</b> · Descartadas sin xERA: <b id="rDescartadas">—</b></div>
+    <div id="bloqueBT" class="bloque" style="display:none;">
+      <div class="fila">Correlación r: <b id="bR">—</b></div>
+      <div class="fila">R²: <b id="bR2">—</b></div>
+      <div class="fila">Pendiente / Intercepto: <b id="bPend">—</b></div>
+      <div class="fila">RMSE / MAE: <b id="bErr">—</b></div>
+      <div class="fila">Rango xERA: <b id="bRangoX">—</b></div>
+      <div class="fila">Rango carreras reales: <b id="bRangoY">—</b></div>
+    </div>
+  </div>
+
+  <div id="console">Pulsa el botón.</div>
+</main>
+
+<script src="pitchers-master.js"></script>
+<script src="f5-calibracion-xera.js"></script>
+<script>
+  var consoleEl = document.getElementById("console");
+  function log(t){ var d=document.createElement("div"); d.textContent=t; consoleEl.appendChild(d); consoleEl.scrollTop=consoleEl.scrollHeight; }
+
+  document.getElementById("btnCorrer").addEventListener("click", function(){
+    var btn = this; btn.disabled = true; btn.textContent = "CALCULANDO…";
+    consoleEl.textContent = "";
+    document.getElementById("resultado").style.display = "none";
+
+    try {
+      var r = calcularF5CalibracionXera(log);
+
+      var estadoEl = document.getElementById("rEstado");
+      estadoEl.textContent = r.estado;
+      estadoEl.className = "estado " + r.estado;
+      document.getElementById("rDetalle").textContent = r.detalle || "";
+      document.getElementById("rN").textContent = (r.n_muestras !== undefined ? r.n_muestras : "—");
+      document.getElementById("rDescartadas").textContent = (r.descartados_sin_xera !== undefined ? r.descartados_sin_xera : "—");
+
+      var bt = document.getElementById("bloqueBT");
+      if (r.backtest_xera) {
+        var b = r.backtest_xera;
+        document.getElementById("bR").textContent = b.correlacion_r;
+        document.getElementById("bR2").textContent = b.r_cuadrado;
+        document.getElementById("bPend").textContent = b.pendiente + " / " + b.intercepto;
+        document.getElementById("bErr").textContent = b.rmse + " / " + b.mae;
+        document.getElementById("bRangoX").textContent = b.rango_xera.min + " a " + b.rango_xera.max;
+        document.getElementById("bRangoY").textContent = b.rango_runs_reales.min + " a " + b.rango_runs_reales.max;
+        bt.style.display = "block";
+      } else { bt.style.display = "none"; }
+
+      document.getElementById("resultado").style.display = "block";
+      log("LISTO. Estado: " + r.estado);
+    } catch(e) {
+      log("ERROR: " + (e && e.message ? e.message : e));
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "CORRER BACKTEST xERA F5";
+    }
+  });
+</script>
+</body>
+</html>
