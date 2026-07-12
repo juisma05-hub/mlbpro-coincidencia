@@ -81,11 +81,12 @@
   No aplica — no usa horarios ni timezone.
 
   ESTADO:
-  Pieza de backtest/diagnóstico. Su salida NO es una fórmula aprobada:
-  es evidencia (correlación, R², pendiente, intercepto, error, tamaño de
-  muestra) para decidir, en un paso separado y explícito, si se alimenta
-  f5-carreraje.js con ella. NO_CONFIRMADO — pendiente de correr la página
-  de prueba con los datos reales ya capturados.
+  Pieza de backtest/diagnóstico. Su salida NO es una fórmula aprobada.
+  Ahora incluye prueba_sesgo_snapshot: parte las muestras por fecha
+  (mitad temprana vs mitad reciente) para confirmar con evidencia si el
+  R² bajo se debe al snapshot de temporada completa (ARSENAL_MASTER_2026/
+  BATTERS_VSPITCH_2026 no son point-in-time) o si la causa es otra.
+  NO_CONFIRMADO — pendiente de correr con los 1,427 juegos ya capturados.
 
   FECHA:
   12 jul 2026.
@@ -207,7 +208,7 @@ function calcularF5Calibracion(logFn) {
     if (typeof rc.f5_runs_away === "number" && Number.isFinite(rc.f5_runs_away)) {
       var cruceHomePitcher = calcularFactorArsenalLineup(rc.home_pitcher_id, rl.lineup_away);
       if (cruceHomePitcher.confirmado) {
-        var muestraA = { woba_esperado: cruceHomePitcher.woba_esperado, runs_reales: rc.f5_runs_away, gamePk: rc.gamePk };
+        var muestraA = { woba_esperado: cruceHomePitcher.woba_esperado, runs_reales: rc.f5_runs_away, gamePk: rc.gamePk, fecha: rc.date };
         muestras.push(muestraA);
         muestrasHomePitcher.push(muestraA);
       } else {
@@ -219,7 +220,7 @@ function calcularF5Calibracion(logFn) {
     if (typeof rc.f5_runs_home === "number" && Number.isFinite(rc.f5_runs_home)) {
       var cruceAwayPitcher = calcularFactorArsenalLineup(rc.away_pitcher_id, rl.lineup_home);
       if (cruceAwayPitcher.confirmado) {
-        var muestraB = { woba_esperado: cruceAwayPitcher.woba_esperado, runs_reales: rc.f5_runs_home, gamePk: rc.gamePk };
+        var muestraB = { woba_esperado: cruceAwayPitcher.woba_esperado, runs_reales: rc.f5_runs_home, gamePk: rc.gamePk, fecha: rc.date };
         muestras.push(muestraB);
         muestrasAwayPitcher.push(muestraB);
       } else {
@@ -260,6 +261,25 @@ function calcularF5Calibracion(logFn) {
 
   log("Backtest general: r=" + backtestGeneral.correlacion_r + " | R2=" + backtestGeneral.r_cuadrado + " | RMSE=" + backtestGeneral.rmse);
 
+  // PRUEBA DE SESGO DE SNAPSHOT: si el R2 bajo se debe a que
+  // ARSENAL_MASTER_2026/BATTERS_VSPITCH_2026 son temporada completa (no
+  // point-in-time), los juegos MAS RECIENTES deberian correlacionar mejor
+  // (el snapshot actual se parece mas a "lo que existia" en una fecha
+  // cercana a hoy que en una fecha de hace meses). Se ordena por fecha y
+  // se parte en dos mitades iguales, sin tocar la logica de arriba.
+  var muestrasOrdenadas = muestras.slice().sort(function (a, b) {
+    return a.fecha < b.fecha ? -1 : (a.fecha > b.fecha ? 1 : 0);
+  });
+  var mitad = Math.floor(muestrasOrdenadas.length / 2);
+  var muestrasTemprano = muestrasOrdenadas.slice(0, mitad);
+  var muestrasReciente = muestrasOrdenadas.slice(mitad);
+
+  var backtestTemprano = muestrasTemprano.length >= F5_CALIBRACION_MINIMO_MUESTRAS ? f5CalibracionRegresion(muestrasTemprano) : null;
+  var backtestReciente = muestrasReciente.length >= F5_CALIBRACION_MINIMO_MUESTRAS ? f5CalibracionRegresion(muestrasReciente) : null;
+
+  log("Sesgo de snapshot -- mitad temprana (" + (muestrasTemprano[0] ? muestrasTemprano[0].fecha : "?") + " a " + (muestrasTemprano[muestrasTemprano.length - 1] ? muestrasTemprano[muestrasTemprano.length - 1].fecha : "?") + "): r=" + (backtestTemprano ? backtestTemprano.correlacion_r : "N/C"));
+  log("Sesgo de snapshot -- mitad reciente (" + (muestrasReciente[0] ? muestrasReciente[0].fecha : "?") + " a " + (muestrasReciente[muestrasReciente.length - 1] ? muestrasReciente[muestrasReciente.length - 1].fecha : "?") + "): r=" + (backtestReciente ? backtestReciente.correlacion_r : "N/C"));
+
   return {
     estado: "BACKTEST_CALCULADO",
     detalle: "Backtest real sobre " + muestras.length + " muestras (" + juegosCruzados + " juegos cruzados). " +
@@ -271,6 +291,13 @@ function calcularF5Calibracion(logFn) {
     backtest_general: backtestGeneral,
     backtest_pitcher_home_vs_lineup_away: backtestHomePitcher,
     backtest_pitcher_away_vs_lineup_home: backtestAwayPitcher,
+    prueba_sesgo_snapshot: {
+      mitad_temprana: backtestTemprano,
+      rango_fechas_temprana: muestrasTemprano.length ? { desde: muestrasTemprano[0].fecha, hasta: muestrasTemprano[muestrasTemprano.length - 1].fecha } : null,
+      mitad_reciente: backtestReciente,
+      rango_fechas_reciente: muestrasReciente.length ? { desde: muestrasReciente[0].fecha, hasta: muestrasReciente[muestrasReciente.length - 1].fecha } : null,
+      interpretacion: "Si backtest_reciente tiene r/R2 claramente mas alto que backtest_temprano, el snapshot de temporada completa SI es una causa real del R2 bajo general. Si ambas mitades muestran r similar (bajo), el snapshot NO es la causa principal -- el problema esta en la metrica o en la relacion misma, no en la fuente de datos."
+    },
     advertencia_metodologica: "ARSENAL_MASTER_2026 y BATTERS_VSPITCH_2026 son snapshots de temporada completa actual, no el dato que existia en la fecha real de cada juego historico. Esto es una aproximacion razonable, NO un backtest point-in-time perfectamente limpio."
   };
 }
