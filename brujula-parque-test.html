@@ -102,36 +102,12 @@
   var consoleEl = document.getElementById("console");
   function log(t){ var d=document.createElement("div"); d.textContent=t; consoleEl.appendChild(d); consoleEl.scrollTop=consoleEl.scrollHeight; }
 
-  // CORREGIDO 11 jul 2026: mismo bug que casar-series-test.html tenia
-  // antes del FIX 8 jul — venueCanon() aqui no existia en absoluto, y
-  // tanto el <select> como el filtro de carrerajeDelRango() comparaban
-  // el nombre de venue CRUDO/EXACTO contra el cache. Si el mismo parque
-  // aparecia bajo mas de una variante de nombre (ej. "Dodger Stadium" vs
-  // "UNIQLO Field at Dodger Stadium" por patrocinio), el <select> los
-  // listaba como parques separados y cada uno solo encontraba SU propia
-  // variante en el cache, dejando el resto del historial real invisible
-  // ("algunos parques si, otros no", sin relacion con los datos reales).
-  // Se agrega venueCanon() usando stadiumCanonName() de estadios.js —
-  // misma funcion, mismo patron que casar-series-test.html — y se aplica
-  // tanto al llenar el <select> como al filtrar por venue en
-  // carrerajeDelRango(). No se toca la logica de arrastre, la brujula,
-  // ni la convencion de grados (esta pagina ya bucketaba wind_dir directo,
-  // sin +180, igual que casar-series-test.html; ese no era el problema aqui).
-  function venueCanon(v) {
-    return (typeof stadiumCanonName === "function") ? stadiumCanonName(v) : v;
-  }
-
   // ---- llenar el selector de parques con lo que haya en cache ----
   (function llenarParques(){
     try {
       var cache = (typeof climaLeerCache === "function") ? climaLeerCache() : [];
       var set = {};
-      for (var i=0; i<cache.length; i++){
-        if (cache[i] && cache[i].venue) {
-          var vc = venueCanon(cache[i].venue);
-          set[vc] = true;
-        }
-      }
+      for (var i=0; i<cache.length; i++){ if (cache[i] && cache[i].venue) set[cache[i].venue] = true; }
       var nombres = Object.keys(set).sort();
       var sel = document.getElementById("parqueSel");
       nombres.forEach(function(n){
@@ -289,17 +265,11 @@
     return null;
   }
 
-  // CORREGIDO 11 jul 2026: g.venue===venue (comparacion exacta) -> ahora
-  // compara venueCanon(g.venue)===venueReal (canonico), igual que
-  // casar-series-test.html. venue ya llega canonizado desde el <select>
-  // (poblado con venueCanon()), pero se vuelve a canonizar aqui por si
-  // se llama con un valor crudo desde otro punto.
   function carrerajeDelRango(venue, deg){
     var cache = climaLeerCache();
-    var venueReal = venueCanon(venue);
     var lo = Math.floor(deg/30)*30, hi = lo+30;
     var juegos = cache.filter(function(g){
-      return g && venueCanon(g.venue)===venueReal && g.wind_dir!==undefined && g.wind_dir!==null && g.wind_dir!=="" &&
+      return g && g.venue === venue && g.wind_dir!==undefined && g.wind_dir!==null && g.wind_dir!=="" &&
              !isNaN(Number(g.wind_dir)) && (Number(g.wind_dir)%360) >= lo && (Number(g.wind_dir)%360) < hi;
     });
     var carreras = [];
