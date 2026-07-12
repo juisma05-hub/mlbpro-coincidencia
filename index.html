@@ -347,13 +347,28 @@
     return (typeof STADIUM_ALIAS_2026 !== "undefined" && STADIUM_ALIAS_2026[v]) ? STADIUM_ALIAS_2026[v] : v;
   }
 
+  // CORREGIDO 11 jul 2026: se elimina la conversion "+180" al calcular
+  // degVieneDe. Casar-series-test.html (svgBrujula/goViento) agrupa el
+  // historico usando wind_dir CRUDO, sin sumar 180 en ningun punto:
+  //   var dir = Number(g.wind_dir)%360;  (dir<0) dir+=360;
+  // Esta funcion, en cambio, sumaba 180 antes de buscar en el mismo
+  // cache, lo que hacia consultar el bucket OPUESTO al que se arrastraba
+  // visualmente. Con parques de viento muy concentrado (confirmado con
+  // Oracle Park: Casar Series mostraba 28 juegos/8.8 carreras en un rango
+  // donde este explorador daba vacio, y viceversa en el rango opuesto),
+  // el efecto era exactamente ese: unos rangos "si" y otros "no" sin
+  // relacion con los datos reales. degVieneDe ahora es igual a degReal:
+  // la MISMA convención que casar-series-test.html usa para agrupar por
+  // wind_dir. No se toca el dibujo/rotacion de la flecha azul (sigue
+  // usando "deg" directo, eso nunca tuvo el problema), solo la busqueda
+  // en el cache.
   function actualizarExplorer(wrap, deg){
     var idx = wrap.getAttribute('data-idx');
     var venue = wrap.getAttribute('data-venue');
     var venueReal = venueCanon(venue);
-            var degReal = ((deg%360)+360)%360;
-        var degVieneDe = ((degReal+180)%360+360)%360;
-        var lo = Math.floor(degVieneDe/30)*30, hi = lo+30;
+    var degReal = ((deg%360)+360)%360;
+    var degVieneDe = degReal;
+    var lo = Math.floor(degVieneDe/30)*30, hi = lo+30;
     var arrow = document.getElementById('explorerArrow_'+idx);
     if(arrow) arrow.setAttribute('transform','rotate('+deg+' 100 100)');
     var rangoEl = document.getElementById('explorerRango_'+idx);
