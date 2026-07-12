@@ -1,0 +1,180 @@
+<!--
+  MLBPro · f5-calibracion-carreraje-test.html
+
+  FUNCIÓN:
+  Página de prueba independiente. Ejecuta calcularF5Calibracion() (de
+  f5-calibracion-carreraje.js) y muestra el backtest real: correlación,
+  R², pendiente, intercepto, RMSE, MAE, tamaño de muestra y la advertencia
+  metodológica. No calcula nada propio, no define ninguna fórmula.
+
+  ENTRADAS:
+  Botón "CORRER BACKTEST F5" (click). No hace ningún fetch: todo sale de
+  localStorage + calcularFactorArsenalLineup() ya cargado en la página.
+
+  SALIDAS / MODIFICACIONES:
+  Solo pinta HTML en #resultado y #console. No escribe ninguna caché.
+
+  DEPENDENCIAS:
+  arsenal-master.js, batters-vspitch.js, factor-arsenal-lineup.js,
+  f5-calibracion-carreraje.js — en ese orden. No carga mlb-routes.js (no
+  hace falta, esta pieza no hace fetch), ni clima-cache.js, ni
+  f5-carreraje.js, ni f5-automatico.js, ni ningún archivo de K6 o brújula.
+
+  NO TOCA:
+  f5-carreraje.js, f5-moneyline.js, f5-automatico.js, factor-arsenal-
+  lineup.js, arsenal-master.js, batters-vspitch.js (los carga para
+  LEERLOS, no los modifica), clima-cache.js, jalar-clima.js, K6, brújula.
+
+  UTC / HORA LOCAL DEL ESTADIO:
+  No aplica.
+
+  ESTADO:
+  Página de prueba de un backtest, no de una fórmula aprobada.
+
+  FECHA:
+  12 jul 2026.
+-->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MLBPro · Backtest Calibración F5</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:-apple-system,system-ui,sans-serif; background:#0d1117; color:#e6edf3; }
+  header { padding:14px 16px; border-bottom:1px solid #30363d; }
+  h1 { font-size:15px; margin:0; }
+  main { padding:14px; max-width:900px; margin:0 auto; }
+  .go { width:100%; border:0; border-radius:10px; padding:16px; font-size:15px; font-weight:800; color:#fff; background:#8957e5; cursor:pointer; margin-bottom:10px; }
+  .go:disabled { background:#30363d; color:#8b949e; }
+  #resultado { display:none; background:#161b22; border:1px solid #30363d; border-radius:10px; padding:14px; margin-bottom:14px; }
+  #resultado.ok { border-color:#238636; }
+  .estado { font-size:15px; font-weight:800; margin-bottom:8px; }
+  .estado.BACKTEST_CALCULADO { color:#3fb950; }
+  .estado.SIN_MUESTRA_SUFICIENTE, .estado.SIN_VARIACION_SUFICIENTE, .estado.SIN_DEPENDENCIA_CARGADA { color:#ffd60a; }
+  .detalle { font-size:13px; color:#c9d1d9; margin-bottom:10px; }
+  .bloque { background:#0d1117; border:1px solid #21262d; border-radius:8px; padding:10px; margin-top:10px; }
+  .bloque .titulo { font-size:12px; font-weight:800; color:#79c0ff; margin-bottom:6px; letter-spacing:0.3px; }
+  .fila { font-size:13px; color:#c9d1d9; padding:2px 0; }
+  .fila b { color:#fff; }
+  .aviso { margin-top:10px; padding-top:10px; border-top:1px dashed #30363d; font-size:12px; color:#ffd60a; font-style:italic; }
+  #console { margin-top:10px; background:#010409; border:1px solid #30363d; border-radius:8px; padding:12px; min-height:60px; max-height:60vh; overflow:auto; font-family:ui-monospace,monospace; font-size:12px; white-space:pre-wrap; word-break:break-word; }
+</style>
+</head>
+<body>
+<header><h1>MLBPro · Backtest Calibración F5</h1></header>
+<main>
+  <button id="btnCorrer" class="go">CORRER BACKTEST F5</button>
+
+  <div id="resultado">
+    <div class="estado" id="rEstado">—</div>
+    <div class="detalle" id="rDetalle"></div>
+
+    <div class="fila">Muestras válidas: <b id="rN">—</b></div>
+    <div class="fila">Juegos cruzados (carreraje + lineup): <b id="rCruzados">—</b></div>
+    <div class="fila">Descartados sin lineup: <b id="rSinLineup">—</b></div>
+    <div class="fila">Descartados por cruce no confirmado: <b id="rSinConfirmar">—</b></div>
+
+    <div id="bloqueGeneral" class="bloque" style="display:none;">
+      <div class="titulo">BACKTEST GENERAL (ambos lados combinados)</div>
+      <div class="fila">Correlación r: <b id="gR">—</b></div>
+      <div class="fila">R²: <b id="gR2">—</b></div>
+      <div class="fila">Pendiente / Intercepto: <b id="gPend">—</b></div>
+      <div class="fila">RMSE / MAE: <b id="gErr">—</b></div>
+      <div class="fila">Rango wOBA esperado: <b id="gRangoW">—</b></div>
+      <div class="fila">Rango carreras reales: <b id="gRangoR">—</b></div>
+    </div>
+
+    <div id="bloqueHome" class="bloque" style="display:none;">
+      <div class="titulo">PITCHER HOME vs LINEUP AWAY (predice carreras del AWAY)</div>
+      <div class="fila">n=<b id="hN">—</b> · r=<b id="hR">—</b> · R²=<b id="hR2">—</b> · RMSE=<b id="hErr">—</b></div>
+    </div>
+
+    <div id="bloqueAway" class="bloque" style="display:none;">
+      <div class="titulo">PITCHER AWAY vs LINEUP HOME (predice carreras del HOME)</div>
+      <div class="fila">n=<b id="aN">—</b> · r=<b id="aR">—</b> · R²=<b id="aR2">—</b> · RMSE=<b id="aErr">—</b></div>
+    </div>
+
+    <div class="aviso" id="rAviso" style="display:none;"></div>
+  </div>
+
+  <div id="console">Pulsa el botón.</div>
+</main>
+
+<script src="arsenal-master.js"></script>
+<script src="batters-vspitch.js"></script>
+<script src="factor-arsenal-lineup.js"></script>
+<script src="f5-calibracion-carreraje.js"></script>
+<script>
+  var consoleEl = document.getElementById("console");
+  function log(t){ var d=document.createElement("div"); d.textContent=t; consoleEl.appendChild(d); consoleEl.scrollTop=consoleEl.scrollHeight; }
+
+  document.getElementById("btnCorrer").addEventListener("click", function(){
+    var btn = this; btn.disabled = true; btn.textContent = "CALCULANDO…";
+    consoleEl.textContent = "";
+    document.getElementById("resultado").style.display = "none";
+
+    try {
+      var r = calcularF5Calibracion(log);
+
+      var estadoEl = document.getElementById("rEstado");
+      estadoEl.textContent = r.estado;
+      estadoEl.className = "estado " + r.estado;
+      document.getElementById("rDetalle").textContent = r.detalle || "";
+      document.getElementById("rN").textContent = (r.n_muestras !== undefined ? r.n_muestras : "—");
+      document.getElementById("rCruzados").textContent = (r.juegos_cruzados !== undefined ? r.juegos_cruzados : "—");
+      document.getElementById("rSinLineup").textContent = (r.descartados_sin_lineup !== undefined ? r.descartados_sin_lineup : "—");
+      document.getElementById("rSinConfirmar").textContent = (r.descartados_cruce_no_confirmado !== undefined ? r.descartados_cruce_no_confirmado : "—");
+
+      var bg = document.getElementById("bloqueGeneral");
+      if (r.backtest_general) {
+        var g = r.backtest_general;
+        document.getElementById("gR").textContent = g.correlacion_r;
+        document.getElementById("gR2").textContent = g.r_cuadrado;
+        document.getElementById("gPend").textContent = g.pendiente + " / " + g.intercepto;
+        document.getElementById("gErr").textContent = g.rmse + " / " + g.mae;
+        document.getElementById("gRangoW").textContent = g.rango_woba_esperado.min + " a " + g.rango_woba_esperado.max;
+        document.getElementById("gRangoR").textContent = g.rango_runs_reales.min + " a " + g.rango_runs_reales.max;
+        bg.style.display = "block";
+      } else { bg.style.display = "none"; }
+
+      var bh = document.getElementById("bloqueHome");
+      if (r.backtest_pitcher_home_vs_lineup_away) {
+        var h = r.backtest_pitcher_home_vs_lineup_away;
+        document.getElementById("hN").textContent = h.n_muestras;
+        document.getElementById("hR").textContent = h.correlacion_r;
+        document.getElementById("hR2").textContent = h.r_cuadrado;
+        document.getElementById("hErr").textContent = h.rmse;
+        bh.style.display = "block";
+      } else { bh.style.display = "none"; }
+
+      var ba = document.getElementById("bloqueAway");
+      if (r.backtest_pitcher_away_vs_lineup_home) {
+        var a = r.backtest_pitcher_away_vs_lineup_home;
+        document.getElementById("aN").textContent = a.n_muestras;
+        document.getElementById("aR").textContent = a.correlacion_r;
+        document.getElementById("aR2").textContent = a.r_cuadrado;
+        document.getElementById("aErr").textContent = a.rmse;
+        ba.style.display = "block";
+      } else { ba.style.display = "none"; }
+
+      var avisoEl = document.getElementById("rAviso");
+      if (r.advertencia_metodologica) {
+        avisoEl.textContent = "⚠️ " + r.advertencia_metodologica;
+        avisoEl.style.display = "block";
+      } else { avisoEl.style.display = "none"; }
+
+      document.getElementById("resultado").style.display = "block";
+      log("LISTO. Estado: " + r.estado);
+    } catch(e) {
+      log("ERROR: " + (e && e.message ? e.message : e));
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "CORRER BACKTEST F5";
+    }
+  });
+</script>
+</body>
+</html>
