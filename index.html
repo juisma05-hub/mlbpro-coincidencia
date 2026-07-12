@@ -1,3 +1,60 @@
+<!--
+  MLBPro · index.html
+
+  FUNCIÓN:
+  Pantalla principal "COINCIDENCIA DATAPRO". Orquesta la cadena completa
+  para los juegos de HOY: clima (histórico + hoy), línea de mercado,
+  lineup/factor humano, catcher/umpire/roster, brújula del viento, y arma
+  la tarjeta visual de cada juego. No define ninguna fórmula propia: solo
+  llama a los módulos que sí las definen y renderiza lo que devuelven.
+
+  ENTRADAS:
+  Botón "COINCIDENCIA DATAPRO" (click). Internamente: schedule de hoy
+  (MLB StatsAPI vía MLB_ROUTES.WORKER_BASE), y los datos devueltos por
+  jalarClima(), jalarLineas(), jalarLineup(), jalarCondition(), jalarRoster(),
+  climaFetchWeather()/climaKeyTZ()/climaBuscarHoraCercana(),
+  calcularCoincidencia(), calcularFactorPitcheoCompleto().
+
+  SALIDAS / MODIFICACIONES:
+  Solo pinta HTML en #lista y #console. No escribe directamente en
+  localStorage — delega toda escritura de histórico a climaGuardarCache()
+  (dentro de clima-cache.js, llamado indirectamente vía jalarClima()).
+  Lee climaLeerCache() (solo lectura) para respaldo de clima y para la
+  brújula explorable.
+
+  DEPENDENCIAS:
+  mlb-routes.js, estadios.js, clima-cache.js, jalar-clima.js,
+  parques-orientacion.js, rellenar-carreras.js, score-match.js,
+  calcular-coincidencia.js, jalar-condition.js, brisa-geo-parques.js,
+  pitchers-master.js, jalar-roster.js, traducir-pitcher.js,
+  catchers-master.js, traducir-catcher.js, umpires-master.js,
+  traducir-umpire.js, bloques-serie.js, bloques-trayectoria.js,
+  jalar-linea.js, arsenal-master.js, batters-vspitch.js, park-factors.js,
+  jalar-lineup.js, jalar-bullpen.js, factor-arsenal-lineup.js,
+  factor-pitcheo-completo.js (todos cargados como <script> antes del bloque
+  principal).
+
+  NO TOCA:
+  No modifica la lógica interna de clima-cache.js, jalar-clima.js,
+  score-match.js, calcular-coincidencia.js, jalar-linea.js (mercado), K6
+  (k6-test.html) ni F5 (f5-test.html / f5-automatico-test.html) — solo los
+  invoca y muestra su resultado.
+
+  CORRECCIÓN ACTUAL:
+  Se quitó el +180 reintroducido en actualizarExplorer() (var degVieneDe =
+  ((degReal+180)%360+360)%360;), que hacía que la flecha azul del explorador
+  de viento consultara el bucket opuesto al real. Ahora degVieneDe = degReal,
+  sin offset. Además se actualizó la llamada a jalarLineup(g.gamePk,
+  awayTeamId, homeTeamId) para pasar los equipos (necesario para el
+  fallback de lineup ya corregido en jalar-lineup.js), y se agregó el
+  rótulo visual "CONFIRMADO" / "ÚLTIMO CONFIRMADO" en LÍNEA F.H.
+
+  FECHA:
+  12 jul 2026.
+
+  ESTADO:
+  NO_CONFIRMADO — pendiente de tu aprobación tras esta corrección.
+-->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -352,7 +409,7 @@
     var venue = wrap.getAttribute('data-venue');
     var venueReal = venueCanon(venue);
             var degReal = ((deg%360)+360)%360;
-        var degVieneDe = ((degReal+180)%360+360)%360;
+        var degVieneDe = degReal;
         var lo = Math.floor(degVieneDe/30)*30, hi = lo+30;
     var arrow = document.getElementById('explorerArrow_'+idx);
     if(arrow) arrow.setAttribute('transform','rotate('+deg+' 100 100)');
@@ -481,7 +538,7 @@ if (lineasCache) {
 
         var factorH = { factor_final: null, confirmado: false, nota: "PENDIENTE" };
         try {
-          var lineupData = await jalarLineup(g.gamePk);
+          var lineupData = await jalarLineup(g.gamePk, awayTeamId, homeTeamId);
           var resAway = (pitcherAwayId && awayTeamId && lineupData.lineup_home.length)
             ? await calcularFactorPitcheoCompleto(awayTeamId, pitcherAwayId, lineupData.lineup_home, hoy)
             : null;
@@ -498,6 +555,13 @@ if (lineasCache) {
             factorH.nota = !lineupData.lineup_home.length && !lineupData.lineup_away.length
               ? "SIN_LINEUP_CONFIRMADO" : "DATOS_PARCIALES";
           }
+
+          // Fuente real de cada lineup usado (para mostrar en la tarjeta si
+          // el F.H. se calculó con el lineup de HOY o con el ÚLTIMO
+          // CONFIRMADO real del equipo). resAway usa lineup_home (bateadores
+          // que enfrenta el pitcher away); resHome usa lineup_away.
+          factorH.fuente_home = lineupData.fuente_home;
+          factorH.fuente_away = lineupData.fuente_away;
         } catch (efh) {
           log("AVISO factor humano "+away+" @ "+home+": "+(efh&&efh.message?efh.message:efh));
           factorH.nota = "ERROR";
@@ -666,6 +730,17 @@ if (lineasCache) {
       fhVal = 'N/C';
       fhClass = 'val pendiente';
       fhSub = factorH ? factorH.nota : 'PENDIENTE';
+    }
+
+    // Indicador visual de la fuente del lineup usado en el F.H.: si
+    // cualquiera de los dos lados usó el ÚLTIMO CONFIRMADO (no el de hoy),
+    // se marca distinto de un CONFIRMADO real de hoy. Nunca oculta la
+    // diferencia, nunca la disfraza de "OK" silencioso.
+    if (factorH && (factorH.fuente_home || factorH.fuente_away)) {
+      var usoUltimo = factorH.fuente_home === "LINEUP_ULTIMO_CONFIRMADO" || factorH.fuente_away === "LINEUP_ULTIMO_CONFIRMADO";
+      var usoConfirmado = factorH.fuente_home === "LINEUP_CONFIRMADO" || factorH.fuente_away === "LINEUP_CONFIRMADO";
+      if (usoUltimo) fhSub += ' · lineup: ÚLTIMO CONFIRMADO';
+      else if (usoConfirmado) fhSub += ' · lineup: CONFIRMADO';
     }
 
     var lineas='<div class="lineas">'+
