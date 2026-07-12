@@ -97,6 +97,13 @@
       <div class="fila">n=<b id="aN">—</b> · r=<b id="aR">—</b> · R²=<b id="aR2">—</b> · RMSE=<b id="aErr">—</b></div>
     </div>
 
+    <div id="bloqueSesgo" class="bloque" style="display:none; border-color:#8957e5;">
+      <div class="titulo">PRUEBA DE SESGO DE SNAPSHOT (temprano vs reciente)</div>
+      <div class="fila">Mitad temprana (<span id="sFechaTemprana">—</span>): r=<b id="sRTemprano">—</b> · R²=<b id="sR2Temprano">—</b></div>
+      <div class="fila">Mitad reciente (<span id="sFechaReciente">—</span>): r=<b id="sRReciente">—</b> · R²=<b id="sR2Reciente">—</b></div>
+      <div class="fila" style="margin-top:6px; color:#8b949e; font-style:italic;">Si reciente &gt;&gt; temprana, el snapshot SÍ es la causa. Si son parecidos, no lo es.</div>
+    </div>
+
     <div class="aviso" id="rAviso" style="display:none;"></div>
   </div>
 
@@ -159,6 +166,22 @@
         document.getElementById("aErr").textContent = a.rmse;
         ba.style.display = "block";
       } else { ba.style.display = "none"; }
+
+      var bs = document.getElementById("bloqueSesgo");
+      if (r.prueba_sesgo_snapshot) {
+        var s = r.prueba_sesgo_snapshot;
+        if (s.mitad_temprana) {
+          document.getElementById("sFechaTemprana").textContent = s.rango_fechas_temprana.desde + " a " + s.rango_fechas_temprana.hasta;
+          document.getElementById("sRTemprano").textContent = s.mitad_temprana.correlacion_r;
+          document.getElementById("sR2Temprano").textContent = s.mitad_temprana.r_cuadrado;
+        }
+        if (s.mitad_reciente) {
+          document.getElementById("sFechaReciente").textContent = s.rango_fechas_reciente.desde + " a " + s.rango_fechas_reciente.hasta;
+          document.getElementById("sRReciente").textContent = s.mitad_reciente.correlacion_r;
+          document.getElementById("sR2Reciente").textContent = s.mitad_reciente.r_cuadrado;
+        }
+        bs.style.display = "block";
+      } else { bs.style.display = "none"; }
 
       var avisoEl = document.getElementById("rAviso");
       if (r.advertencia_metodologica) {
