@@ -1,3 +1,75 @@
+/*
+  MLBPro · jalar-clima.js
+
+  FUNCIÓN:
+  Orquestador principal del clima. Trae el schedule de MLB en un rango,
+  cruza clima real por parque (vía clima-cache.js), cruza carreras y
+  abridores reales por juego (vía MLB StatsAPI), aplica la Regla Madre
+  (hoy nunca entra al histórico) y guarda: histórico validado en la Data
+  Madre (climaGuardarCache) y clima de hoy en memoria (climaHoyGuardar).
+
+  ENTRADAS:
+  logFn (function, opcional) — callback de progreso. Internamente:
+  MLB_ROUTES.WORKER_BASE (mlb-routes.js); stadiumNorm/STADIUM_INDEX
+  (estadios.js); climaHoyISO, climaLeerCache, climaStartDesde,
+  climaFetchWeather, climaKeyTZ, climaBuscarHoraCercana, climaHoyGuardar,
+  climaGuardarCache, climaMerge (clima-cache.js).
+
+  SALIDAS / MODIFICACIONES:
+  Escribe localStorage["MLBPRO_CLIMA_CACHE_2026"] (histórico, vía
+  climaGuardarCache) y CLIMA_HOY_MEM en RAM (hoy, vía climaHoyGuardar).
+  Devuelve el array totalHistorico (mismo que queda en la Data Madre).
+
+  DEPENDENCIAS:
+  mlb-routes.js, estadios.js, clima-cache.js.
+
+  NO TOCA:
+  K6, F5, MoneyLine directamente — solo deja clima de hoy disponible en
+  memoria para que esos módulos lo lean si quieren, nunca escribe ni
+  modifica nada de esos módulos.
+
+  UTC / HORA LOCAL DEL ESTADIO:
+  Ambas. g.gameDate (de MLB StatsAPI) es UTC. Se convierte a hora LOCAL
+  del estadio con climaKeyTZ(g.gameDate, tz) antes de cruzar contra el
+  mapa de clima (que está indexado en hora local). El corte de "hoy" usa
+  climaHoyISO() (America/New_York, definido en clima-cache.js).
+
+  QUÉ HACE: trae schedule, clima, carreras y abridor confirmado por
+  juego; guarda histórico validado y clima de hoy en memoria.
+
+  QUÉ NO HACE: no calcula Coincidencia, no toca lineups del rival, no
+  calibra ninguna fórmula. No inventa clima, carreras ni abridor cuando
+  no puede confirmarlos — usa códigos ERR:... o null y sigue.
+
+  QUÉ AFECTA: la Data Madre completa (histórico) y el clima de hoy en
+  memoria — de ahí dependen Coincidencia, Over/Under, F5 (lectura),
+  brújula, series por parque.
+
+  QUÉ NO AFECTA: K6, MoneyLine, lineups, mercado — no los escribe ni
+  los modifica.
+
+  CORRECCIÓN ACTUAL (Bloque 2, Problema #7 — confirmado por código,
+  mismo patrón que ya se corrigió antes en f5-historico-carreraje.js):
+  Antes, home_pitcher_id/away_pitcher_id se tomaban como
+  homePitchers[0]/awayPitchers[0] — el primer id de un arreglo
+  (dBox.teams.X.pitchers), sin ninguna garantía de que fuera el abridor
+  real. Corregido: ahora se recorre dBox.teams.X.players (objeto por
+  jugador) y se exige EXACTAMENTE UN jugador con
+  stats.pitching.gamesStarted === 1 para ese lado. Si no hay ninguno o
+  hay más de uno, el pitcher_id de ese lado queda null (NO_CONFIRMADO
+  para cualquier consumidor aguas abajo que ya trata null como abridor
+  no confirmado, ej. f5-historico-carreraje.js). Nunca se asume el
+  primero de la lista ni se inventa un abridor.
+
+  ESTADO:
+  NO_CONFIRMADO — corregido el Problema #7, pendiente de ejecución real
+  para confirmar con evidencia (¿cuántos juegos quedan con pitcher_id
+  null que antes tenían un valor tomado del primer elemento?).
+
+  FECHA:
+  12 jul 2026.
+*/
+
 // jalar-clima.js
 //
 // RUTA: Orquestador que jala el schedule de MLB, cruza clima (vía
@@ -70,9 +142,37 @@
 //   carreras que solo comprobaban typeof "number" (en runsMap, en el
 //   guardia de nuevosHistoricos, y en el filtro final de totalHistorico)
 //   ahora exigen además Number.isFinite() — un NaN sigue siendo typeof
-//   "number" y antes podía colarse en teoría. Ningún otro comportamiento
+//   "number" y antes podía colarse en teoría. CORREGIDO 12 jul 2026
+//   (auditoría Bloque 2, Problema #7): abridor confirmado por
+//   gamesStarted===1 en vez de pitchers[0] (primer elemento del arreglo,
+//   sin garantía de ser el abridor real). Ningún otro comportamiento
 //   cambia: misma fecha de corte, mismo criterio Final, mismo manejo de
-//   clima/pitchers/venue no reconocido.
+//   clima/carreras/venue no reconocido.
+
+// Confirma el abridor REAL de un equipo en ESTE juego: recorre
+// dBox.teams.X.players (objeto keyed por "ID...") y reune TODOS los
+// jugadores cuyas estadisticas reales de ESE juego traen
+// stats.pitching.gamesStarted === 1. Solo devuelve un id si encuentra
+// EXACTAMENTE UNO -- si encuentra cero o mas de uno, devuelve null (nunca
+// asume el primero de la lista ni adivina cual es el real). Mismo
+// criterio ya validado en f5-historico-carreraje.js.
+function jalarClimaAbridorConfirmado(players) {
+  if (!players || typeof players !== "object") return null;
+
+  const candidatos = [];
+  const keys = Object.keys(players);
+
+  for (let i = 0; i < keys.length; i++) {
+    const p = players[keys[i]];
+    const gs = p && p.stats && p.stats.pitching ? p.stats.pitching.gamesStarted : undefined;
+
+    if (Number(gs) === 1 && p.person && p.person.id != null) {
+      candidatos.push(p.person.id);
+    }
+  }
+
+  return candidatos.length === 1 ? candidatos[0] : null;
+}
 
 async function jalarClima(logFn) {
   function log(t) {
@@ -318,31 +418,28 @@ async function jalarClima(logFn) {
 
       const dBox = await resBox.json();
 
-      const homePitchers =
+      // CORREGIDO (Problema #7): antes se tomaba pitchers[0] (primer id
+      // de un arreglo, sin garantia de ser el abridor). Ahora se exige
+      // gamesStarted===1 confirmado en players, igual que
+      // f5-historico-carreraje.js.
+      const homePlayers =
         dBox &&
         dBox.teams &&
         dBox.teams.home &&
-        Array.isArray(dBox.teams.home.pitchers)
-          ? dBox.teams.home.pitchers
-          : [];
+        dBox.teams.home.players
+          ? dBox.teams.home.players
+          : {};
 
-      const awayPitchers =
+      const awayPlayers =
         dBox &&
         dBox.teams &&
         dBox.teams.away &&
-        Array.isArray(dBox.teams.away.pitchers)
-          ? dBox.teams.away.pitchers
-          : [];
+        dBox.teams.away.players
+          ? dBox.teams.away.players
+          : {};
 
-      const homePitcherId =
-        homePitchers.length > 0
-          ? homePitchers[0]
-          : null;
-
-      const awayPitcherId =
-        awayPitchers.length > 0
-          ? awayPitchers[0]
-          : null;
+      const homePitcherId = jalarClimaAbridorConfirmado(homePlayers);
+      const awayPitcherId = jalarClimaAbridorConfirmado(awayPlayers);
 
       if (homePitcherId || awayPitcherId) {
         pitchersMap.set(g.game_id, {
