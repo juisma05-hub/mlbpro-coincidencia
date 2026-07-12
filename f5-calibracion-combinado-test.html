@@ -1,0 +1,138 @@
+<!--
+  MLBPro · f5-calibracion-combinado-test.html
+
+  FUNCIÓN:
+  Ejecuta calcularF5CalibracionCombinado() y muestra el R² de la regresión
+  woba_esperado + xERA combinados, comparado contra cada métrica sola.
+
+  ENTRADAS:
+  Botón "CORRER BACKTEST COMBINADO F5" (click). No hace fetch: todo sale
+  de localStorage y de las funciones/tablas ya cargadas en la página.
+
+  SALIDAS / MODIFICACIONES:
+  Solo pinta HTML en #resultado y #console. No escribe ninguna caché.
+
+  DEPENDENCIAS:
+  arsenal-master.js, batters-vspitch.js, factor-arsenal-lineup.js,
+  pitchers-master.js, f5-calibracion-combinado.js — en ese orden.
+
+  NO TOCA:
+  f5-carreraje.js, f5-moneyline.js, f5-automatico.js, factor-arsenal-
+  lineup.js, arsenal-master.js, batters-vspitch.js, pitchers-master.js,
+  clima-cache.js, jalar-clima.js, K6, brújula.
+
+  UTC / HORA LOCAL: no aplica.
+  ESTADO: página de prueba de un backtest, no de fórmula aprobada.
+  FECHA: 12 jul 2026.
+-->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MLBPro · Backtest Combinado F5</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:-apple-system,system-ui,sans-serif; background:#0d1117; color:#e6edf3; }
+  header { padding:14px 16px; border-bottom:1px solid #30363d; }
+  h1 { font-size:15px; margin:0; }
+  main { padding:14px; max-width:900px; margin:0 auto; }
+  .go { width:100%; border:0; border-radius:10px; padding:16px; font-size:15px; font-weight:800; color:#fff; background:#238636; cursor:pointer; margin-bottom:10px; }
+  .go:disabled { background:#30363d; color:#8b949e; }
+  #resultado { display:none; background:#161b22; border:1px solid #30363d; border-radius:10px; padding:14px; margin-bottom:14px; }
+  .estado { font-size:15px; font-weight:800; margin-bottom:8px; }
+  .estado.BACKTEST_CALCULADO { color:#3fb950; }
+  .estado.SIN_MUESTRA_SUFICIENTE, .estado.SIN_VARIACION_SUFICIENTE, .estado.SIN_DEPENDENCIA_CARGADA { color:#ffd60a; }
+  .detalle { font-size:13px; color:#c9d1d9; margin-bottom:10px; }
+  .bloque { background:#0d1117; border:1px solid #21262d; border-radius:8px; padding:10px; margin-top:10px; }
+  .titulo { font-size:12px; font-weight:800; color:#79c0ff; margin-bottom:6px; }
+  .fila { font-size:13px; color:#c9d1d9; padding:2px 0; }
+  .fila b { color:#fff; }
+  #console { margin-top:10px; background:#010409; border:1px solid #30363d; border-radius:8px; padding:12px; min-height:60px; max-height:60vh; overflow:auto; font-family:ui-monospace,monospace; font-size:12px; white-space:pre-wrap; word-break:break-word; }
+</style>
+</head>
+<body>
+<header><h1>MLBPro · Backtest Combinado F5</h1></header>
+<main>
+  <button id="btnCorrer" class="go">CORRER BACKTEST COMBINADO F5</button>
+
+  <div id="resultado">
+    <div class="estado" id="rEstado">—</div>
+    <div class="detalle" id="rDetalle"></div>
+    <div class="fila">Muestras: <b id="rN">—</b></div>
+
+    <div id="bloqueComp" class="bloque" style="display:none;">
+      <div class="titulo">COMPARACIÓN R² (mismo n para los tres)</div>
+      <div class="fila">n idéntico: <b id="cN">—</b></div>
+      <div class="fila">woba_esperado solo: <b id="cWoba">—</b></div>
+      <div class="fila">xERA solo: <b id="cXera">—</b></div>
+      <div class="fila">Combinado: <b id="cComb">—</b></div>
+    </div>
+
+    <div id="bloqueBT" class="bloque" style="display:none;">
+      <div class="titulo">DETALLE REGRESIÓN COMBINADA</div>
+      <div class="fila">Intercepto: <b id="bB0">—</b></div>
+      <div class="fila">Coef. woba_esperado: <b id="bB1">—</b></div>
+      <div class="fila">Coef. xERA: <b id="bB2">—</b></div>
+      <div class="fila">RMSE / MAE: <b id="bErr">—</b></div>
+    </div>
+  </div>
+
+  <div id="console">Pulsa el botón.</div>
+</main>
+
+<script src="arsenal-master.js"></script>
+<script src="batters-vspitch.js"></script>
+<script src="factor-arsenal-lineup.js"></script>
+<script src="pitchers-master.js"></script>
+<script src="f5-calibracion-combinado.js"></script>
+<script>
+  var consoleEl = document.getElementById("console");
+  function log(t){ var d=document.createElement("div"); d.textContent=t; consoleEl.appendChild(d); consoleEl.scrollTop=consoleEl.scrollHeight; }
+
+  document.getElementById("btnCorrer").addEventListener("click", function(){
+    var btn = this; btn.disabled = true; btn.textContent = "CALCULANDO…";
+    consoleEl.textContent = "";
+    document.getElementById("resultado").style.display = "none";
+
+    try {
+      var r = calcularF5CalibracionCombinado(log);
+
+      var estadoEl = document.getElementById("rEstado");
+      estadoEl.textContent = r.estado;
+      estadoEl.className = "estado " + r.estado;
+      document.getElementById("rDetalle").textContent = r.detalle || "";
+      document.getElementById("rN").textContent = (r.n_muestras !== undefined ? r.n_muestras : "—");
+
+      var bc = document.getElementById("bloqueComp");
+      if (r.comparacion) {
+        document.getElementById("cN").textContent = r.comparacion.n_muestras_identico_para_los_tres;
+        document.getElementById("cWoba").textContent = r.comparacion.woba_solo_r2;
+        document.getElementById("cXera").textContent = r.comparacion.xera_solo_r2;
+        document.getElementById("cComb").textContent = r.comparacion.combinado_r2;
+        bc.style.display = "block";
+      } else { bc.style.display = "none"; }
+
+      var bt = document.getElementById("bloqueBT");
+      if (r.backtest_combinado) {
+        var b = r.backtest_combinado;
+        document.getElementById("bB0").textContent = b.intercepto;
+        document.getElementById("bB1").textContent = b.coef_woba_esperado;
+        document.getElementById("bB2").textContent = b.coef_xera;
+        document.getElementById("bErr").textContent = b.rmse + " / " + b.mae;
+        bt.style.display = "block";
+      } else { bt.style.display = "none"; }
+
+      document.getElementById("resultado").style.display = "block";
+      log("LISTO. Estado: " + r.estado);
+    } catch(e) {
+      log("ERROR: " + (e && e.message ? e.message : e));
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "CORRER BACKTEST COMBINADO F5";
+    }
+  });
+</script>
+</body>
+</html>
