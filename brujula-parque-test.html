@@ -1,3 +1,106 @@
+<!--
+  MLBPro · brujula-parque-test.html
+
+  FUNCIÓN:
+  Herramienta de exploración: para un parque elegido, arrastra una regla
+  vertical (0-359°) y muestra el promedio de carreras/velocidad de viento
+  de los juegos históricos que cayeron en ese rango de 30°, con un compás
+  visual que rota según la orientación real del parque.
+
+  ENTRADAS:
+  Selección de parque (<select>), grado arrastrado en la regla (0-359),
+  orientación manual opcional (<input>). Internamente: climaLeerCache()
+  (clima-cache.js), stadiumCanonName() (estadios.js),
+  orientacionDelParque() (orientacion-parques.js, capa de compatibilidad
+  que a su vez depende de getInfoParque() de parques-orientacion.js).
+
+  SALIDAS / MODIFICACIONES:
+  Solo pinta HTML/SVG en la página. No escribe ninguna caché ni
+  localStorage.
+
+  DEPENDENCIAS:
+  mlb-routes.js, estadios.js, clima-cache.js, parques-orientacion.js
+  (archivo maestro de orientación), orientacion-parques.js (capa de
+  compatibilidad) — EN ESE ORDEN EXACTO. parques-orientacion.js debe
+  cargar ANTES que orientacion-parques.js porque este último ahora pide
+  prestado el grado a getInfoParque() del maestro (ver Bloque 3,
+  Problema #14).
+
+  NO TOCA:
+  jalar-clima.js, calcular-coincidencia.js, score-match.js, jalar-linea.js
+  (mercado), K6, F5, MoneyLine, Coincidencia. No escribe ninguna caché.
+
+  UTC / HORA LOCAL:
+  No aplica.
+
+  QUÉ HACE: muestra el carreraje promedio de un parque para un rango de
+  viento de 30° elegido a mano, con compás visual que refleja la
+  orientación real del parque cuando está confirmada.
+
+  QUÉ NO HACE: no decide FAVORABLE/DESFAVORABLE (eso vive en
+  casar-series-test.html) — solo muestra el promedio crudo. No calcula
+  ninguna fórmula de Coincidencia/F5/K6.
+
+  QUÉ AFECTA: nada fuera de sí misma — es una herramienta de exploración,
+  de solo lectura.
+
+  QUÉ NO AFECTA: Data Madre, Coincidencia, F5, K6, MoneyLine, mercado.
+
+  CORRECCIÓN ACTUAL (Bloque 3, Problema #9/#14):
+  Se confirmó que orientacion-parques.js SÍ existe como archivo real y
+  distinto (no era un error de nombre) — define orientacionDelParque(),
+  que este archivo ya llamaba correctamente. Se agregó
+  <script src="parques-orientacion.js?v=3"> ANTES de
+  <script src="orientacion-parques.js">, porque tras la migración del
+  Problema #14, orientacionDelParque() ahora depende de getInfoParque()
+  (parques-orientacion.js) para el grado numérico.
+
+  CORRECCIÓN ADICIONAL (Bloque 3, Problema #13 — RECHAZADA una vez,
+  corregida de nuevo con ambos fallos reales):
+  1) hpActual() devolvía 45° en silencio cuando no había orientación
+     real (input vacío). Ahora devuelve null. pintarCompassGrande(hp) y
+     actualizar() tratan null explícitamente (rotan como si fuera 0,
+     pero SIN presentarlo como confirmado) y se agregó el elemento
+     #compassEstado, que muestra "NO_CONFIRMADO (sin orientación real)"
+     en vez de un grado inventado.
+  2) actualizar() llamaba aplicarOrientacionAutomatica(venue) en CADA
+     ejecución -- y actualizar() se dispara en cada arrastre de la regla
+     y en cada tecla del input manual. Eso pisaba silenciosamente
+     cualquier orientación manual que el usuario hubiera escrito, y
+     repetía el log "Orientación automática..." sin parar. Corregido:
+     aplicarOrientacionAutomatica() ahora se dispara ÚNICAMENTE desde el
+     listener "change" del <select> de parque (cuando el parque
+     realmente cambia), nunca desde actualizar().
+  3) (RECHAZADO una vez, corregido) Al volver el <select> a "— elegir —"
+     (venue vacío), orientInput y la brújula conservaban la orientación
+     del parque anterior -- estado viejo mostrado como si fuera del
+     parque actual (ninguno). Corregido: el listener "change" ahora
+     limpia orientInput.value y repinta el compás a NO_CONFIRMADO
+     explícitamente cuando venue queda vacío.
+
+  CAMBIO ADICIONAL (mejora de usabilidad, sin tocar filtros/orientación/
+  carreraje): el <select> de parque ahora muestra "EQUIPO — PARQUE" (ej.
+  "Los Angeles Dodgers — Dodger Stadium") en el texto visible de cada
+  <option>, tomando el equipo de home_team real de la Data Madre (mismo
+  patrón que ya usa casar-series-test.html) — nunca de una tabla
+  inventada. El value del <option> sigue siendo ÚNICAMENTE el nombre
+  canónico del parque, así que carrerajeDelRango(),
+  aplicarOrientacionAutomatica() y todo lo demás reciben exactamente el
+  mismo string de siempre. Si un parque en cache no tiene home_team
+  confirmado, se muestra "NO_CONFIRMADO — PARQUE" en vez de inventar un
+  equipo.
+
+  ESTADO:
+  NO_CONFIRMADO — pendiente de ejecución real: (a) elegir un parque y
+  confirmar que la orientación automática se llena una sola vez; (b)
+  escribir un valor manual y arrastrar la regla, confirmando que el
+  valor manual YA NO se pisa ni se repite el log; (c) elegir un parque
+  sin orientación confirmada y ver "NO_CONFIRMADO (sin orientación
+  real)" en el compás, sin rotación inventada.
+
+  FECHA:
+  12 jul 2026.
+-->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -83,6 +186,7 @@
             <circle cx="110" cy="110" r="4" fill="#e6edf3"/>
           </svg>
         </div>
+        <div id="compassEstado" style="text-align:center;font-size:10px;color:#8b949e;margin-bottom:6px;">—</div>
         <div class="lbox"><div class="lbl">DIRECCIÓN VIENTO</div><div class="val" id="lecDir">—</div></div>
         <div class="lbox"><div class="lbl">VELOCIDAD VIENTO (prom. rango)</div><div class="val" id="lecVel">—</div></div>
         <div class="lbox"><div class="lbl">CARRERAJE EN ESTE RANGO</div><div class="val" id="lecCarr">—</div><div class="sub" id="lecSub">elige un parque</div></div>
@@ -96,6 +200,7 @@
 <script src="mlb-routes.js"></script>
 <script src="estadios.js"></script>
 <script src="clima-cache.js"></script>
+<script src="parques-orientacion.js?v=3"></script>
 <script src="orientacion-parques.js"></script>
 
 <script>
@@ -121,29 +226,56 @@
   (function llenarParques(){
     try {
       var cache = (typeof climaLeerCache === "function") ? climaLeerCache() : [];
-      var set = {};
+      var set = {}; // vc -> home_team real (o null si no se ha visto todavía)
       for (var i=0; i<cache.length; i++){
         if (cache[i] && cache[i].venue) {
           var vc = venueCanon(cache[i].venue);
-          set[vc] = true;
+          if (!(vc in set) || !set[vc]) {
+            set[vc] = cache[i].home_team || null;
+          }
         }
       }
       var nombres = Object.keys(set).sort();
       var sel = document.getElementById("parqueSel");
       nombres.forEach(function(n){
-        var o = document.createElement("option"); o.value = n; o.textContent = n; sel.appendChild(o);
+        var o = document.createElement("option");
+        o.value = n; // value sigue siendo UNICAMENTE el nombre canonico del parque
+        var equipo = set[n] ? set[n] : "NO_CONFIRMADO"; // real de la Data Madre, nunca inventado
+        o.textContent = equipo + " — " + n;
+        sel.appendChild(o);
       });
       log("Parques en cache: " + nombres.length + " · Filas: " + cache.length);
     } catch(e) { log("AVISO: " + e.message); }
   })();
 
-  document.getElementById("parqueSel").addEventListener("change", actualizar);
+  // CORREGIDO (Bloque 3, Problema #13): aplicarOrientacionAutomatica()
+  // ahora se dispara SOLO aquí, cuando cambia el parque seleccionado --
+  // ya no se llama desde dentro de actualizar(), que se ejecuta en cada
+  // arrastre de la regla y en cada tecla del input manual. Antes, eso
+  // pisaba silenciosamente cualquier valor manual que el usuario hubiera
+  // escrito, y repetía el log de "Orientación automática..." sin parar.
+  document.getElementById("parqueSel").addEventListener("change", function(){
+    var venue = document.getElementById("parqueSel").value;
+    if (venue) {
+      aplicarOrientacionAutomatica(venue);
+    } else {
+      // CORREGIDO (Bloque 3, Problema #13, 2do fallo): al volver el
+      // select a "— elegir —", antes se quedaba con la orientación del
+      // parque anterior en orientInput y en la brújula. Ahora se limpia
+      // explícitamente y se repinta el compás a NO_CONFIRMADO.
+      document.getElementById("orientInput").value = "";
+      pintarCompassGrande(null);
+    }
+    actualizar();
+  });
 
   // ---- pinta los 16 puntos cardinales en el circulo grande. Se llama
   // cada vez que cambia la orientacion (parque nuevo o input manual),
   // porque el anillo ROTA al reves de hp (percepcion: el parque queda
   // fijo mirando arriba, lo que se mueve es el anillo de cardinales). ----
   function pintarCompassGrande(hp){
+    var hpValido = (hp !== null && hp !== undefined && !isNaN(hp));
+    var hpParaRotar = hpValido ? (((Number(hp)%360)+360)%360) : 0;
     var puntos16 = [
       {g:0,t:"N"},{g:22.5,t:"NNE"},{g:45,t:"NE"},{g:67.5,t:"ENE"},
       {g:90,t:"E"},{g:112.5,t:"ESE"},{g:135,t:"SE"},{g:157.5,t:"SSE"},
@@ -153,7 +285,7 @@
     var cx=110, cy=110, r=95;
     var html = "";
     puntos16.forEach(function(p){
-      var gAjustado = ((p.g - hp)%360+360)%360;
+      var gAjustado = ((p.g - hpParaRotar)%360+360)%360;
       var rad = gAjustado * Math.PI/180;
       var esMayor = (p.g % 90 === 0);
       var rTxt = r - (esMayor?16:12);
@@ -164,11 +296,25 @@
       html += '<line x1="'+p1x+'" y1="'+p1y+'" x2="'+p2x+'" y2="'+p2y+'" stroke="'+(esMayor?"#e6edf3":"#484f58")+'" stroke-width="'+(esMayor?2:1)+'"/>';
     });
     document.getElementById("compassMarcas").innerHTML = html;
+
+    // Estado explícito: nunca dejar que el usuario crea que el compás
+    // rota por una orientación real cuando en verdad es un valor vacío.
+    var estadoEl = document.getElementById("compassEstado");
+    if (estadoEl) {
+      estadoEl.textContent = hpValido
+        ? ("orientación: " + Math.round(hp) + "°")
+        : "NO_CONFIRMADO (sin orientación real)";
+    }
   }
 
+  // CORREGIDO (Bloque 3, Problema #13): antes devolvía 45 en silencio
+  // cuando no había orientación. Ahora devuelve null -- NO_CONFIRMADO
+  // real, nunca un número inventado. Todo llamador de hpActual() debe
+  // tratar null explícitamente (ver pintarCompassGrande y actualizar).
   function hpActual(){
     var v = document.getElementById("orientInput").value;
-    return (v === "" || isNaN(v)) ? 45 : (Number(v)%360+360)%360;
+    if (v === "" || isNaN(v)) return null;
+    return (Number(v)%360+360)%360;
   }
 
   document.getElementById("orientInput").addEventListener("input", function(){
@@ -332,11 +478,21 @@
 
     var flecha = document.getElementById("compassFlecha");
     if (flecha) {
-      var degAjustado = ((deg - hpActual())%360+360)%360;
+      // hpActual() puede ser null (sin orientación real, Problema #13) --
+      // se trata como 0 solo para el cálculo de rotación relativa, nunca
+      // se le pide al usuario que crea que es un valor confirmado.
+      var hp = hpActual();
+      var hpParaRotar = (hp === null) ? 0 : hp;
+      var degAjustado = ((deg - hpParaRotar)%360+360)%360;
       flecha.setAttribute("transform", "rotate("+degAjustado+" 110 110)");
     }
 
-    if (venue) aplicarOrientacionAutomatica(venue);
+    // CORREGIDO (Bloque 3, Problema #13): ya NO se llama
+    // aplicarOrientacionAutomatica() aquí. actualizar() se ejecuta en
+    // cada arrastre de la regla y en cada tecla del input manual -- si
+    // siguiera llamando a la automática, pisaría el valor manual del
+    // usuario y repetiría el log constantemente. Ese disparo ahora vive
+    // únicamente en el listener "change" del <select> de parque.
 
     if (!venue) {
       document.getElementById("lecCarr").textContent = "—";
