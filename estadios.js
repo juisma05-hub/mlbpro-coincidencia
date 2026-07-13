@@ -1,3 +1,70 @@
+/*
+  MLBPro · estadios.js
+
+  FUNCIÓN:
+  Fuente única de datos de estadios: coordenadas, timezone, roof, alias de
+  nombre de parque, y funciones de resolución de venue. Es la BASE de la
+  cadena — se carga antes que clima-cache.js, jalar-clima.js,
+  score-match.js, casar-series-test.html y calcular-coincidencia.js.
+
+  ENTRADAS:
+  Ninguna en tiempo de carga (dato estático, hardcodeado). stadiumGet(),
+  stadiumCanonName() y stadiumNorm() reciben un string de venue.
+
+  SALIDAS / MODIFICACIONES:
+  Expone STADIUM_COORDS_2026, STADIUM_ESPECIALES_2026, STADIUM_INDEX
+  (Map), STADIUM_ALIAS_2026, stadiumNorm(), stadiumCanonName(),
+  stadiumGet(). No escribe ninguna caché ni localStorage.
+
+  DEPENDENCIAS:
+  Ninguna — es la base de la cadena. Debe cargarse ANTES que cualquier
+  archivo que use stadiumNorm(), stadiumGet(), stadiumCanonName() o
+  STADIUM_INDEX.
+
+  NO TOCA:
+  clima, carreras, score, series, Data Madre. No hace fetch, no escribe
+  caché ni localStorage.
+
+  UTC / HORA LOCAL:
+  No aplica directamente — este archivo solo EXPONE el campo timezone de
+  cada parque (ej. "America/Los_Angeles"), no hace ninguna conversión de
+  hora por sí mismo. La conversión real vive en clima-cache.js
+  (climaKeyTZ), que consume este campo.
+
+  QUÉ HACE: da coordenadas/timezone/roof por parque, resuelve nombres de
+  patrocinio a nombre canónico (stadiumCanonName), y resuelve el objeto
+  completo del estadio a partir de cualquier variante de nombre
+  (stadiumGet).
+
+  QUÉ NO HACE: no decide clima, no calcula Coincidencia/F5/K6, no aplica
+  ninguna Regla Madre de fechas/carreras (esa vive en clima-cache.js).
+
+  QUÉ AFECTA: absolutamente todo lo que necesita resolver un parque —
+  clima-cache.js, jalar-clima.js, score-match.js, calcular-coincidencia.js,
+  casar-series-test.html, brujula-parque-test.html, parques-orientacion.js,
+  orientacion-parques.js, y transitivamente F5/K6/MoneyLine/index.html.
+
+  QUÉ NO AFECTA: nada decide su propio comportamiento — es puramente
+  fuente de datos y resolución de nombres, sin lógica de negocio propia.
+
+  REGLA MADRE (del propio archivo, sin cambios): este archivo es el
+  ÚNICO lugar donde debe vivir el mapeo canónico de nombres de parque
+  (alias → canónico). Ningún otro archivo debe mantener su propio
+  mapeo de alias de parque en paralelo — todos deben resolver el parque
+  a través de stadiumGet()/stadiumCanonName(). (Nota de auditoría,
+  Bloque 3: esta regla se violaba en parques-orientacion.js y
+  brisa-geo-parques.js — ya corregido, ver sus propios prólogos,
+  Problemas #11/#12).
+
+  ESTADO:
+  CONFIRMADO — auditado en el Bloque 3, sin bugs encontrados, sin
+  cambios de lógica. Prólogo agregado (el archivo ya tenía un
+  encabezado detallado, pero no el formato obligatorio completo).
+
+  FECHA:
+  12 jul 2026.
+*/
+
 // estadios.js
 //
 // RUTA: Fuente única de datos de estadios (coordenadas, timezone, roof,
