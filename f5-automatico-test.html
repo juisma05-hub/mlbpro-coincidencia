@@ -60,6 +60,7 @@
 <body>
 <header><h1>MLBPro · F5 Automático — juegos reales de hoy</h1></header>
 <main>
+  <a href="index.html" style="display:inline-block;margin-bottom:10px;color:#79c0ff;font-size:13px;text-decoration:none;">← Volver al inicio</a>
   <button id="btnCorrer" class="go">CORRER F5 AUTOMÁTICO (juegos de hoy)</button>
   <button id="btnAuto" class="go-auto">🔄 Auto-actualizar cada 30 min: OFF (necesita esta pestaña abierta)</button>
   <div id="lista"></div>
@@ -137,6 +138,17 @@
           return partes.join("<br>");
         }
 
+        // Detalle real de la proyección temprana F5, tal cual la devuelve
+        // proyeccion-pitcher-temprana.js (no se toca ni se reinterpreta ese
+        // archivo). Solo se muestran campos que el objeto realmente trae;
+        // si no hay estado utilizable, se marca NO_CONFIRMADO.
+        function detalleProyeccion(p) {
+          if (!p || typeof p.estado !== "string" || p.estado === "SIN_DATOS") return "NO_CONFIRMADO";
+          var partes = [p.estado];
+          if (typeof p.detalle === "string" && p.detalle) partes.push(p.detalle);
+          return partes.join("<br>");
+        }
+
         var mlAwayTxt = (lm && lm.moneylineF5) ? fmtAmerican(lm.moneylineF5.away_price) : "N/C";
         var mlHomeTxt = (lm && lm.moneylineF5) ? fmtAmerican(lm.moneylineF5.home_price) : "N/C";
 
@@ -158,13 +170,10 @@
         var totalUnderTxt = (lm && lm.totalF5) ? fmtAmerican(lm.totalF5.under_price) : "N/C";
 
         // ── 3. Clima horizontal ──
-        // IMPORTANTE (hallazgo, no invención): f5-automatico.js SÍ calcula
-        // tempF/vientoMph/direccionViento internamente (variable `today`),
-        // pero nunca los agrega al objeto de resultados.push(...) — por eso
-        // r.tempF, r.humedad, r.vientoMph, r.direccionViento y r.roof no
-        // existen todavía en este resultado. Se conecta a esos nombres de
-        // campo exactos para que funcione solo el día que se expongan desde
-        // f5-automatico.js; mientras tanto, correctamente, sale NO_CONFIRMADO.
+        // f5-automatico.js ya entrega tempF, humedad, vientoMph,
+        // direccionViento y roof directamente en cada objeto de resultado
+        // (resultados.push(...)). Si algún campo falta en un juego puntual
+        // (p.ej. sin hit de clima para esa hora), sale NO_CONFIRMADO abajo.
         var tempTxt = !nc(r.tempF) ? (r.tempF + "°F") : "NO_CONFIRMADO";
         var humedadTxt = !nc(r.humedad) ? (r.humedad + "%") : "NO_CONFIRMADO";
         var vientoMphTxt = !nc(r.vientoMph) ? (r.vientoMph + " mph") : "NO_CONFIRMADO";
@@ -177,6 +186,7 @@
         // el tamaño no depende de si hay dato, solo la aguja.
         var tieneDireccion = !nc(r.direccionViento) && typeof r.direccionViento === "number";
         var grados = tieneDireccion ? r.direccionViento : 0;
+        var vaHacia = tieneDireccion ? (grados + 180) % 360 : 0;
         var brujulaSvg =
           '<svg width="150" height="150" viewBox="0 0 150 150">'+
             '<circle cx="75" cy="75" r="70" fill="#0d1117" stroke="#30363d" stroke-width="2"/>'+
@@ -185,16 +195,16 @@
             '<text x="75" y="140" text-anchor="middle" fill="#8b949e" font-size="12" font-weight="800">S</text>'+
             '<text x="18" y="79" text-anchor="middle" fill="#8b949e" font-size="12" font-weight="800">O</text>'+
             (tieneDireccion
-              ? '<g transform="rotate('+grados+' 75 75)"><line x1="75" y1="75" x2="75" y2="24" stroke="#79c0ff" stroke-width="4" stroke-linecap="round"/><circle cx="75" cy="75" r="5" fill="#79c0ff"/></g>'
+              ? '<g transform="rotate('+vaHacia+' 75 75)"><line x1="75" y1="75" x2="75" y2="24" stroke="#79c0ff" stroke-width="4" stroke-linecap="round"/><circle cx="75" cy="75" r="5" fill="#79c0ff"/></g>'
               : '<circle cx="75" cy="75" r="5" fill="#30363d"/>')+
           '</svg>';
         var brujulaHtml =
           '<div class="brujula-wrap">'+brujulaSvg+'</div>'+
-          '<div class="brujula-cap">'+(tieneDireccion ? (grados+'° — '+direccionTxt) : 'Dirección de viento: NO_CONFIRMADO')+'</div>';
+          '<div class="brujula-cap">'+(tieneDireccion ? ('viene de '+grados+'° → va hacia '+vaHacia+'°') : 'Dirección de viento: NO_CONFIRMADO')+'</div>';
 
         // ── 5. Mediciones alrededor de la brújula ──
         var mlbproLineaTxt = "PENDIENTE"; // no existe todavía ninguna pieza "Línea MLBPro"
-        var scoreProyectadoTxt = "PENDIENTE"; // no existe todavía ninguna pieza "Score proyectado"
+        var scoreProyectadoTxt = detalleProyeccion(r.proyeccionTemprana);
         var trayectoriaTxt = "PENDIENTE"; // viento-trayectoria-7h.js no está conectado a este flujo todavía
 
         var medicionesHtml =
@@ -203,7 +213,7 @@
             '<div class="medicion"><div class="t">Carreraje Home</div><div class="v">'+detalleCarreraje(r.carrerajeHome)+'</div></div>'+
             '<div class="medicion"><div class="t">Carreraje Away</div><div class="v">'+detalleCarreraje(r.carrerajeAway)+'</div></div>'+
             '<div class="medicion"><div class="t">Línea MLBPro</div><div class="v nc">'+mlbproLineaTxt+'</div></div>'+
-            '<div class="medicion"><div class="t">Score proyectado</div><div class="v nc">'+scoreProyectadoTxt+'</div></div>'+
+            '<div class="medicion"><div class="t">Score proyectado</div><div class="v'+(scoreProyectadoTxt==="NO_CONFIRMADO"?" nc":"")+'">'+scoreProyectadoTxt+'</div></div>'+
             '<div class="medicion"><div class="t">Trayectoria del viento</div><div class="v nc">'+trayectoriaTxt+'</div></div>'+
           '</div>';
 
