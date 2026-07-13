@@ -1,3 +1,60 @@
+<!--
+  MLBPro · medir-orientacion.html
+
+  FUNCIÓN:
+  Herramienta manual "suelta" para medir a mano la orientación de un
+  parque comparando dos reglas giratorias (brújula y línea del parque)
+  contra una fuente externa (imagen, mapa, etc.) que el usuario tenga
+  abierta aparte. No calcula nada automático, no lee ninguna fuente real
+  de datos del proyecto.
+
+  ENTRADAS:
+  Selección de parque (<select>, lista fija hardcodeada de 30 parques).
+  Arrastre de dos reglas verticales (anillo de brújula, línea del
+  parque). Sin fetch, sin lectura de caché.
+
+  SALIDAS / MODIFICACIONES:
+  Solo pinta HTML/SVG en la página. Al presionar "CONGELAR LECTURA",
+  muestra un texto de resultado en pantalla para que el usuario lo copie
+  a mano — no escribe ninguna caché ni localStorage, no envía el dato a
+  ningún otro archivo del proyecto.
+
+  DEPENDENCIAS:
+  Ninguna. No carga mlb-routes.js, estadios.js ni clima-cache.js — es
+  completamente autónomo, confirmado por auditoría (Bloque 3).
+
+  NO TOCA:
+  Ningún archivo del proyecto. No lee ni escribe la Data Madre, no toca
+  parques-orientacion.js ni orientacion-parques.js — el resultado que
+  arroja es solo para que una persona lo copie manualmente a esos
+  archivos en otro momento, fuera de esta herramienta.
+
+  UTC / HORA LOCAL:
+  No aplica.
+
+  QUÉ HACE: permite girar dos reglas por separado (brújula y línea del
+  parque) hasta hacerlas calzar visualmente con una fuente externa, y
+  muestra el grado resultante para que el usuario lo anote a mano.
+
+  QUÉ NO HACE: no guarda nada, no valida contra ninguna fuente real, no
+  actualiza parques-orientacion.js ni orientacion-parques.js
+  automáticamente — es una calculadora visual, no una pieza de datos.
+
+  QUÉ AFECTA: nada del proyecto directamente — es una herramienta de
+  apoyo para que una persona mida a mano y después actualice los
+  archivos de orientación por su cuenta.
+
+  QUÉ NO AFECTA: Data Madre, Coincidencia, F5, K6, MoneyLine, brújula
+  real (casar-series-test.html / brujula-parque-test.html), clima.
+
+  ESTADO:
+  CONFIRMADO — auditado en el Bloque 3, sin bugs encontrados, sin
+  cambios de lógica. Prólogo agregado (el archivo no tenía ninguno
+  antes).
+
+  FECHA:
+  12 jul 2026.
+-->
 <!DOCTYPE html>
 <html lang="es">
 <head>
