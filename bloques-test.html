@@ -40,8 +40,17 @@
         '<div class="s">CARRERAJE: '+carrTxt+'</div>';
       for (var j=0;j<b.juegos.length;j++){
         var g=b.juegos[j];
+        // Score final: SOLO lee g.away_runs/g.home_runs, ya presentes en
+        // este mismo objeto del caché histórico (climaLeerCache()) — sin
+        // fetch nuevo, sin cruzar por gamePk/game_id. Si falta cualquiera
+        // de los dos como número real, se marca NO_CONFIRMADO en vez de
+        // inventar un score.
+        var tieneScore = typeof g.away_runs === "number" && !isNaN(g.away_runs) &&
+                          typeof g.home_runs === "number" && !isNaN(g.home_runs);
+        var finalTxt = tieneScore ? ("FINAL: "+g.away_runs+" - "+g.home_runs) : "FINAL: NO_CONFIRMADO";
         html += '<div class="g">'+g.date+' · '+(g.away_team||"?")+' / '+(g.home_team||"?")+
-          ' · '+(g.temperature_f!==undefined?g.temperature_f+"°":"?")+'</div>';
+          ' · '+(g.temperature_f!==undefined?g.temperature_f+"°":"?")+
+          ' · '+finalTxt+'</div>';
       }
       html += '</div>';
     }
