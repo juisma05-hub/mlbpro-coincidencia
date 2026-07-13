@@ -21,6 +21,42 @@
 <script src="bloques-trayectoria.js"></script>
 <script src="bloques-carreraje.js"></script>
 <script>
+  // ============================================================
+  // FUNCIÓN: horaLocalEstadio(g)
+  // ENTRADA: objeto de juego del caché histórico (climaLeerCache())
+  // FUENTE ÚNICA: g.game_time (UTC, viene de g.gameDate de MLB)
+  // ZONA HORARIA: g.timezone (viene del registro del caché, NUNCA
+  //   del dispositivo del usuario)
+  // SALIDA: string "h:mm AM/PM" en hora local del estadio, o el
+  //   string "NO_CONFIRMADA" si falta/está inválido game_time o
+  //   timezone. NO inventa hora en ningún caso.
+  // NO TOCA: jalar-clima.js, clima-cache.js, bloques-serie.js,
+  //   bloques-trayectoria.js, bloques-carreraje.js, ni la línea FINAL.
+  // NO AGREGA FETCH: usa exclusivamente datos ya presentes en el
+  //   objeto g del caché en memoria.
+  // ============================================================
+  function horaLocalEstadio(g) {
+    if (!g ||
+        typeof g.game_time !== "string" || g.game_time.length === 0 ||
+        typeof g.timezone !== "string" || g.timezone.length === 0) {
+      return "NO_CONFIRMADA";
+    }
+    var d = new Date(g.game_time);
+    if (isNaN(d.getTime())) return "NO_CONFIRMADA";
+    try {
+      var fmt = new Intl.DateTimeFormat("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+        timeZone: g.timezone
+      });
+      return fmt.format(d);
+    } catch (e) {
+      // timeZone inválido/desconocido -> no inventar hora
+      return "NO_CONFIRMADA";
+    }
+  }
+
   var out = document.getElementById("out");
   try {
     var hist = climaLeerCache();
@@ -40,6 +76,11 @@
         '<div class="s">CARRERAJE: '+carrTxt+'</div>';
       for (var j=0;j<b.juegos.length;j++){
         var g=b.juegos[j];
+        // Hora local del estadio: fuente única g.game_time + g.timezone.
+        // Si falta cualquiera de los dos o son inválidos, se marca
+        // HORA: NO_CONFIRMADA en vez de inventar o usar hora del dispositivo.
+        var horaCalc = horaLocalEstadio(g);
+        var horaTxt = (horaCalc === "NO_CONFIRMADA") ? "HORA: NO_CONFIRMADA" : horaCalc;
         // Score final: SOLO lee g.away_runs/g.home_runs, ya presentes en
         // este mismo objeto del caché histórico (climaLeerCache()) — sin
         // fetch nuevo, sin cruzar por gamePk/game_id. Si falta cualquiera
@@ -48,7 +89,7 @@
         var tieneScore = typeof g.away_runs === "number" && !isNaN(g.away_runs) &&
                           typeof g.home_runs === "number" && !isNaN(g.home_runs);
         var finalTxt = tieneScore ? ("FINAL: "+g.away_runs+" - "+g.home_runs) : "FINAL: NO_CONFIRMADO";
-        html += '<div class="g">'+g.date+' · '+(g.away_team||"?")+' / '+(g.home_team||"?")+
+        html += '<div class="g">'+g.date+' · '+horaTxt+' · '+(g.away_team||"?")+' / '+(g.home_team||"?")+
           ' · '+(g.temperature_f!==undefined?g.temperature_f+"°":"?")+
           ' · '+finalTxt+'</div>';
       }
