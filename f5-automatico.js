@@ -13,8 +13,10 @@
   logFn (function, opcional) — callback para mostrar progreso en consola.
   Internamente: schedule de hoy (MLB StatsAPI vía MLB_ROUTES.WORKER_BASE,
   hydrate=probablePitcher), climaLeerCache() (histórico), climaFetchWeather()
-  + climaKeyTZ() (clima de hoy), jalarLineasF5() (mercado F5),
-  jalarLineup(gamePk, awayTeamId, homeTeamId) (lineup rival).
+  + climaKeyTZ() + climaBuscarHoraCercana() (clima de hoy), climaHoyISO()
+  (fecha de hoy), stadiumGet() / stadiumCanonName() (identidad de parque),
+  jalarLineasF5() (mercado F5), jalarLineup(gamePk, awayTeamId, homeTeamId)
+  (lineup rival).
 
   SALIDAS / MODIFICACIONES:
   Array de objetos, uno por juego de hoy:
@@ -39,8 +41,35 @@
   clima-cache.js, jalar-clima.js (histórico y clima de hoy: solo los llama,
   no cambia su lógica), Coincidencia general (calcular-coincidencia.js,
   score-match.js — esto es F5, un motor aparte), K6, brújula, jalar-linea.js
-  (mercado de línea completa, distinto de jalar-linea-f5.js). No escribe
-  ninguna caché directamente.
+  (mercado de línea completa, distinto de jalar-linea-f5.js), f5-carreraje.js,
+  f5-moneyline.js, f5-coincidencia.js, factor-arsenal-lineup.js,
+  f5-automatico-test.html. No escribe ninguna caché directamente.
+
+  UTC/HORA LOCAL:
+  `hoy` ya no se calcula con un desplazamiento fijo UTC−6 (que rompía en
+  DST y en parques fuera de zona Central). Ahora usa climaHoyISO() (misma
+  fuente de verdad de fecha-de-hoy que el resto de la cadena). El clima de
+  hoy sigue cruzándose por hora exacta vía climaKeyTZ(g.gameDate,
+  s.timezone), con fallback a climaBuscarHoraCercana() si no hay hit exacto.
+
+  QUÉ HACE:
+  Orquesta schedule + clima + histórico + línea F5 + lineup + cruce arsenal
+  + Carreraje + MoneyLine para cada juego de hoy, y expone el resultado
+  combinado. Ver diagnóstico temporal Ronda 1 y Ronda 2 más abajo (intacto).
+
+  QUÉ NO HACE:
+  No calcula fórmulas de Coincidencia, Carreraje ni MoneyLine — eso vive en
+  f5-coincidencia.js, f5-carreraje.js y f5-moneyline.js. No inventa datos:
+  si falta línea F5 real, propaga null/NO_CONFIRMADO en vez de un valor
+  fijo. No escribe cache propia.
+
+  QUÉ AFECTA:
+  El array de resultados que consume f5-automatico-test.html.
+
+  QUÉ NO AFECTA:
+  f5-carreraje.js, f5-moneyline.js, f5-coincidencia.js,
+  factor-arsenal-lineup.js, f5-automatico-test.html (ninguno fue tocado;
+  solo se ajustó CÓMO f5-automatico.js arma los datos que les envía).
 
   CORRECCIÓN ANTERIOR (misma cadena, sesión previa):
   jalarLineup(g.gamePk) se llamaba SIN awayTeamId/homeTeamId, así que el
@@ -61,7 +90,7 @@
   ejecuta correctamente. factor-arsenal-lineup.js queda descartado como
   cuello de botella — no se toca.
 
-  DIAGNÓSTICO TEMPORAL — RONDA 2 (esta sesión, EN CURSO):
+  DIAGNÓSTICO TEMPORAL — RONDA 2 (sesión previa, EN CURSO — sin tocar):
   Con factor-arsenal-lineup.js descartado, el diagnóstico se mueve a la
   entrada/salida real de f5Carreraje() (f5-carreraje.js), que es el
   siguiente eslabón de la cadena. Se agregó logging de: cruce.confirmado,
@@ -71,16 +100,51 @@
   modifica ninguna fórmula de f5-carreraje.js, factor-arsenal-lineup.js,
   Moneyline, clima, línea de mercado, K6 ni brújula. Todo el logging de la
   Ronda 1 se deja intacto para no perder el rastro completo de la cadena
-  en una sola corrida.
+  en una sola corrida. Este bloque de diagnóstico NO fue modificado en la
+  corrección actual (solo se le pasa ahora un lineaCarreraje que puede ser
+  null en vez de 0.5 — ver CORRECCIÓN ACTUAL).
+
+  CORRECCIÓN ACTUAL (esta sesión — 6 puntos confirmados por lectura de código):
+  1. `hoy` ya no se calcula con offset fijo UTC−6; ahora usa climaHoyISO().
+  2. Clima de hoy: se cruza por hora exacta (climaKeyTZ) con fallback real
+     a climaBuscarHoraCercana(w, clave) si no hay hit exacto en esa hora.
+  3. El histórico del mismo parque ya no se cruza con stadiumNorm() aplicado
+     directo al nombre crudo, sino con stadiumNorm(stadiumCanonName(...))
+     sobre ambos lados (x.venue y venue): stadiumCanonName() resuelve el
+     nombre canónico y stadiumNorm() asegura que la comparación sea
+     insensible a mayúsculas/minúsculas (p.ej. "loanDepot park" vs
+     "LoanDepot Park").
+  4. `direccionViento` del histórico ya no usa `hist.wind_dir || null`
+     (que convertía wind_dir=0 — viento del norte real — en null). Ahora
+     se conserva 0 explícitamente: null solo si wind_dir no es un número.
+  5. `lineaCarreraje` ya no cae a 0.5 inventado cuando no hay línea F5 real
+     de mercado. Si `lineaF5Juego.runlineF5.point` no es un número real,
+     queda `null`, y ese null se propaga tal cual a f5Carreraje() (no se
+     traduce a NO_CONFIRMADO aquí porque esa traducción de estado es
+     responsabilidad de f5-carreraje.js, que no se toca).
+  6. El estadio de hoy ya no se resuelve con
+     `STADIUM_INDEX.get(stadiumNorm(venue))` directo, sino con
+     `stadiumGet(venue)`, para usar el mismo punto único de resolución de
+     estadio que usan las demás piezas ya auditadas (estadios.js).
+  No se tocó ninguna otra lógica: diagnóstico Ronda 1/Ronda 2, cruce por
+  equipo de línea F5 (lineasF5BuscarEquipos), lineup con fallback, cruce
+  arsenal, f5Coincidencia(), f5Carreraje(), f5MoneyLine() y el shape del
+  objeto de resultados quedan exactamente igual.
 
   FECHA:
-  12 jul 2026.
+  13 jul 2026.
 
   ESTADO:
-  NO_CONFIRMADO — con diagnóstico de entrada/salida de f5Carreraje()
-  agregado. Pendiente de una corrida real de F5 Automático para ver el
-  objeto exacto que devuelve f5Carreraje() y confirmar si el corte está
-  ahí o más adelante en la cadena (f5MoneyLine()).
+  NO_CONFIRMADO — correcciones aplicadas por lectura de código, pendientes
+  de una corrida real de F5 Automático para confirmar en consola: (a) que
+  `hoy` cae en la fecha correcta en el huso de cada parque, (b) que el
+  fallback climaBuscarHoraCercana() efectivamente rellena casos que antes
+  quedaban en null, (c) que el cruce histórico por stadiumCanonName() no
+  deja huérfano ningún parque que antes sí cruzaba por stadiumNorm(), (d)
+  que wind_dir=0 aparece como 0 y no como null en al menos un caso real,
+  y (e) que lineaCarreraje=null se ve reflejado honestamente en
+  carrerajeHome/carrerajeAway (NO_CONFIRMADO) en vez de un cálculo con 0.5
+  fantasma.
 */
 
 // f5-automatico.js — MLBPro F5 · Pieza Automática
@@ -101,6 +165,12 @@
 // (hit.humidity_pct), que `today` no capturaba antes: es el mismo patrón
 // exacto que ya usan tempF/vientoMph/direccionViento sobre el mismo objeto
 // `hit`, no un cálculo nuevo ni una conversión inventada.
+//
+// CORREGIDO 13 jul 2026 (6 puntos — ver CORRECCIÓN ACTUAL en el prólogo):
+// hoy vía climaHoyISO(); clima de hoy con fallback climaBuscarHoraCercana();
+// histórico cruzado por stadiumCanonName(); wind_dir=0 conservado; sin 0.5
+// inventado cuando falta línea F5 real; estadio resuelto con stadiumGet().
+//
 // DIAGNÓSTICO TEMPORAL — SOLO LECTURA.
 // No modifica ARSENAL_MASTER_2026, BATTERS_VSPITCH_2026 ni
 // calcularFactorArsenalLineup(). Solo inspecciona los mismos datos que esa
@@ -152,10 +222,9 @@ function diagnosticoArsenalLineup(pitcherId, lineupRival, etiqueta, logFn) {
 async function f5AutomaticoHoy(logFn) {
   function log(t) { if (typeof logFn === "function") logFn(t); }
 
-  var hoy = (function(){
-    var d = new Date(Date.now() - 6*60*60*1000);
-    return d.getFullYear()+"-"+("0"+(d.getMonth()+1)).slice(-2)+"-"+("0"+d.getDate()).slice(-2);
-  })();
+  // PUNTO 1: hoy ya no usa offset fijo UTC-6 — usa climaHoyISO() (misma
+  // fuente de verdad de fecha-de-hoy que el resto de la cadena).
+  var hoy = climaHoyISO();
 
   log("Trayendo clima + juegos...");
   await jalarClima(log);
@@ -189,12 +258,17 @@ async function f5AutomaticoHoy(logFn) {
     log("Procesando: "+away+" @ "+home);
 
     // --- clima de hoy ---
-    var s = STADIUM_INDEX.get(stadiumNorm(venue));
+    // PUNTO 6: estadio resuelto con stadiumGet(venue), no directo contra
+    // STADIUM_INDEX + stadiumNorm().
+    var s = stadiumGet(venue);
     var today = { venue: venue, roof: s?s.roof:null, tempF: null, humedad: null, vientoMph: null, direccionViento: null };
     if (s) {
       try {
         var w = await climaFetchWeather(s, hoy, hoy);
-        var hit = w.get(climaKeyTZ(g.gameDate, s.timezone));
+        // PUNTO 2: hora exacta con fallback real a climaBuscarHoraCercana()
+        // si no hay hit exacto en esa clave.
+        var clave = climaKeyTZ(g.gameDate, s.timezone);
+        var hit = w.get(clave) || climaBuscarHoraCercana(w, clave);
         if (hit) {
           today.tempF = (typeof hit.temperature_f === "number") ? hit.temperature_f : null;
           today.humedad = (typeof hit.humidity_pct === "number") ? hit.humidity_pct : null;
@@ -205,8 +279,11 @@ async function f5AutomaticoHoy(logFn) {
     }
 
     // --- histórico: juego pasado más reciente en el mismo parque, con clima real ---
+    // PUNTO 3: cruce por parque canonizado (stadiumCanonName) y además
+    // normalizado (stadiumNorm) para que la comparación sea insensible a
+    // mayúsculas/minúsculas, no por stadiumNorm() crudo sobre el venue tal cual.
     var histCandidatos = cache.filter(function(x){
-      return x && x.venue && stadiumNorm(x.venue)===stadiumNorm(venue) &&
+      return x && x.venue && stadiumNorm(stadiumCanonName(x.venue))===stadiumNorm(stadiumCanonName(venue)) &&
              x.status==="Final" && typeof x.temperature_f==="number";
     });
     histCandidatos.sort(function(a,b){ return a.date<b.date?1:-1; });
@@ -226,10 +303,12 @@ async function f5AutomaticoHoy(logFn) {
       ? proyectarF5DesdePitcher(perfilPitcherHoy, perfilPitcherAwayHoy)
       : { pieza: "F5_PROYECCION_TEMPRANA", estado: "SIN_DATOS", detalle: "Función de proyección no cargada." };
 
+    // PUNTO 4: wind_dir=0 se conserva; null solo si no es un número real.
     var datosHistorico = hist ? {
       venue: hist.venue, roof: hist.roof||null, tempF: hist.temperature_f,
       vientoMph: (typeof hist.windspeed_mph==="number")?hist.windspeed_mph:null,
-      direccionViento: hist.wind_dir||null, perfilPitcher: perfilPitcherHist
+      direccionViento: (typeof hist.wind_dir==="number") ? hist.wind_dir : null,
+      perfilPitcher: perfilPitcherHist
     } : { venue: null, roof: null, tempF: null, vientoMph: null, direccionViento: null, perfilPitcher: null };
 
     var datosHoy = {
@@ -248,7 +327,11 @@ async function f5AutomaticoHoy(logFn) {
     // --- cruce arsenal vs lineup rival (Carreraje) ---
     // CORREGIDO: cruce por equipo (home/away), ya no por venue.
     var lineaF5Juego = lineasF5 ? lineasF5BuscarEquipos(home, away) : null;
-    var lineaCarreraje = (lineaF5Juego && lineaF5Juego.runlineF5) ? lineaF5Juego.runlineF5.point : 0.5;
+    // PUNTO 5: sin 0.5 inventado. Si no hay línea F5 real de mercado,
+    // lineaCarreraje queda null y se propaga honestamente a f5Carreraje().
+    var lineaCarreraje = (lineaF5Juego && lineaF5Juego.runlineF5 && typeof lineaF5Juego.runlineF5.point === "number")
+      ? lineaF5Juego.runlineF5.point
+      : null;
 
     var carrerajeHome = { pieza:"F5_CARRERAJE", estado:"SIN_DATOS", detalle:"Sin pitcher o lineup rival." };
     var carrerajeAway = { pieza:"F5_CARRERAJE", estado:"SIN_DATOS", detalle:"Sin pitcher o lineup rival." };
