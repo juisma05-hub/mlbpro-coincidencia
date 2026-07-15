@@ -1,11 +1,70 @@
-// perfil-pitcher-builder.js
-// Arma el objeto "perfil pitcher" que necesita f5-pitcher.js (f5PerfilPitcher)
-// a partir de las tablas madre YA existentes: PITCHERS_MASTER_2026 (xera) y
-// ARSENAL_MASTER_2026 (arsenal + whiff% por pitcheo).
-// No inventa nada: mano, kPct, bbPct, xwoba, ipRecientes se dejan en null
-// porque hoy no hay fuente real para ellos. whiffPct SÍ se calcula (no se
-// inventa): es el promedio de whiff% de cada pitcheo del arsenal, ponderado
-// por su % de uso real.
+/*
+  MLBPro · perfil-pitcher-builder.js
+
+  FUNCIÓN:
+  Construye el perfil genérico de un pitcher para uso compartido entre los
+  bloques F5 y Moneyline, utilizando exclusivamente las tablas madre ya
+  existentes PITCHERS_MASTER_2026 y ARSENAL_MASTER_2026.
+
+  ENTRADAS:
+  - pitcherId: identificador oficial del pitcher en MLB.
+  - PITCHERS_MASTER_2026[pitcherId].
+  - ARSENAL_MASTER_2026[pitcherId].
+
+  SALIDAS / MODIFICACIONES:
+  - Expone armarPerfilPitcher(pitcherId).
+  - Devuelve un objeto con:
+    mano, kPct, bbPct, whiffPct, xera, xwoba, arsenal,
+    ipRecientes y nombre.
+  - No modifica las tablas madre.
+  - No escribe caché ni localStorage.
+
+  DEPENDENCIAS:
+  - pitchers-master.js
+  - arsenal-master.js
+
+  NO TOCA:
+  - Schedule.
+  - Lineups.
+  - Bullpen.
+  - Líneas de mercado.
+  - Clima.
+  - Coincidencia.
+  - K6.
+  - Históricos.
+
+  UTC / HORA LOCAL:
+  No maneja fechas, horas ni zonas horarias.
+
+  QUÉ HACE:
+  - Busca xERA y nombre en PITCHERS_MASTER_2026.
+  - Busca arsenal y nombre en ARSENAL_MASTER_2026.
+  - Calcula whiffPct mediante promedio ponderado por el uso real de cada
+    pitcheo que tenga whiff válido.
+  - Devuelve null cuando no existe ningún dato real de xERA ni arsenal.
+
+  QUÉ NO HACE:
+  - No inventa datos faltantes.
+  - No sustituye valores faltantes por cero ni por promedios genéricos.
+  - No calcula mano, K%, BB%, xwOBA ni innings recientes.
+  - No calcula directamente una predicción de F5 ni de Moneyline.
+
+  QUÉ AFECTA:
+  - El perfil de pitcheo consumido por los módulos F5 y Moneyline.
+
+  QUÉ NO AFECTA:
+  - Otros motores o bloques independientes del proyecto.
+
+  CORRECCIÓN ACTUAL:
+  - Se declara formalmente como utilidad compartida F5/Moneyline.
+  - Se mantiene intacta la lógica previamente auditada.
+
+  FECHA:
+  2026-07-15
+
+  ESTADO:
+  Pendiente de prueba y aprobación final.
+*/
 
 function armarPerfilPitcher(pitcherId) {
   if (!pitcherId) return null;
