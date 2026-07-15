@@ -1,0 +1,278 @@
+<!--
+  MLBPro · factor-pitcheo-completo-test.html
+
+  FUNCIÓN:
+  Arnés de prueba para factor-pitcheo-completo.js. Corre 6 casos con mocks
+  en memoria (sin red) que ejercitan exactamente los puntos corregidos en
+  esta auditoría, y ofrece un modo opcional para correr con datos reales
+  (teamId, pitcherAbridorId, gamePk) contra los endpoints reales vía
+  MLB_ROUTES.WORKER_BASE.
+
+  ENTRADAS:
+  Ninguna para los casos mockeados (corren solos al cargar la página).
+  Para el modo real: teamId, pitcherAbridorId, fechaHoyISO, lineupRival
+  (ingresados por el usuario en el formulario).
+
+  SALIDAS / MODIFICACIONES:
+  Imprime PASS/FAIL por caso en la página. No escribe cache ni localStorage.
+
+  DEPENDENCIAS:
+  factor-pitcheo-completo.js (cargado por <script src>).
+  Para el modo real, ademas se cargan en orden real (no solo mockeadas):
+  mlb-routes.js -> jalar-bullpen.js -> factor-arsenal-lineup.js ->
+  factor-pitcheo-completo.js. Los 6 casos mockeados sobrescriben esas
+  funciones temporalmente y las RESTAURAN al terminar, para que el boton
+  de "modo real" use las funciones reales cargadas por script, no el
+  ultimo mock de prueba.
+
+  NO TOCA:
+  Ningún archivo del repo. Es un arnés de prueba aislado.
+
+  QUÉ HACE:
+  - CASO 1: abridor confirmado + bullpen con relevistas válidos -> espera
+    cobertura ABRIDOR_Y_BULLPEN_PARCIAL y confirmado=false (el bullpen
+    usado es siempre parcial — solo el último juego Final — así que nunca
+    se llama "COMPLETO" ni se marca como confirmado, aunque ambas piezas
+    existan).
+  - CASO 2: solo abridor confirmado, bullpen sin datos -> espera cobertura
+    PARCIAL_ABRIDOR y confirmado=false.
+  - CASO 3: solo bullpen, sin abridor confirmado -> espera cobertura
+    PARCIAL_BULLPEN y confirmado=false.
+  - CASO 4: sin ningún dato (calcularFactorArsenalLineup ausente,
+    jalarBullpenAyer devuelve error) -> espera cobertura SIN_DATOS,
+    factor_final=null, confirmado=false (verifica el fix del punto 4 y el
+    blindaje del punto 9).
+  - CASO 5: jalarBullpenAyer devuelve pitchers_usados_ayer como algo que
+    NO es un arreglo (dato malformado) -> espera que no truene la
+    ejecución y que cobertura_bullpen quede SIN_DATOS (verifica el
+    blindaje del punto 10).
+  - CASO 6: calcularFactorArsenalLineup() LANZA una excepción (no solo
+    ausente o null) -> espera que no truene la ejecución, cobertura
+    SIN_DATOS, factor_final=null, confirmado=false (verifica el blindaje
+    del punto 17).
+
+  QUÉ NO HACE:
+  No prueba clima, coincidencia, lineup ni línea de mercado. No hace
+  backtest de la regla de exclusión de 3+ outs (eso queda pendiente y
+  documentado como tal en el prólogo del módulo).
+
+  QUÉ AFECTA:
+  Solo esta página de prueba.
+
+  QUÉ NO AFECTA:
+  Nada del repo real.
+
+  FECHA:
+  15 jul 2026.
+
+  ESTADO:
+  Cuarta version del test (Caso 1 corregido a ABRIDOR_Y_BULLPEN_PARCIAL,
+  Caso 6 agregado). Pendiente de correr con gamePk reales y anexar la
+  evidencia de ejecucion real antes de aprobar factor-pitcheo-completo.js.
+-->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Test — factor-pitcheo-completo.js</title>
+<style>
+  body { font-family: monospace; background:#111; color:#eee; padding:20px; }
+  h1 { font-size:16px; }
+  .pass { color:#4caf50; }
+  .fail { color:#f44336; }
+  .case { border:1px solid #333; margin-bottom:12px; padding:10px; white-space:pre-wrap; }
+  input, button { font-family:monospace; padding:4px; margin:4px 0; }
+  label { display:block; margin-top:8px; }
+</style>
+</head>
+<body>
+
+<h1>factor-pitcheo-completo.js — casos mockeados (sin red, 6 casos)</h1>
+<div id="resultados"></div>
+
+<hr>
+<h1>Modo real (opcional, requiere red y los demás archivos del repo)</h1>
+<label>teamId <input id="in-teamId" value=""></label>
+<label>pitcherAbridorId <input id="in-pitcherId" value=""></label>
+<label>fechaHoyISO (YYYY-MM-DD) <input id="in-fecha" value=""></label>
+<label>lineupRival (JSON, opcional) <input id="in-lineup" value="[]" size="60"></label>
+<button id="btn-real">Ejecutar con datos reales</button>
+<pre id="resultado-real"></pre>
+
+<script src="mlb-routes.js"></script>
+<script src="jalar-bullpen.js"></script>
+<script src="factor-arsenal-lineup.js"></script>
+<script src="factor-pitcheo-completo.js"></script>
+<script>
+(async function () {
+  const contenedor = document.getElementById("resultados");
+
+  // Se guardan las funciones REALES (cargadas por <script src> arriba) antes
+  // de sobrescribirlas con mocks, para poder restaurarlas al final y que el
+  // "modo real" use las funciones de verdad, no el ultimo mock de prueba.
+  const real_calcularFactorArsenalLineup = (typeof calcularFactorArsenalLineup === "function") ? calcularFactorArsenalLineup : undefined;
+  const real_jalarBullpenAyer = (typeof jalarBullpenAyer === "function") ? jalarBullpenAyer : undefined;
+  const real_pitchersNoDisponiblesHoy = (typeof pitchersNoDisponiblesHoy === "function") ? pitchersNoDisponiblesHoy : undefined;
+
+  function pintar(nombre, ok, esperado, obtenido) {
+    const div = document.createElement("div");
+    div.className = "case";
+    div.innerHTML =
+      "<strong class='" + (ok ? "pass" : "fail") + "'>" + (ok ? "PASS" : "FAIL") + "</strong> — " + nombre + "\n" +
+      "Esperado: " + esperado + "\n" +
+      "Obtenido: " + JSON.stringify(obtenido, null, 2);
+    contenedor.appendChild(div);
+  }
+
+  // ---- CASO 1: abridor + bullpen validos -> ABRIDOR_Y_BULLPEN_PARCIAL ----
+  window.calcularFactorArsenalLineup = function (pitcherId) {
+    return { confirmado: true, factor: pitcherId === "ABRIDOR1" ? 1.10 : 0.95 };
+  };
+  window.jalarBullpenAyer = async function () {
+    return {
+      team_id: "T1",
+      pitchers_usados_ayer: [
+        { player_id: "REL1", nombre: "Relevista Uno", outs_pitched: 2 },
+        { player_id: "REL2", nombre: "Relevista Dos", outs_pitched: 4 }
+      ],
+      error: null
+    };
+  };
+  window.pitchersNoDisponiblesHoy = function (b) {
+    return b.pitchers_usados_ayer
+      .filter(function (p) { return p.outs_pitched >= 3; })
+      .map(function (p) { return { player_id: p.player_id, nombre: p.nombre, tipo: "DEDUCCION_NO_CONFIRMADO" }; });
+  };
+
+  let r1 = await calcularFactorPitcheoCompleto("T1", "ABRIDOR1", [], "2026-07-15");
+  pintar(
+    "CASO 1: abridor + bullpen validos (corregido: nunca es COMPLETO, el bullpen es siempre parcial)",
+    r1.cobertura === "ABRIDOR_Y_BULLPEN_PARCIAL" && r1.confirmado === false && r1.factor_final !== null,
+    "cobertura=ABRIDOR_Y_BULLPEN_PARCIAL, confirmado=false, factor_final numerico",
+    r1
+  );
+
+  // ---- CASO 2: solo abridor, bullpen sin datos -> PARCIAL_ABRIDOR, confirmado=false ----
+  window.jalarBullpenAyer = async function () {
+    return { team_id: "T1", error: "SIN_JUEGO_ANTERIOR_EN_VENTANA" };
+  };
+  let r2 = await calcularFactorPitcheoCompleto("T1", "ABRIDOR1", [], "2026-07-15");
+  pintar(
+    "CASO 2: solo abridor confirmado (fix punto 1: confirmado debe ser false)",
+    r2.cobertura === "PARCIAL_ABRIDOR" && r2.confirmado === false && r2.factor_final === r2.factor_abridor,
+    "cobertura=PARCIAL_ABRIDOR, confirmado=false",
+    r2
+  );
+
+  // ---- CASO 3: solo bullpen, sin abridor confirmado -> PARCIAL_BULLPEN, confirmado=false ----
+  window.calcularFactorArsenalLineup = function (pitcherId) {
+    if (pitcherId === "ABRIDOR1") return { confirmado: false, factor: null };
+    return { confirmado: true, factor: 0.9 };
+  };
+  window.jalarBullpenAyer = async function () {
+    return {
+      team_id: "T1",
+      pitchers_usados_ayer: [{ player_id: "REL1", nombre: "Relevista Uno", outs_pitched: 1 }],
+      error: null
+    };
+  };
+  let r3 = await calcularFactorPitcheoCompleto("T1", "ABRIDOR1", [], "2026-07-15");
+  pintar(
+    "CASO 3: solo bullpen confirmado",
+    r3.cobertura === "PARCIAL_BULLPEN" && r3.confirmado === false,
+    "cobertura=PARCIAL_BULLPEN, confirmado=false",
+    r3
+  );
+
+  // ---- CASO 4: sin ningun dato -> SIN_DATOS, factor_final=null (fix punto 4 + blindaje punto 9) ----
+  window.calcularFactorArsenalLineup = undefined; // simula que la funcion no existe en el entorno
+  window.jalarBullpenAyer = async function () {
+    return { team_id: "T1", error: "SIN_JUEGO_ANTERIOR_EN_VENTANA" };
+  };
+  let r4 = await calcularFactorPitcheoCompleto("T1", "ABRIDOR1", [], "2026-07-15");
+  pintar(
+    "CASO 4: sin ningun dato (fix punto 4: nunca 1.0; blindaje punto 9: funcion ausente no truena)",
+    r4.cobertura === "SIN_DATOS" && r4.factor_final === null && r4.confirmado === false,
+    "cobertura=SIN_DATOS, factor_final=null, confirmado=false",
+    r4
+  );
+
+  // ---- CASO 5: pitchers_usados_ayer no es un arreglo (blindaje punto 10) ----
+  window.calcularFactorArsenalLineup = function (pitcherId) {
+    return { confirmado: true, factor: pitcherId === "ABRIDOR1" ? 1.0 : 0.9 };
+  };
+  window.jalarBullpenAyer = async function () {
+    return { team_id: "T1", pitchers_usados_ayer: "DATO_MALFORMADO_NO_ES_ARRAY", error: null };
+  };
+  let r5 = null;
+  let r5Truena = false;
+  try {
+    r5 = await calcularFactorPitcheoCompleto("T1", "ABRIDOR1", [], "2026-07-15");
+  } catch (e) {
+    r5Truena = true;
+  }
+  pintar(
+    "CASO 5: pitchers_usados_ayer malformado (blindaje punto 10: no debe truenar)",
+    r5Truena === false && r5 && r5.cobertura_bullpen === "SIN_DATOS",
+    "no lanza excepcion, cobertura_bullpen=SIN_DATOS",
+    r5Truena ? "EXCEPCION NO CONTROLADA" : r5
+  );
+
+  // ---- CASO 6: calcularFactorArsenalLineup() LANZA una excepcion (blindaje punto 17) ----
+  window.calcularFactorArsenalLineup = function () {
+    throw new Error("Fallo simulado dentro de calcularFactorArsenalLineup");
+  };
+  window.jalarBullpenAyer = async function () {
+    return {
+      team_id: "T1",
+      pitchers_usados_ayer: [{ player_id: "REL1", nombre: "Relevista Uno", outs_pitched: 1 }],
+      error: null
+    };
+  };
+  window.pitchersNoDisponiblesHoy = function () { return []; };
+
+  let r6 = null;
+  let r6Truena = false;
+  try {
+    r6 = await calcularFactorPitcheoCompleto("T1", "ABRIDOR1", [], "2026-07-15");
+  } catch (e) {
+    r6Truena = true;
+  }
+  pintar(
+    "CASO 6: calcularFactorArsenalLineup() lanza excepcion (blindaje punto 17: no debe truenar)",
+    r6Truena === false && r6 && r6.cobertura === "SIN_DATOS" && r6.confirmado === false && r6.factor_final === null,
+    "no lanza excepcion, cobertura=SIN_DATOS, factor_final=null, confirmado=false",
+    r6Truena ? "EXCEPCION NO CONTROLADA" : r6
+  );
+
+  // Restaurar las funciones REALES (si existian) para que el modo real de
+  // abajo use las dependencias de verdad, no el ultimo mock de esta seccion.
+  window.calcularFactorArsenalLineup = real_calcularFactorArsenalLineup;
+  window.jalarBullpenAyer = real_jalarBullpenAyer;
+  window.pitchersNoDisponiblesHoy = real_pitchersNoDisponiblesHoy;
+
+})();
+
+// ---- Modo real opcional ----
+document.getElementById("btn-real").addEventListener("click", async function () {
+  const teamId = document.getElementById("in-teamId").value.trim();
+  const pitcherId = document.getElementById("in-pitcherId").value.trim();
+  const fecha = document.getElementById("in-fecha").value.trim();
+  let lineup = [];
+  try { lineup = JSON.parse(document.getElementById("in-lineup").value || "[]"); } catch (e) {}
+
+  const out = document.getElementById("resultado-real");
+  if (typeof calcularFactorArsenalLineup !== "function" || typeof jalarBullpenAyer !== "function") {
+    out.textContent = "NO_CONFIRMADO: falta cargar factor-arsenal-lineup.js y/o jalar-bullpen.js en esta pagina para el modo real.";
+    return;
+  }
+  try {
+    const real = await calcularFactorPitcheoCompleto(teamId, pitcherId, lineup, fecha);
+    out.textContent = JSON.stringify(real, null, 2);
+  } catch (e) {
+    out.textContent = "ERROR: " + (e && e.message ? e.message : e);
+  }
+});
+</script>
+</body>
+</html>
