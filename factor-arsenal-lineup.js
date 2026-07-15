@@ -6,14 +6,23 @@
 // NO inventa números. Si falta arsenal, lineup, referencia de liga o datos del
 // bateador contra un pitch específico, ese dato se excluye.
 // Si no hay lineup confirmado o no existe muestra suficiente, devuelve factor
-// neutral 1.0 con confirmado:false y una nota explicativa.
+// NO_CONFIRMADO (null) con confirmado:false y una nota explicativa.
+//
+// CORRECCIÓN (esta auditoría): factor ya NO devuelve 1.0 como valor neutro
+// cuando falta cualquier dato — devuelve null. Antes, un consumidor que
+// olvidara chequear "confirmado" podía leer 1.0 como si fuera un factor
+// real. El cambio se aplicó en el único punto donde se declara el valor
+// inicial de "factor" dentro del objeto salida, por lo que cubre las 6
+// salidas tempranas (SIN_LINEUP_CONFIRMADO, SIN_ARSENAL_CONFIRMADO,
+// SIN_REFERENCIA_WOBA_LIGA, SIN_DATOS_SUFICIENTES_EN_LINEUP,
+// WOBA_ESPERADO_INVALIDO, FACTOR_INVALIDO) sin tocar cada una por separado.
 
 function calcularFactorArsenalLineup(pitcherId, lineupRival) {
   const lineupValido = Array.isArray(lineupRival);
 
   const salida = {
     pitcher_id: pitcherId,
-    factor: 1.0,
+    factor: null,
     woba_esperado: null,
     woba_liga_ref: null,
     bateadores_usados: 0,
