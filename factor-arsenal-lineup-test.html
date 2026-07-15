@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>MLBPro · Test Arsenal vs Lineup</title>
+
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      background: #0b0f14;
+      color: #e8eef5;
+      font-family: Arial, sans-serif;
+    }
+
+    h1 {
+      margin-top: 0;
+      font-size: 24px;
+    }
+
+    button {
+      padding: 12px 18px;
+      border: 0;
+      border-radius: 8px;
+      background: #238636;
+      color: white;
+      font-weight: bold;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    .resumen {
+      margin: 18px 0;
+      padding: 14px;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      background: #161b22;
+      font-size: 18px;
+      font-weight: bold;
+    }
+
+    .prueba {
+      margin-bottom: 12px;
+      padding: 14px;
+      border-radius: 8px;
+      background: #161b22;
+      border-left: 6px solid #8b949e;
+    }
+
+    .pass {
+      border-left-color: #2ea043;
+    }
+
+    .fail {
+      border-left-color: #f85149;
+    }
+
+    .titulo {
+      font-weight: bold;
+      margin-bottom: 8px;
+    }
+
+    pre {
+      white-space: pre-wrap;
+      word-break: break-word;
+      margin: 0;
+      font-size: 13px;
+      color: #c9d1d9;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>MLBPro · Arsenal vs Lineup</h1>
+
+  <button onclick="correrPruebas()">CORRER PRUEBAS</button>
+
+  <div id="resumen" class="resumen">
+    Pendiente de ejecutar.
+  </div>
+
+  <div id="resultados"></div>
+
+  <script>
+    /*
+      DATOS CONTROLADOS DE PRUEBA.
+
+      Pitcher 1001:
+      - FF 60%
+      - SL 40%
+
+      Pitcher 1002:
+      - sin arsenal
+
+      Los bateadores incluyen muestras válidas, muestras insuficientes
+      y datos faltantes para comprobar que el motor no inventa valores.
+    */
+
+    var ARSENAL_MASTER_2026 = {
+      "1001": {
+        pitcher_id: 1001,
+        arsenal: [
+          {
+            pt: "FF",
+            usage: 0.60
+          },
+          {
+            pt: "SL",
+            usage: 0.40
+          }
+        ]
+      },
+
+      "1003": {
+        pitcher_id: 1003,
+        arsenal: [
+          {
+            pt: "CH",
+            usage: 1.00
+          }
+        ]
+      }
+    };
+
+    var BATTERS_VSPITCH_2026 = {
+      "2001": {
+        vs: {
+          FF: {
+            woba: 0.340,
+            pa: 20
+          },
+          SL: {
+            woba: 0.280,
+            pa: 15
+          }
+        }
+      },
+
+      "2002": {
+        vs: {
+          FF: {
+            woba: 0.300,
+            pa: 30
+          },
+          SL: {
+            woba: 0.320,
+            pa: 25
+          }
+        }
+      },
+
+      "2003": {
+        vs: {
+          FF: {
+            woba: 0.360,
+            pa: 12
+          },
+          SL: {
+            woba: 0.250,
+            pa: 10
+          }
+        }
+      },
+
+      "2004": {
+        vs: {
+          FF: {
+            woba: 0.310,
+            pa: 18
+          },
+          SL: {
+            woba: 0.290,
+            pa: 22
+          }
+        }
+      },
+
+      "2005": {
+        vs: {
+          FF: {
+            woba: 0.330,
+            pa: 40
+          },
+          SL: {
+            woba: 0.270,
+            pa: 35
+          }
+        }
+      },
+
+      "2006": {
+        vs: {
+          FF: {
+            woba: 0.290,
+            pa: 18
+          },
+          SL: {
+            woba: 0.340,
+            pa: 14
+          }
+        }
+      },
+
+      "2007": {
+        vs: {
+          FF: {
+            woba: 0.315,
+            pa: 21
+          },
+          SL: {
+            woba: 0.305,
+            pa: 19
+          }
+        }
+      },
+
+      "2008": {
+        vs: {
+          FF: {
+            woba: 0.350,
+            pa: 16
+          },
+          SL: {
+            woba: 0.260,
+            pa: 11
+          }
+        }
+      },
+
+      "2009": {
+        vs: {
+          FF: {
+            woba: 0.280,
+            pa: 26
+          },
+          SL: {
+            woba: 0.330,
+            pa: 17
+          }
+        }
+      },
+
+      "2010": {
+        vs: {
+          FF: {
+            woba: 0.999,
+            pa: 2
+          },
+          SL: {
+            woba: 0.999,
+            pa: 3
+          }
+        }
+      },
+
+      "2011": {
+        vs: {
+          CH: {
+            woba: 0.300,
+            pa: 3
+          }
+        }
+      }
+    };
+  </script>
+
+  <script src="factor-arsenal-lineup.js"></script>
+
+  <script>
+    function agregarResultado(nombre, paso, esperado, recibido) {
+      const contenedor = document.getElementById("resultados");
+
+      const bloque = document.createElement("div");
+      bloque.className = "prueba " + (paso ? "pass" : "fail");
+
+      const titulo = document.createElement("div");
+      titulo.className = "titulo";
+      titulo.textContent = (paso ? "✅ PASS · " : "❌ FAIL · ") + nombre;
+
+      const detalle = document.createElement("pre");
+      detalle.textContent =
+        "Esperado:\n" +
+        JSON.stringify(esperado, null, 2) +
+        "\n\nRecibido:\n" +
+        JSON.stringify(recibido, null, 2);
+
+      bloque.appendChild(titulo);
+      bloque.appendChild(detalle);
+      contenedor.appendChild(bloque);
+    }
+
+    function igual(a, b) {
+      return JSON.stringify(a) === JSON.stringify(b);
+    }
+
+    function correrPruebas() {
+      const resultados = document.getElementById("resultados");
+      const resumen = document.getElementById("resumen");
+
+      resultados.innerHTML = "";
+      resumen.textContent = "Ejecutando...";
+
+      let pass = 0;
+      let fail = 0;
+
+      var lineupCompleto = [
+        { player_id: 2001 },
+        { player_id: 2002 },
+        { player_id: 2003 },
+        { player_id: 2004 },
+        { player_id: 2005 },
+        { player_id: 2006 },
+        { player_id: 2007 },
+        { player_id: 2008 },
+        { player_id: 2009 }
+      ];
+
+      var prueba1 = calcularFactorArsenalLineup(
+        1001,
+        lineupCompleto
+      );
+
+      var paso1 =
+        prueba1.confirmado === true &&
+        prueba1.nota === "OK" &&
+        prueba1.bateadores_usados === 9 &&
+        prueba1.woba_esperado !== null &&
+        prueba1.woba_liga_ref !== null &&
+        Number.isFinite(prueba1.factor);
+
+      agregarResultado(
+        "Lineup completo y arsenal válido",
+        paso1,
+        {
+          confirmado: true,
+          nota: "OK",
+          bateadores_usados: 9,
+          factor: "NUMERO_FINITO"
+        },
+        prueba1
+      );
+
+      paso1 ? pass++ : fail++;
+
+      var prueba2 = calcularFactorArsenalLineup(
+        1001,
+        []
+      );
+
+      var paso2 =
+        prueba2.confirmado === false &&
+        prueba2.factor === 1 &&
+        prueba2.nota === "SIN_LINEUP_CONFIRMADO";
+
+      agregarResultado(
+        "Sin lineup confirmado",
+        paso2,
+        {
+          confirmado: false,
+          factor: 1,
+          nota: "SIN_LINEUP_CONFIRMADO"
+        },
+        prueba2
+      );
+
+      paso2 ? pass++ : fail++;
+
+      var prueba3 = calcularFactorArsenalLineup(
+        1002,
+        lineupCompleto
+      );
+
+      var paso3 =
+        prueba3.confirmado === false &&
+        prueba3.factor === 1 &&
+        prueba3.nota === "SIN_ARSENAL_CONFIRMADO";
+
+      agregarResultado(
+        "Pitcher sin arsenal",
+        paso3,
+        {
+          confirmado: false,
+          factor: 1,
+          nota: "SIN_ARSENAL_CONFIRMADO"
+        },
+        prueba3
+      );
+
+      paso3 ? pass++ : fail++;
+
+      var lineupParcial = [
+        { player_id: 2001 },
+        { player_id: 2002 },
+        { player_id: 2010 },
+        { player_id: 999999 }
+      ];
+
+      var prueba4 = calcularFactorArsenalLineup(
+        1001,
+        lineupParcial
+      );
+
+      var paso4 =
+        prueba4.confirmado === false &&
+        prueba4.bateadores_usados === 2 &&
+        prueba4.nota === "MUESTRA_PARCIAL_2_DE_4";
+
+      agregarResultado(
+        "Muestra parcial",
+        paso4,
+        {
+          confirmado: false,
+          bateadores_usados: 2,
+          nota: "MUESTRA_PARCIAL_2_DE_4"
+        },
+        prueba4
+      );
+
+      paso4 ? pass++ : fail++;
+
+      var prueba5 = calcularFactorArsenalLineup(
+        1003,
+        [
+          { player_id: 2011 }
+        ]
+      );
+
+      var paso5 =
+        prueba5.confirmado === false &&
+        prueba5.factor === 1 &&
+        prueba5.woba_esperado === null &&
+        prueba5.bateadores_usados === 0 &&
+        prueba5.nota === "SIN_DATOS_SUFICIENTES_EN_LINEUP";
+
+      agregarResultado(
+        "Sin datos suficientes",
+        paso5,
+        {
+          confirmado: false,
+          factor: 1,
+          bateadores_usados: 0,
+          nota: "SIN_DATOS_SUFICIENTES_EN_LINEUP"
+        },
+        prueba5
+      );
+
+      paso5 ? pass++ : fail++;
+
+      var respaldoBatters = BATTERS_VSPITCH_2026;
+
+      BATTERS_VSPITCH_2026 = undefined;
+      _wobaLigaCache = undefined;
+
+      var prueba6 = calcularFactorArsenalLineup(
+        1001,
+        lineupCompleto
+      );
+
+      var paso6 =
+        prueba6.confirmado === false &&
+        prueba6.factor === 1 &&
+        prueba6.woba_liga_ref === null &&
+        prueba6.nota === "SIN_REFERENCIA_WOBA_LIGA";
+
+      agregarResultado(
+        "Sin referencia real de liga",
+        paso6,
+        {
+          confirmado: false,
+          factor: 1,
+          woba_liga_ref: null,
+          nota: "SIN_REFERENCIA_WOBA_LIGA"
+        },
+        prueba6
+      );
+
+      paso6 ? pass++ : fail++;
+
+      BATTERS_VSPITCH_2026 = respaldoBatters;
+      _wobaLigaCache = undefined;
+
+      resumen.textContent =
+        pass + "/6 PASS · " +
+        fail + "/6 FAIL";
+
+      resumen.style.color =
+        fail === 0 ? "#3fb950" : "#f85149";
+
+      console.log(
+        "MLBPro Arsenal vs Lineup:",
+        {
+          pass: pass,
+          fail: fail
+        }
+      );
+    }
+
+    window.addEventListener("load", correrPruebas);
+  </script>
+</body>
+</html>
