@@ -139,8 +139,15 @@
   // exacto. Se deja el nombre venueCanon() igual para no tocar ningun otro
   // punto de este archivo (todas las llamadas existentes se benefician
   // automaticamente).
+  //
+  // FIX 17 jul 2026: esta funcion seguia sin aplicar el segundo paso de
+  // la regla del proyecto (stadiumNorm(stadiumCanonName(...)) en ambos
+  // lados de toda comparacion de venue). Solo llamaba stadiumCanonName(),
+  // nunca stadiumNorm(). Se agrega el segundo paso de forma defensiva
+  // (typeof check) para no romper nada si stadiumNorm no estuviera cargada.
   function venueCanon(v) {
-    return (typeof stadiumCanonName === "function") ? stadiumCanonName(v) : v;
+    var canon = (typeof stadiumCanonName === "function") ? stadiumCanonName(v) : v;
+    return (typeof stadiumNorm === "function") ? stadiumNorm(canon) : canon;
   }
 
   // Valida que una fecha "YYYY-MM-DD" sea una fecha REAL, no una que
@@ -229,10 +236,20 @@
       var cache = cacheHistoricoFiltrado();
       if(!cache.length){ log("CACHE VACIO (tras barrera defensiva). Abre el index y pulsa COINCIDENCIA para llenar el cache."); return; }
       var set={};
+      // FIX 17 jul 2026: antes esta condicion exigia cache[i].home_team
+      // ademas de venue, asi que cualquier fila con venue real pero sin
+      // home_team (dato incompleto, no invalido) quedaba fuera del
+      // <select> por completo — el parque nunca aparecia como opcion, sin
+      // importar cuantos juegos reales tuviera en cache. Ahora solo se
+      // exige venue. Si home_team falta se usa "?" como placeholder
+      // explicito (nunca se inventa un nombre de equipo), y si una fila
+      // posterior del mismo venue SI trae home_team real, se actualiza.
       for(var i=0;i<cache.length;i++){
-        if(cache[i]&&cache[i].venue&&cache[i].home_team){
+        if(cache[i]&&cache[i].venue){
           var vc = venueCanon(cache[i].venue);
-          set[vc]=cache[i].home_team;
+          if(!set[vc] || set[vc]==="?"){
+            set[vc] = cache[i].home_team || "?";
+          }
         }
       }
       var parques=Object.keys(set).sort(function(a,b){ return set[a]<set[b]?-1:(set[a]>set[b]?1:0); });
@@ -534,10 +551,18 @@
         return;
       }
       var favJuegos = [], desfJuegos = [], excluidos = [];
+      // FIX 17 jul 2026: reemplazado g.total_runs (campo que no existe en
+      // ningun otro punto de este archivo — el resto del stack usa
+      // home_runs + away_runs via carrerasDe()) por carrerasDe(g), tanto
+      // en la validacion como en el promedio. Antes, si total_runs no
+      // existia en el esquema real del cache, TODOS los juegos caian en
+      // excluidos silenciosamente y el boton siempre mostraba 0/0 sin
+      // avisar que era un problema de esquema.
       for (var i=0; i<cache.length; i++) {
         var g = cache[i];
         if (g.status !== "Final") continue;
-        if (typeof g.total_runs !== "number" || !Number.isFinite(g.total_runs)) continue;
+        var carreras = carrerasDe(g);
+        if (carreras === null) continue;
         if (g.roof === "fixed_dome") { excluidos.push(g); continue; }
         if (typeof g.wind_dir !== "number" || !Number.isFinite(g.wind_dir)) { excluidos.push(g); continue; }
         if (typeof g.windspeed_mph !== "number" || !Number.isFinite(g.windspeed_mph)) { excluidos.push(g); continue; }
@@ -548,7 +573,15 @@
         if (vientoFavorable(windDirNorm, hpACF)) favJuegos.push(g);
         else desfJuegos.push(g);
       }
-      function prom(arr){ if(!arr.length) return 0; var s=0; for(var i=0;i<arr.length;i++) s+=arr[i].total_runs; return (s/arr.length); }
+      function prom(arr){
+        if(!arr.length) return 0;
+        var s=0;
+        for(var i=0;i<arr.length;i++){
+          var c = carrerasDe(arr[i]);
+          if(c!==null) s+=c;
+        }
+        return (s/arr.length);
+      }
       var promFav = prom(favJuegos), promDesf = prom(desfJuegos);
       var totalUsados = favJuegos.length + desfJuegos.length;
       var pctFav = totalUsados ? (favJuegos.length/totalUsados*100).toFixed(1) : "0.0";
