@@ -7,8 +7,43 @@
 // - Una vez guardada la línea pregame del día, no vuelve a actualizarla.
 // - Los mercados en vivo quedan completamente rechazados.
 // - La llave NUNCA sale al cliente: la inyecta el Worker de Cloudflare.
+//
+// CORREGIDO 17 jul 2026 (auditoría Moneyline): antes, un juego se
+// rechazaba por completo si no tenía Total pregame válido, aunque sí
+// tuviera Moneyline (moneyline_home/away) real disponible de la API.
+// Nueva regla de entrada: el juego entra al cache si tiene Total válido O
+// Moneyline válida. Se rechaza únicamente cuando NO tiene ni Total válido
+// ni Moneyline válida.
+//
+// CORREGIDO 17 jul 2026 (bump de versión de cache): LINEAS_CACHE_KEY pasa
+// de "lineas_mercado_pregame_v3" a "lineas_mercado_pregame_v4", para
+// forzar una captura nueva bajo la lógica corregida en vez de devolver el
+// cache congelado de hoy calculado con la lógica anterior.
+//
+// CORREGIDO 17 jul 2026 (Moneyline requiere ambos lados): "tieneMoneyline"
+// exige mlHome !== null && mlAway !== null. Moneyline solo cuenta como
+// válida si ambos lados están confirmados.
+//
+// CORREGIDO 17 jul 2026 (limpieza de Moneyline parcial): si no hay
+// Moneyline completa (ambos lados), se descarta cualquier lado parcial
+// resuelto — el juego nunca guarda un solo lado de Moneyline como si
+// fuera dato confirmado.
+//
+// CORREGIDO 17 jul 2026 (Moneyline debe venir de la MISMA casa): antes,
+// mlHome y mlAway se escribían directo sobre las variables acumuladoras
+// mientras se recorrían los bookmakers en orden (draftkings, fanduel,
+// betmgm). Si DraftKings traía solo el lado home, mlHome quedaba fijado
+// por DraftKings; si luego FanDuel traía solo el lado away, mlAway
+// quedaba fijado por FanDuel — mezclando dos casas distintas en una sola
+// línea Moneyline. Ahora, por cada bookmaker se leen ambos outcomes en
+// variables temporales (candidatoHome, candidatoAway) y solo se asignan
+// mlHome/mlAway/mlBookie cuando AMBOS candidatos de esa misma casa son
+// números finitos. Si una casa trae un solo lado, ese valor no se
+// conserva para combinarlo con la siguiente casa. Se mantiene el orden
+// de prioridad draftkings → fanduel → betmgm: se sigue intentando la
+// siguiente casa solo mientras mlHome/mlAway sigan en null.
 
-var LINEAS_CACHE_KEY = "lineas_mercado_pregame_v3";
+var LINEAS_CACHE_KEY = "lineas_mercado_pregame_v4";
 
 // Mapeo: nombre de equipo como viene de The Odds API → venue exacto.
 var ODDS_TEAM_TO_VENUE = {
@@ -323,6 +358,9 @@ async function jalarLineas(logFn) {
               ? market.outcomes
               : [];
 
+            var candidatoHome = null;
+            var candidatoAway = null;
+
             for (var x = 0; x < outsML.length; x++) {
               var out = outsML[x];
 
@@ -331,7 +369,7 @@ async function jalarLineas(logFn) {
                 out.price !== undefined &&
                 Number.isFinite(Number(out.price))
               ) {
-                mlHome = Number(out.price);
+                candidatoHome = Number(out.price);
               }
 
               if (
@@ -339,11 +377,16 @@ async function jalarLineas(logFn) {
                 out.price !== undefined &&
                 Number.isFinite(Number(out.price))
               ) {
-                mlAway = Number(out.price);
+                candidatoAway = Number(out.price);
               }
             }
 
-            if (mlHome !== null || mlAway !== null) {
+            if (
+              candidatoHome !== null &&
+              candidatoAway !== null
+            ) {
+              mlHome = candidatoHome;
+              mlAway = candidatoAway;
               mlBookie = bookmaker.title || bookmaker.key;
             }
           }
@@ -359,16 +402,24 @@ async function jalarLineas(logFn) {
       }
     }
 
-    // Sin total pregame válido, el evento no entra al cache.
-    if (total === null) {
+    var tieneTotal = total !== null;
+    var tieneMoneyline = mlHome !== null && mlAway !== null;
+
+    if (!tieneTotal && !tieneMoneyline) {
       log(
-        "  SIN TOTAL PREGAME VÁLIDO: " +
+        "  SIN TOTAL Y SIN MONEYLINE PREGAME VÁLIDOS: " +
         away +
         " @ " +
         home
       );
 
       continue;
+    }
+
+    if (!tieneMoneyline) {
+      mlHome = null;
+      mlAway = null;
+      mlBookie = null;
     }
 
     juegos.push({
@@ -395,7 +446,7 @@ async function jalarLineas(logFn) {
       "  " + away + " @ " + home +
       " → PREGAME" +
       " · venue: " + (venue || "N/C") +
-      " · total: " + total +
+      " · total: " + (total === null ? "N/C" : total) +
       " · ML away: " + lineasFormatoML(mlAway) +
       " · ML home: " + lineasFormatoML(mlHome)
     );
