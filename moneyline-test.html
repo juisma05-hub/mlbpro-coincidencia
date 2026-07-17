@@ -1,0 +1,332 @@
+<!--
+  moneyline-test.html
+
+  RUTA: Pantalla de prueba manual para moneyline-data.js y
+  moneyline-motor.js. Está fuera de la cadena de producción — no la usa
+  index.html todavía (por decisión explícita: primero se prueba aquí).
+
+  RECIBE DE: mlb-routes.js, estadios.js, clima-cache.js, jalar-clima.js,
+  parques-orientacion.js, score-match.js, calcular-coincidencia.js,
+  jalar-linea.js, moneyline-data.js, moneyline-motor.js.
+
+  ENTREGA A: nada — es una pantalla de prueba, no alimenta ningún otro
+  módulo.
+
+  NO TOCA: histórico, localStorage directamente (delega toda escritura a
+  climaGuardarCache()/lineasGuardarCache() vía jalarClima()/jalarLineas(),
+  igual que index.html), Coincidencia, K6, F5.
+
+  IMPORTANTE — bloques NO conectados en esta prueba (a propósito):
+  roster, lineup, pitcheo, arsenal_vs_lineup y fuerza_equipo NO reciben
+  ningún resolver en esta pantalla. Sus interfaces reales
+  (jalar-roster.js, jalar-lineup.js, factor-pitcheo-completo.js,
+  factor-arsenal-lineup.js) no fueron auditadas en la sesión donde se
+  construyó esta pantalla, y conectarlas sin auditar violaría la regla de
+  "nada inventado". Esos cinco bloques aparecerán como NO_CONFIRMADO de
+  forma honesta. Solo clima, coincidencia y linea_pregame traen datos
+  reales aquí.
+
+  PESOS DEL MOTOR: esta pantalla NO trae ningún peso por defecto. Los
+  campos de peso están vacíos a propósito — el operador decide qué pesos
+  usar y los escribe a mano antes de correr el motor. Si se deja un campo
+  vacío, ese bloque queda sin peso configurado (PESO_NO_CONFIRMADO).
+
+  CORREGIDO 17 jul 2026 (bug de fecha): la función local hoyISO() usaba
+  `new Date(Date.now() - 6*60*60*1000)`, un descuento fijo de 6 horas que
+  NO representa correctamente America/New_York (no ajusta por horario de
+  verano, y depende de la hora/zona local del dispositivo, no de la zona
+  MLB real) — el mismo tipo de error que ya se corrigió en clima-cache.js
+  como [FIX-1]. Se elimina hoyISO() por completo y se usa climaHoyISO()
+  (de clima-cache.js, ya cargado en esta página), que resuelve la fecha
+  vía Intl.DateTimeFormat con America/New_York real y cae a un fallback
+  seguro si la timezone fallara. Mismo corte de "hoy" que usan
+  jalar-clima.js y jalar-linea.js.
+
+  SI ESTE ARCHIVO FALLA: no afecta nada más — es una herramienta de
+  prueba aislada.
+-->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>MLBPro · Moneyline TEST</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; font-family:-apple-system,system-ui,sans-serif; background:#0d1117; color:#e6edf3; }
+  header { padding:14px 16px; border-bottom:1px solid #30363d; }
+  h1 { font-size:17px; margin:0; }
+  main { padding:16px; max-width:900px; margin:0 auto; }
+  .go { width:100%; border:0; border-radius:10px; padding:16px; font-size:16px; font-weight:800; color:#fff; background:#238636; cursor:pointer; margin-bottom:8px; }
+  .go:disabled { background:#30363d; color:#8b949e; }
+  .go-motor { width:100%; border:0; border-radius:10px; padding:16px; font-size:16px; font-weight:800; color:#fff; background:#5b3da8; cursor:pointer; margin-top:14px; }
+  .go-motor:disabled { background:#30363d; color:#8b949e; }
+
+  .aviso { background:#2d2408; border:1px solid #6b5416; border-radius:8px; padding:10px 12px; font-size:12px; color:#ffd60a; margin-bottom:14px; }
+
+  .pesos-box { background:#161b22; border:1px solid #30363d; border-radius:12px; padding:14px; margin-top:14px; }
+  .pesos-box .hdr { font-size:13px; font-weight:800; color:#e6edf3; margin-bottom:10px; }
+  .pesos-grid { display:grid; grid-template-columns: 1fr 1fr; gap:8px; }
+  .pcampo { display:flex; flex-direction:column; gap:3px; }
+  .pcampo label { font-size:11px; color:#8b949e; }
+  .pcampo input { background:#0d1117; border:1px solid #30363d; border-radius:6px; padding:8px; color:#e6edf3; font-size:13px; }
+  .pfila { display:flex; align-items:center; gap:6px; margin-top:8px; font-size:12px; color:#c9d1d9; }
+
+  .juego { background:#161b22; border:1px solid #30363d; border-radius:14px; padding:14px; margin-top:14px; }
+  .matchup { font-size:16px; font-weight:800; }
+  .estadio { font-size:12px; color:#8b949e; margin:3px 0 8px; }
+
+  .cobertura-bar { background:#0d1117; border:1px solid #30363d; border-radius:8px; padding:8px; margin:8px 0; font-size:12px; }
+  .cobertura-bar b { color:#79c0ff; }
+
+  .bloques-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(140px,1fr)); gap:6px; margin:8px 0; }
+  .bloque-chip { font-size:11px; border-radius:6px; padding:6px 8px; border:1px solid #30363d; background:#0d1117; }
+  .bloque-chip.ok { border-color:#3fb950; color:#3fb950; }
+  .bloque-chip.no { border-color:#484f58; color:#8b949e; }
+  .bloque-chip .nombre { font-weight:700; display:block; }
+  .bloque-chip .estado { font-size:10px; opacity:0.85; }
+
+  .linea-box { background:#0d1117; border:1px dashed #30363d; border-radius:8px; padding:10px; margin:8px 0; font-size:12px; }
+  .linea-box .val { font-size:15px; font-weight:800; color:#ffd60a; }
+
+  .motor-box { background:#0d1117; border:1px solid #5b3da8; border-radius:8px; padding:10px; margin-top:8px; font-size:12px; }
+  .motor-box .pick { font-size:15px; font-weight:800; }
+  .motor-box .pick.confirmado { color:#3fb950; }
+  .motor-box .pick.no-confirmado { color:#8b949e; }
+
+  details.fold { margin-top:8px; border-top:1px solid #30363d; padding-top:6px; }
+  details.fold > summary { font-size:12px; color:#79c0ff; font-weight:700; cursor:pointer; list-style:none; padding:4px 0; }
+  details.fold > summary::-webkit-details-marker { display:none; }
+  pre.raw { background:#010409; border:1px solid #30363d; border-radius:6px; padding:10px; font-size:10px; overflow:auto; max-height:40vh; white-space:pre-wrap; }
+
+  #console { margin-top:16px; background:#010409; border:1px solid #30363d; border-radius:8px; padding:12px; min-height:50px; max-height:25vh; overflow:auto; font-family:ui-monospace,monospace; font-size:12px; white-space:pre-wrap; }
+</style>
+</head>
+<body>
+<header><h1>MLBPro · Moneyline TEST</h1></header>
+<a href="index.html" style="display:block; text-align:center; color:#5b9fd8; font-size:13px; padding:8px; text-decoration:none;">← Volver al inicio</a>
+<main>
+  <div class="aviso">
+    ⚠️ AVISO: roster, lineup, pitcheo, arsenal_vs_lineup y fuerza_equipo NO están conectados en esta prueba (interfaces no auditadas todavía). Van a salir como NO_CONFIRMADO. Solo clima, coincidencia y línea pregame traen datos reales.
+  </div>
+
+  <button id="goCargar" class="go">CARGAR JUEGOS DE HOY (moneyline-data)</button>
+
+  <div class="pesos-box">
+    <div class="hdr">PESOS DEL MOTOR (vacío = sin peso, no inventado)</div>
+    <div class="pesos-grid">
+      <div class="pcampo"><label>pitcheo</label><input type="number" id="pesoPitcheo" step="any" placeholder="—"></div>
+      <div class="pcampo"><label>arsenal_vs_lineup</label><input type="number" id="pesoArsenal" step="any" placeholder="—"></div>
+      <div class="pcampo"><label>fuerza_equipo</label><input type="number" id="pesoFuerza" step="any" placeholder="—"></div>
+      <div class="pcampo"><label>clima</label><input type="number" id="pesoClima" step="any" placeholder="—"></div>
+      <div class="pcampo"><label>coincidencia</label><input type="number" id="pesoCoincidencia" step="any" placeholder="—"></div>
+      <div class="pcampo"><label>lineup</label><input type="number" id="pesoLineup" step="any" placeholder="—"></div>
+    </div>
+    <div class="pfila"><label>cobertura_minima (0–1)</label><input type="number" id="coberturaMinima" step="any" style="width:80px;background:#0d1117;border:1px solid #30363d;border-radius:6px;padding:6px;color:#e6edf3;" placeholder="1"></div>
+    <div class="pfila"><label>ventaja_minima</label><input type="number" id="ventajaMinima" step="any" style="width:80px;background:#0d1117;border:1px solid #30363d;border-radius:6px;padding:6px;color:#e6edf3;" placeholder="0"></div>
+    <div class="pfila"><label>edge_minimo</label><input type="number" id="edgeMinimo" step="any" style="width:80px;background:#0d1117;border:1px solid #30363d;border-radius:6px;padding:6px;color:#e6edf3;" placeholder="0"></div>
+    <div class="pfila"><label><input type="checkbox" id="exigirLinea" checked style="width:auto;"> exigir_linea</label></div>
+  </div>
+
+  <button id="goMotor" class="go-motor" disabled>CORRER MOTOR (moneyline-motor) CON ESTOS PESOS</button>
+
+  <div id="lista"></div>
+  <div id="console">Pulsa "CARGAR JUEGOS DE HOY".</div>
+</main>
+
+<script src="mlb-routes.js"></script>
+<script src="estadios.js"></script>
+<script src="clima-cache.js"></script>
+<script src="jalar-clima.js"></script>
+<script src="parques-orientacion.js?v=3"></script>
+<script src="score-match.js"></script>
+<script src="calcular-coincidencia.js"></script>
+<script src="jalar-linea.js"></script>
+<script src="moneyline-data.js"></script>
+<script src="moneyline-motor.js"></script>
+
+<script>
+  var consoleEl = document.getElementById("console");
+  var listaEl = document.getElementById("lista");
+  var datosJuegos = []; // guarda la salida real de moneylineData() por juego, para reusar al correr el motor
+
+  function log(t) { var d = document.createElement("div"); d.textContent = t; consoleEl.appendChild(d); consoleEl.scrollTop = consoleEl.scrollHeight; }
+
+  function bloqueChipHtml(nombre, estadoObj) {
+    var cls = estadoObj.confirmado ? "ok" : "no";
+    return '<div class="bloque-chip ' + cls + '">' +
+      '<span class="nombre">' + nombre + '</span>' +
+      '<span class="estado">' + estadoObj.estado + '</span>' +
+    '</div>';
+  }
+
+  function renderJuegoData(idx, juegoRaw, data) {
+    var away = (juegoRaw.teams && juegoRaw.teams.away && juegoRaw.teams.away.team) ? juegoRaw.teams.away.team.name : "?";
+    var home = (juegoRaw.teams && juegoRaw.teams.home && juegoRaw.teams.home.team) ? juegoRaw.teams.home.team.name : "?";
+    var venue = juegoRaw.venue ? juegoRaw.venue.name : "?";
+
+    var bloques = data.cobertura.detalle;
+    var chips = "";
+    for (var nombre in bloques) {
+      if (bloques.hasOwnProperty(nombre)) chips += bloqueChipHtml(nombre, bloques[nombre]);
+    }
+
+    var lineaHtml;
+    if (data.linea_pregame && data.linea_pregame.confirmado) {
+      lineaHtml = '<div class="linea-box">Línea PREGAME confirmada · ' +
+        away + ' <span class="val">' + data.linea_pregame.moneyline_away + '</span> · ' +
+        home + ' <span class="val">' + data.linea_pregame.moneyline_home + '</span>' +
+        (data.linea_pregame.total !== null ? ' · O/U <span class="val">' + data.linea_pregame.total + '</span>' : '') +
+        (data.linea_pregame.moneyline_bookie ? ' · ' + data.linea_pregame.moneyline_bookie : '') +
+      '</div>';
+    } else {
+      lineaHtml = '<div class="linea-box">Línea PREGAME: <b style="color:#8b949e;">' + (data.linea_pregame ? data.linea_pregame.estado : "NO_CONFIRMADO") + '</b></div>';
+    }
+
+    return '<div class="juego" id="juego_' + idx + '">' +
+      '<div class="matchup">' + away + ' @ ' + home + '</div>' +
+      '<div class="estadio">' + venue + '</div>' +
+      '<div class="cobertura-bar">Cobertura: <b>' + data.cobertura.confirmados + '/' + data.cobertura.total + '</b> (' + data.cobertura.porcentaje + '%) · moneylineData estado: <b>' + data.estado + '</b></div>' +
+      '<div class="bloques-grid">' + chips + '</div>' +
+      lineaHtml +
+      (data.notas.length ? '<div style="font-size:11px;color:#8b949e;">Notas: ' + data.notas.join(', ') + '</div>' : '') +
+      '<div id="motor_' + idx + '"></div>' +
+      '<details class="fold"><summary>Ver moneylineData completo (JSON crudo)</summary><pre class="raw">' + JSON.stringify(data, null, 2) + '</pre></details>' +
+    '</div>';
+  }
+
+  document.getElementById("goCargar").addEventListener("click", async function () {
+    var btn = this;
+    btn.disabled = true;
+    btn.textContent = "TRABAJANDO…";
+    consoleEl.textContent = "";
+    listaEl.innerHTML = "";
+    datosJuegos = [];
+    document.getElementById("goMotor").disabled = true;
+
+    try {
+      log("Jalando clima (histórico + hoy)...");
+      await jalarClima(log);
+
+      log("Jalando líneas pregame...");
+      var lineasCache = null;
+      try {
+        lineasCache = await jalarLineas(log);
+      } catch (el) {
+        log("AVISO líneas: " + (el && el.message ? el.message : el));
+      }
+
+      log("Trayendo juegos de hoy...");
+      // CORREGIDO: se usa climaHoyISO() (clima-cache.js) en vez de un
+      // descuento fijo de horas — mismo corte de "hoy" que jalar-clima.js
+      // y jalar-linea.js, correcto en America/New_York con DST.
+      var hoy = climaHoyISO();
+      var mlbUrl = "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=" + hoy;
+      var resp = await fetch(MLB_ROUTES.WORKER_BASE + encodeURIComponent(mlbUrl));
+      if (!resp.ok) throw new Error("Schedule hoy HTTP " + resp.status);
+      var dataSched = await resp.json();
+      var games = (dataSched.dates && dataSched.dates[0]) ? dataSched.dates[0].games : [];
+      games.sort(function (a, b) { return new Date(a.gameDate) - new Date(b.gameDate); });
+      log("Juegos hoy: " + games.length);
+
+      if (games.length === 0) {
+        log("No hay juegos hoy (" + hoy + ").");
+        return;
+      }
+
+      var html = "";
+      for (var i = 0; i < games.length; i++) {
+        var g = games[i];
+        var juegoEntrada = {
+          gamePk: g.gamePk,
+          away_team: (g.teams && g.teams.away && g.teams.away.team) ? g.teams.away.team.name : null,
+          home_team: (g.teams && g.teams.home && g.teams.home.team) ? g.teams.home.team.name : null,
+          venue: g.venue ? g.venue.name : null,
+          game_date: g.gameDate,
+          status: g.status && g.status.detailedState ? g.status.detailedState : null
+        };
+
+        // Sin resolvers de roster/lineup/pitcheo/arsenal/fuerza_equipo a
+        // propósito (ver aviso al inicio del archivo). moneyline-data.js
+        // los deja en null/NO_CONFIRMADO por su propia cuenta.
+        var data = await moneylineData(juegoEntrada, {});
+
+        datosJuegos.push({ juegoRaw: g, data: data });
+
+        html += renderJuegoData(i, g, data);
+      }
+
+      listaEl.innerHTML = html;
+      document.getElementById("goMotor").disabled = false;
+      log("LISTO. " + datosJuegos.length + " juego(s) procesados por moneylineData.");
+    } catch (e) {
+      log("ERROR: " + (e && e.message ? e.message : e));
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "CARGAR JUEGOS DE HOY (moneyline-data)";
+    }
+  });
+
+  function leerPesoInput(id) {
+    var v = document.getElementById(id).value;
+    if (v === "" || v === null || v === undefined) return undefined;
+    var n = Number(v);
+    return Number.isFinite(n) ? n : undefined;
+  }
+
+  document.getElementById("goMotor").addEventListener("click", function () {
+    if (!datosJuegos.length) {
+      log("No hay juegos cargados todavía.");
+      return;
+    }
+
+    var pesos = {
+      pitcheo: leerPesoInput("pesoPitcheo"),
+      arsenal_vs_lineup: leerPesoInput("pesoArsenal"),
+      fuerza_equipo: leerPesoInput("pesoFuerza"),
+      clima: leerPesoInput("pesoClima"),
+      coincidencia: leerPesoInput("pesoCoincidencia"),
+      lineup: leerPesoInput("pesoLineup")
+    };
+
+    var coberturaMinimaVal = leerPesoInput("coberturaMinima");
+    var ventajaMinimaVal = leerPesoInput("ventajaMinima");
+    var edgeMinimoVal = leerPesoInput("edgeMinimo");
+
+    var configuracion = {
+      pesos: pesos,
+      cobertura_minima: coberturaMinimaVal !== undefined ? coberturaMinimaVal : undefined,
+      ventaja_minima: ventajaMinimaVal !== undefined ? ventajaMinimaVal : undefined,
+      edge_minimo: edgeMinimoVal !== undefined ? edgeMinimoVal : undefined,
+      exigir_linea: document.getElementById("exigirLinea").checked
+    };
+
+    log("Corriendo motor con la configuración de pesos indicada...");
+
+    for (var i = 0; i < datosJuegos.length; i++) {
+      var data = datosJuegos[i].data;
+      var resultado = moneylineMotor(data, configuracion);
+
+      var motorDiv = document.getElementById("motor_" + i);
+      if (!motorDiv) continue;
+
+      var pickCls = resultado.pick && resultado.pick.confirmado ? "confirmado" : "no-confirmado";
+      var pickTxt = resultado.pick && resultado.pick.confirmado
+        ? (resultado.pick.equipo || resultado.pick.lado) + " · edge " + (resultado.pick.edge !== null ? (resultado.pick.edge * 100).toFixed(2) + "%" : "N/C")
+        : "SIN PICK (" + resultado.estado + ")";
+
+      motorDiv.innerHTML =
+        '<div class="motor-box">' +
+          '<div class="pick ' + pickCls + '">' + pickTxt + '</div>' +
+          '<div style="font-size:11px;color:#8b949e;margin-top:4px;">Cobertura motor: ' + resultado.cobertura.porcentaje + '% (mín. requerida ' + resultado.cobertura.minima_requerida + '%) · bloques usados: ' + resultado.cobertura.bloques_usados + '</div>' +
+          (resultado.mercado.confirmado ? '<div style="font-size:11px;color:#8b949e;">Mercado: prob. justa home ' + (resultado.mercado.probabilidad_justa_home * 100).toFixed(1) + '% · away ' + (resultado.mercado.probabilidad_justa_away * 100).toFixed(1) + '% · vig ' + (resultado.mercado.vig * 100).toFixed(1) + '%</div>' : '<div style="font-size:11px;color:#8b949e;">Mercado: ' + resultado.mercado.estado + '</div>') +
+          '<details class="fold"><summary>Ver resultado del motor completo (JSON crudo)</summary><pre class="raw">' + JSON.stringify(resultado, null, 2) + '</pre></details>' +
+        '</div>';
+    }
+
+    log("LISTO. Motor corrido sobre " + datosJuegos.length + " juego(s).");
+  });
+</script>
+</body>
+</html>
