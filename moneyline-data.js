@@ -77,6 +77,40 @@
 // Cada bloque faltante queda en null con estado NO_CONFIRMADO.
 // El objeto general puede devolverse aunque falten piezas, para que la
 // interfaz muestre cobertura real sin fabricar una predicción.
+//
+// CORREGIDO 17 jul 2026 (bug #1 — resolverFuerzaEquipo nunca se
+// ejecutaba): resolverBloque() armaba el nombre del resolver con
+// "resolver" + nombre.charAt(0).toUpperCase() + nombre.slice(1). Para
+// nombre="fuerza_equipo" esto daba "resolverFuerza_equipo" (con guion
+// bajo), no "resolverFuerzaEquipo" como documenta este prólogo. Cualquier
+// bloques.resolverFuerzaEquipo pasado por el llamador nunca se
+// encontraba, y el bloque quedaba en null aunque sí existiera un resolver
+// real. Se agrega aCamelCasePascal(nombre), que convierte cada
+// nombre_con_guion_bajo a PascalCase completo (fuerza_equipo ->
+// FuerzaEquipo) antes de anteponer "resolver". Para los demás nombres de
+// bloque (sin guion bajo: roster, lineup, pitcheo, arsenal, clima) el
+// resultado es idéntico al de antes — no cambia ningún resolver que ya
+// funcionaba. fuerza_equipo sigue devolviendo NO_CONFIRMADO mientras no
+// exista una fuente real para esa capa (confirmado por Perez: todavía no
+// se ha construido).
+//
+// CORREGIDO 17 jul 2026 (bug #2 — bloqueEstado no reconocía
+// confirmado:true con estado:"OK"): bloqueEstado() revisaba primero si
+// valor.estado no era null/undefined, y en ese caso devolvía SIEMPRE
+// confirmado:false, sin mirar valor.confirmado. Como
+// validarLineaPregame() siempre entrega un estado como string ("OK",
+// "NO_PREGAME" o "MONEYLINE_NO_CONFIRMADA") y nunca null (a diferencia
+// del contrato de calcularCoincidencia, que usa estado:null para "válido"
+// — dos convenciones distintas dentro del mismo proyecto), linea_pregame
+// quedaba marcado como no confirmado en la cobertura incluso cuando
+// linea_pregame.confirmado era true. Esto bloqueaba estructuralmente que
+// moneylineData() pudiera devolver confirmado:true en algún caso, sin
+// importar cuán completos estuvieran los datos reales. Se reordena
+// bloqueEstado() para revisar valor.confirmado explícitamente primero
+// (true o false), y solo si valor.confirmado no está definido cae a la
+// convención de estado:null=válido (compatible con calcularCoincidencia,
+// que no trae campo "confirmado" propio). No cambia el comportamiento de
+// ningún bloque que no traiga "confirmado" explícito.
 
 (function (global) {
   "use strict";
@@ -99,6 +133,21 @@
     }
 
     return null;
+  }
+
+  // AGREGADO (fix bug #1): convierte "fuerza_equipo" -> "FuerzaEquipo".
+  // Para nombres sin guion bajo (ej. "roster", "clima") produce el mismo
+  // resultado que el charAt(0).toUpperCase()+slice(1) original.
+  function aCamelCasePascal(nombre) {
+    return String(nombre || "")
+      .split("_")
+      .filter(function (parte) {
+        return parte.length > 0;
+      })
+      .map(function (parte) {
+        return parte.charAt(0).toUpperCase() + parte.slice(1);
+      })
+      .join("");
   }
 
   function normalizarEquipo(valor) {
@@ -218,6 +267,12 @@
     };
   }
 
+  // CORREGIDO (fix bug #2): antes revisaba valor.estado antes que
+  // valor.confirmado, lo que hacía que cualquier bloque con un estado
+  // como string (incluso "OK") quedara marcado confirmado:false. Ahora
+  // valor.confirmado (true/false explícito) tiene prioridad; solo si no
+  // está definido se usa la convención estado:null=válido (contrato de
+  // calcularCoincidencia).
   function bloqueEstado(valor) {
     if (valor === null || valor === undefined) {
       return {
@@ -235,11 +290,13 @@
       };
     }
 
-    if (valor.estado !== undefined && valor.estado !== null) {
+    if (valor.confirmado === true) {
       return {
         disponible: true,
-        confirmado: false,
-        estado: String(valor.estado)
+        confirmado: true,
+        estado: (valor.estado !== undefined && valor.estado !== null)
+          ? String(valor.estado)
+          : "OK"
       };
     }
 
@@ -247,7 +304,21 @@
       return {
         disponible: true,
         confirmado: false,
-        estado: valor.nota || "NO_CONFIRMADO"
+        estado: valor.nota
+          ? valor.nota
+          : ((valor.estado !== undefined && valor.estado !== null)
+            ? String(valor.estado)
+            : "NO_CONFIRMADO")
+      };
+    }
+
+    // valor.confirmado no viene definido: se usa la convención de
+    // calcularCoincidencia (estado === null significa válido).
+    if (valor.estado !== undefined && valor.estado !== null) {
+      return {
+        disponible: true,
+        confirmado: false,
+        estado: String(valor.estado)
       };
     }
 
@@ -265,10 +336,10 @@
       return valorDirecto;
     }
 
-    var nombreResolver =
-      "resolver" +
-      nombre.charAt(0).toUpperCase() +
-      nombre.slice(1);
+    // CORREGIDO (fix bug #1): aCamelCasePascal(nombre) reemplaza al
+    // charAt(0).toUpperCase()+slice(1) original, que no manejaba guiones
+    // bajos.
+    var nombreResolver = "resolver" + aCamelCasePascal(nombre);
 
     var resolver = bloques[nombreResolver];
 
