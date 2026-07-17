@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+  >
+  <title>MLBPro · Test jalar-lineup.js</title>
+
+  <style>
+    :root {
+      color-scheme: dark;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 18px;
+      background: #111;
+      color: #eee;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco,
+        Consolas, "Liberation Mono", monospace;
+      line-height: 1.4;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 20px;
+    }
+
+    h2 {
+      margin: 26px 0 10px;
+      font-size: 17px;
+      border-top: 1px solid #444;
+      padding-top: 14px;
+    }
+
+    .resumen {
+      margin: 12px 0 18px;
+      padding: 12px;
+      border: 1px solid #444;
+      background: #181818;
+      white-space: pre-wrap;
+    }
+
+    .caso {
+      margin: 12px 0;
+      padding: 12px;
+      border: 1px solid #333;
+      background: #151515;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .pass {
+      color: #59d36b;
+      font-weight: 700;
+    }
+
+    .fail {
+      color: #ff6464;
+      font-weight: 700;
+    }
+
+    label {
+      display: block;
+      margin: 10px 0 4px;
+    }
+
+    input {
+      width: 100%;
+      max-width: 420px;
+      padding: 9px;
+      border: 1px solid #666;
+      border-radius: 4px;
+      background: #fff;
+      color: #111;
+      font-size: 16px;
+    }
+
+    button {
+      margin-top: 12px;
+      padding: 10px 14px;
+      border: 0;
+      border-radius: 5px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    pre {
+      margin: 12px 0 0;
+      padding: 12px;
+      border: 1px solid #333;
+      background: #151515;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>jalar-lineup.js — prueba de estructura y modo real</h1>
+
+  <div id="resumen" class="resumen">Ejecutando pruebas...</div>
+  <div id="casos"></div>
+
+  <h2>Modo real</h2>
+
+  <label for="gamePk">gamePk</label>
+  <input id="gamePk" inputmode="numeric" placeholder="Ejemplo: 777777">
+
+  <label for="awayTeamId">awayTeamId</label>
+  <input id="awayTeamId" inputmode="numeric" placeholder="ID equipo visitante">
+
+  <label for="homeTeamId">homeTeamId</label>
+  <input id="homeTeamId" inputmode="numeric" placeholder="ID equipo local">
+
+  <button id="ejecutarReal">Ejecutar con datos reales</button>
+
+  <pre id="salidaReal">Esperando datos...</pre>
+
+  <script src="mlb-routes.js"></script>
+  <script src="jalar-lineup.js"></script>
+
+  <script>
+    (function () {
+      "use strict";
+
+      var casosEl = document.getElementById("casos");
+      var resumenEl = document.getElementById("resumen");
+
+      var total = 0;
+      var pass = 0;
+
+      function pintarCaso(nombre, ok, detalle) {
+        total += 1;
+        if (ok) pass += 1;
+
+        var div = document.createElement("div");
+        div.className = "caso";
+
+        var estado = ok
+          ? '<span class="pass">PASS</span>'
+          : '<span class="fail">FAIL</span>';
+
+        div.innerHTML =
+          estado + " — " + escapar(nombre) + "\n" + escapar(detalle);
+
+        casosEl.appendChild(div);
+      }
+
+      function escapar(valor) {
+        return String(valor)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
+      }
+
+      function jugador(id, nombre, battingOrder) {
+        return {
+          person: {
+            id: id,
+            fullName: nombre
+          },
+          battingOrder: battingOrder
+        };
+      }
+
+      function equipoConNueve() {
+        var players = {};
+
+        for (var i = 1; i <= 9; i++) {
+          players["ID" + i] = jugador(
+            i,
+            "Bateador " + i,
+            String(i * 100)
+          );
+        }
+
+        return { players: players };
+      }
+
+      function equipoConOcho() {
+        var players = {};
+
+        for (var i = 1; i <= 8; i++) {
+          players["ID" + i] = jugador(
+            i,
+            "Bateador " + i,
+            String(i * 100)
+          );
+        }
+
+        return { players: players };
+      }
+
+      function correrPruebas() {
+        try {
+          pintarCaso(
+            "CASO 1: funciones obligatorias cargadas",
+            typeof jalarLineup === "function" &&
+              typeof ultimoLineupConfirmadoDeEquipo === "function" &&
+              typeof extraerLineup === "function" &&
+              typeof fechaHoyMLBLineup === "function" &&
+              typeof restarDiasISOLineup === "function",
+            [
+              "jalarLineup: " + typeof jalarLineup,
+              "ultimoLineupConfirmadoDeEquipo: " +
+                typeof ultimoLineupConfirmadoDeEquipo,
+              "extraerLineup: " + typeof extraerLineup,
+              "fechaHoyMLBLineup: " + typeof fechaHoyMLBLineup,
+              "restarDiasISOLineup: " + typeof restarDiasISOLineup
+            ].join("\n")
+          );
+
+          var nueve = extraerLineup(equipoConNueve());
+
+          pintarCaso(
+            "CASO 2: extrae exactamente 9 titulares",
+            Array.isArray(nueve.lineup) &&
+              nueve.lineup.length === 9 &&
+              nueve.lineup[0].orden === 100 &&
+              nueve.lineup[8].orden === 900,
+            JSON.stringify(nueve, null, 2)
+          );
+
+          var ocho = extraerLineup(equipoConOcho());
+
+          pintarCaso(
+            "CASO 3: no convierte 8 jugadores en lineup confirmado",
+            Array.isArray(ocho.lineup) && ocho.lineup.length === 8,
+            JSON.stringify(ocho, null, 2)
+          );
+
+          var malformado = extraerLineup({
+            players: {
+              ID1: jugador(1, "Válido", "100"),
+              ID2: jugador(2, "Orden inválido", "250"),
+              ID3: jugador(3, "Sin orden", null),
+              ID4: {
+                person: { fullName: "Sin ID" },
+                battingOrder: "200"
+              }
+            }
+          });
+
+          pintarCaso(
+            "CASO 4: ignora órdenes e IDs inválidos",
+            malformado.lineup.length === 1 &&
+              malformado.lineup[0].player_id === 1 &&
+              malformado.lineup[0].orden === 100,
+            JSON.stringify(malformado, null, 2)
+          );
+
+          var fecha = fechaHoyMLBLineup();
+
+          pintarCaso(
+            "CASO 5: fecha MLB válida en America/New_York",
+            /^\d{4}-\d{2}-\d{2}$/.test(fecha),
+            "Fecha obtenida: " + fecha
+          );
+
+          var resta = restarDiasISOLineup("2026-07-17", 5);
+
+          pintarCaso(
+            "CASO 6: resta de fecha ISO estable",
+            resta === "2026-07-12",
+            "Esperado: 2026-07-12\nObtenido: " + resta
+          );
+        } catch (err) {
+          pintarCaso(
+            "ERROR GENERAL DE PRUEBA",
+            false,
+            err && err.stack ? err.stack : String(err)
+          );
+        }
+
+        resumenEl.textContent =
+          "RESULTADO: " + pass + "/" + total + " PASS\n" +
+          (pass === total
+            ? "jalar-lineup.js pasó las pruebas locales."
+            : "Hay pruebas fallidas; no cerrar todavía.");
+      }
+
+      document
+        .getElementById("ejecutarReal")
+        .addEventListener("click", async function () {
+          var salidaReal = document.getElementById("salidaReal");
+
+          var gamePk = document.getElementById("gamePk").value.trim();
+          var awayTeamId =
+            document.getElementById("awayTeamId").value.trim();
+          var homeTeamId =
+            document.getElementById("homeTeamId").value.trim();
+
+          if (!gamePk) {
+            salidaReal.textContent = "Falta gamePk.";
+            return;
+          }
+
+          salidaReal.textContent = "Consultando MLB...";
+
+          try {
+            var resultado = await jalarLineup(
+              Number(gamePk),
+              awayTeamId ? Number(awayTeamId) : null,
+              homeTeamId ? Number(homeTeamId) : null
+            );
+
+            salidaReal.textContent = JSON.stringify(resultado, null, 2);
+          } catch (err) {
+            salidaReal.textContent =
+              "ERROR:\n" +
+              (err && err.stack ? err.stack : String(err));
+          }
+        });
+
+      correrPruebas();
+    })();
+  </script>
+</body>
+</html>
