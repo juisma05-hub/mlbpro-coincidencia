@@ -85,17 +85,27 @@
 
   <script>
     /*
-      DATOS CONTROLADOS DE PRUEBA.
+      MLBPro · factor-arsenal-lineup-test.html
 
-      Pitcher 1001:
-      - FF 60%
-      - SL 40%
+      FUNCIÓN:
+      Prueba controlada de factor-arsenal-lineup.js.
 
-      Pitcher 1002:
-      - sin arsenal
+      VERIFICA:
+      - lineup completo y arsenal válido;
+      - lineup no confirmado;
+      - pitcher sin arsenal;
+      - muestra parcial;
+      - falta de datos suficientes;
+      - ausencia temporal de BATTERS_VSPITCH_2026 y reintento posterior.
 
-      Los bateadores incluyen muestras válidas, muestras insuficientes
-      y datos faltantes para comprobar que el motor no inventa valores.
+      REGLA:
+      Toda salida no confirmada debe devolver factor:null, nunca factor:1.
+
+      PRUEBA DEL CACHÉ:
+      La última prueba retira temporalmente BATTERS_VSPITCH_2026, confirma
+      SIN_REFERENCIA_WOBA_LIGA, restaura la dependencia SIN reiniciar
+      _wobaLigaCache y verifica que una segunda llamada pueda calcular
+      normalmente. Esto confirma que un fallo temporal no queda cacheado.
     */
 
     var ARSENAL_MASTER_2026 = {
@@ -291,10 +301,6 @@
       contenedor.appendChild(bloque);
     }
 
-    function igual(a, b) {
-      return JSON.stringify(a) === JSON.stringify(b);
-    }
-
     function correrPruebas() {
       const resultados = document.getElementById("resultados");
       const resumen = document.getElementById("resumen");
@@ -304,6 +310,8 @@
 
       let pass = 0;
       let fail = 0;
+
+      _wobaLigaCache = undefined;
 
       var lineupCompleto = [
         { player_id: 2001 },
@@ -351,7 +359,7 @@
 
       var paso2 =
         prueba2.confirmado === false &&
-        prueba2.factor === 1 &&
+        prueba2.factor === null &&
         prueba2.nota === "SIN_LINEUP_CONFIRMADO";
 
       agregarResultado(
@@ -359,7 +367,7 @@
         paso2,
         {
           confirmado: false,
-          factor: 1,
+          factor: null,
           nota: "SIN_LINEUP_CONFIRMADO"
         },
         prueba2
@@ -374,7 +382,7 @@
 
       var paso3 =
         prueba3.confirmado === false &&
-        prueba3.factor === 1 &&
+        prueba3.factor === null &&
         prueba3.nota === "SIN_ARSENAL_CONFIRMADO";
 
       agregarResultado(
@@ -382,7 +390,7 @@
         paso3,
         {
           confirmado: false,
-          factor: 1,
+          factor: null,
           nota: "SIN_ARSENAL_CONFIRMADO"
         },
         prueba3
@@ -405,6 +413,7 @@
       var paso4 =
         prueba4.confirmado === false &&
         prueba4.bateadores_usados === 2 &&
+        Number.isFinite(prueba4.factor) &&
         prueba4.nota === "MUESTRA_PARCIAL_2_DE_4";
 
       agregarResultado(
@@ -413,6 +422,7 @@
         {
           confirmado: false,
           bateadores_usados: 2,
+          factor: "NUMERO_FINITO",
           nota: "MUESTRA_PARCIAL_2_DE_4"
         },
         prueba4
@@ -429,7 +439,7 @@
 
       var paso5 =
         prueba5.confirmado === false &&
-        prueba5.factor === 1 &&
+        prueba5.factor === null &&
         prueba5.woba_esperado === null &&
         prueba5.bateadores_usados === 0 &&
         prueba5.nota === "SIN_DATOS_SUFICIENTES_EN_LINEUP";
@@ -439,7 +449,7 @@
         paso5,
         {
           confirmado: false,
-          factor: 1,
+          factor: null,
           bateadores_usados: 0,
           nota: "SIN_DATOS_SUFICIENTES_EN_LINEUP"
         },
@@ -453,27 +463,56 @@
       BATTERS_VSPITCH_2026 = undefined;
       _wobaLigaCache = undefined;
 
-      var prueba6 = calcularFactorArsenalLineup(
+      var primerIntento = calcularFactorArsenalLineup(
+        1001,
+        lineupCompleto
+      );
+
+      BATTERS_VSPITCH_2026 = respaldoBatters;
+
+      /*
+        No se reinicia _wobaLigaCache aquí.
+
+        Si el fallo temporal hubiera quedado cacheado como null,
+        este segundo intento volvería a fallar. Debe recuperarse solo.
+      */
+      var segundoIntento = calcularFactorArsenalLineup(
         1001,
         lineupCompleto
       );
 
       var paso6 =
-        prueba6.confirmado === false &&
-        prueba6.factor === 1 &&
-        prueba6.woba_liga_ref === null &&
-        prueba6.nota === "SIN_REFERENCIA_WOBA_LIGA";
+        primerIntento.confirmado === false &&
+        primerIntento.factor === null &&
+        primerIntento.woba_liga_ref === null &&
+        primerIntento.nota === "SIN_REFERENCIA_WOBA_LIGA" &&
+        segundoIntento.confirmado === true &&
+        segundoIntento.nota === "OK" &&
+        segundoIntento.bateadores_usados === 9 &&
+        Number.isFinite(segundoIntento.woba_liga_ref) &&
+        Number.isFinite(segundoIntento.factor);
 
       agregarResultado(
-        "Sin referencia real de liga",
+        "Fallo temporal de liga permite reintento",
         paso6,
         {
-          confirmado: false,
-          factor: 1,
-          woba_liga_ref: null,
-          nota: "SIN_REFERENCIA_WOBA_LIGA"
+          primer_intento: {
+            confirmado: false,
+            factor: null,
+            woba_liga_ref: null,
+            nota: "SIN_REFERENCIA_WOBA_LIGA"
+          },
+          segundo_intento: {
+            confirmado: true,
+            factor: "NUMERO_FINITO",
+            woba_liga_ref: "NUMERO_FINITO",
+            nota: "OK"
+          }
         },
-        prueba6
+        {
+          primer_intento: primerIntento,
+          segundo_intento: segundoIntento
+        }
       );
 
       paso6 ? pass++ : fail++;
