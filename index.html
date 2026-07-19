@@ -15,60 +15,27 @@
   climaFetchWeather()/climaKeyTZ()/climaBuscarHoraCercana(),
   calcularCoincidencia(), calcularFactorPitcheoCompleto().
 
-  NUEVO (17 jul 2026): Botón "MONEYLINE (INTEGRACIÓN REAL)". Carga los
-  juegos reales de hoy y ejecuta moneylineData() por cada uno, mostrando
-  cobertura, estado de cada bloque, notas, línea pregame y el objeto
-  completo devuelto. Es una pantalla de solo lectura/diagnóstico: NO
-  calcula pesos, NO calcula probabilidad, NO genera pick — moneyline-motor.js
-  ni siquiera se carga en esta página porque este botón no lo necesita.
+  MONEYLINE: existe un botón "Moneyline" (id="goMoneylineTest") que
+  únicamente navega a moneyline-test.html (location.href) — la pantalla
+  real de prueba de Moneyline, con sus propios resolvers de roster,
+  lineup, arsenal_vs_lineup, pitcheo y fuerza de equipo. Este archivo no
+  ejecuta moneylineData() ni ninguna lógica de Moneyline directamente:
+  solo abre esa pantalla.
 
-  Bloques conectados con resolvers reales en el botón Moneyline:
-    - roster: resolución automática de moneyline-data.js vía jalarRoster().
-    - lineup: resolución automática de moneyline-data.js vía jalarLineup().
-    - pitcheo: resolverPitcheo() replica exactamente la misma llamada a
-      calcularFactorPitcheoCompleto(teamId, pitcherId, lineup, hoy) que ya
-      usa el botón COINCIDENCIA DATAPRO (pitcher away vs lineup home,
-      pitcher home vs lineup away).
-    - arsenal_vs_lineup: resolverArsenal() llama a
-      calcularFactorArsenalLineup(pitcherId, lineupRival) — función
-      pública real de factor-arsenal-lineup.js (cerrado y validado 6/6),
-      confirmada directamente en el repo. Toma el abridor confirmado del
-      roster ya resuelto primero (con el schedule solo como respaldo),
-      igual que resolverPitcheo.
-    - clima: resolución automática vía climaHoyLeer(), alimentado por
-      jalarClima() (mismo pipeline que el botón existente).
-    - linea_pregame: resolución automática vía lineasBuscarJuego(),
-      alimentado por jalarLineas() (mismo pipeline que el botón existente).
-
-  Bloque NO conectado a propósito en el botón Moneyline:
-    - fuerza_equipo: no existe todavía como capa real (confirmado por
-      Perez). Queda honestamente NO_CONFIRMADO. Es el único bloque sin
-      resolver.
-
-  CORREGIDO 17 jul 2026 (fuente de abridores en moneylineResolverPitcheo y
-  moneylineResolverArsenal): tomaban primero juego.raw.pitcher_away_id/
-  pitcher_home_id (schedule), que pueden venir vacíos aunque
-  jalarRoster() ya haya confirmado el abridor real por otra vía. Ahora
-  toman primero bloquesTrabajo.roster.pitcher_away_id/.pitcher_home_id,
-  con el schedule solo como respaldo.
-
-  CORREGIDO 17 jul 2026 (moneylinePrimerValor aceptaba "NO_CONFIRMADO"
-  como ID válido): se agrega v !== "NO_CONFIRMADO" a la condición del
-  helper, mismo criterio que valorConfirmado() en moneyline-data.js.
-
-  CONECTADO 17 jul 2026 (arsenal_vs_lineup): moneylineResolverArsenal()
-  llama a calcularFactorArsenalLineup(pitcherId, lineupRival), función
-  pública real de factor-arsenal-lineup.js, confirmada por Perez contra
-  el repo (cerrado, validado 6/6).
-
-  CORREGIDO 17 jul 2026 (LÍNEA F.H. y moneylineResolverPitcheo exigían
-  confirmado===true en ambos lados): factor-pitcheo-completo.js puede
-  devolver factor_final numérico y finito con cobertura parcial. Ahora
-  ambos puntos aceptan cada lado cuando su factor_final es typeof
-  "number" y Number.isFinite, sin exigir además .confirmado === true. Si
-  ambos lados son válidos pero no ambos vienen con .confirmado === true,
-  el resultado se marca explícitamente como PITCHEO PARCIAL (nunca como
-  completo).
+  CORREGIDO 19 jul 2026 (eliminado el flujo inline de Moneyline): antes
+  existía un segundo botón ("MONEYLINE (INTEGRACIÓN REAL)", id=
+  "goMoneyline") que ejecutaba moneylineData() dentro de esta misma
+  página, con su propia consola (#moneylineConsole), su propia lista
+  (#moneylineLista), su aviso (.money-aviso) y sus resolvers locales
+  (moneylineResolverPitcheo, moneylineResolverArsenal,
+  moneylinePrimerValor, etc.). Todo eso se elimina de este archivo: el
+  botón, los estilos .go-moneyline/.money-*, los divs #moneylineLista/
+  #moneylineConsole/.money-aviso, la carga de moneyline-data.js (ya no
+  se usa en ningún otro punto de este archivo) y el bloque completo de
+  script de esa sección. Queda un único botón "Moneyline" que abre
+  moneyline-test.html, que es donde vive esa integración real ahora.
+  No se tocó moneyline-test.html, ni ningún otro botón, estilo o lógica
+  de este archivo (Coincidencia, Brújula, K6, F5, clima).
 
   CORREGIDO 17 jul 2026 (validación de factorH.factor_final en tarjeta()
   era insuficiente): la condición usaba
@@ -77,7 +44,7 @@
   pudieran colarse. Se reemplaza por
   typeof factorH.factor_final === "number" && Number.isFinite(factorH.factor_final),
   validación real de número finito, igual criterio que ya se usa en
-  moneylineResolverPitcheo() y en el resto del stack (esNumeroReal).
+  el resto del stack (esNumeroReal).
 
   CORREGIDO 17 jul 2026 (LÍNEA F.H. seguía calculando con los abridores
   del schedule en vez del roster ya resuelto): dentro del botón
@@ -86,21 +53,17 @@
   aunque justo antes ya se había ejecutado
   rosterHoy = await jalarRoster(g.gamePk), cuyo abridor confirmado puede
   ser distinto o estar disponible cuando el schedule no lo trae. Se
-  agrega el helper local primerAbridorValido() (mismo criterio de
-  exclusión que moneylinePrimerValor: descarta null/undefined/""/
-  "NO_CONFIRMADO") y ahora se toma primero
+  agrega el helper local primerAbridorValido() (descarta null/undefined/
+  ""/"NO_CONFIRMADO") y ahora se toma primero
   rosterHoy.pitcher_away_id / rosterHoy.pitcher_home_id (con las mismas
   variantes de nombre: away_pitcher_id/home_pitcher_id, pitcherAwayId/
   pitcherHomeId), cayendo a pitcherAwayId/pitcherHomeId del schedule solo
-  como respaldo. Mismo criterio que ya aplica Moneyline, ahora también en
-  el bloque original de LÍNEA F.H. No se tocó arsenal, la brújula,
-  Moneyline (fuera de este ajuste ya reflejado), F5, ni el promedio del
+  como respaldo. No se tocó arsenal, la brújula, F5, ni el promedio del
   desplegable de los 5 juegos parecidos.
 
   SALIDAS / MODIFICACIONES:
-  Solo pinta HTML en #lista/#console (botón original) y en
-  #moneylineLista/#moneylineConsole (botón nuevo). No escribe directamente
-  en localStorage — delega toda escritura de histórico a
+  Solo pinta HTML en #lista/#console. No escribe directamente en
+  localStorage — delega toda escritura de histórico a
   climaGuardarCache() (dentro de clima-cache.js, llamado indirectamente vía
   jalarClima()). Lee climaLeerCache() (solo lectura) para respaldo de clima
   y para la brújula explorable.
@@ -114,17 +77,16 @@
   traducir-umpire.js, bloques-serie.js, bloques-trayectoria.js,
   jalar-linea.js, arsenal-master.js, batters-vspitch.js, park-factors.js,
   jalar-lineup.js, jalar-bullpen.js, factor-arsenal-lineup.js,
-  factor-pitcheo-completo.js, moneyline-data.js (nuevo, para el botón
-  Moneyline) (todos cargados como <script> antes del bloque principal).
+  factor-pitcheo-completo.js (todos cargados como <script> antes del
+  bloque principal).
 
   NO TOCA:
   No modifica la lógica interna de clima-cache.js, jalar-clima.js,
   score-match.js, calcular-coincidencia.js, jalar-linea.js (mercado),
-  moneyline-data.js, factor-arsenal-lineup.js, factor-pitcheo-completo.js,
+  moneyline-test.html, factor-arsenal-lineup.js, factor-pitcheo-completo.js,
   K6 (k6-test.html) ni F5 (f5-test.html / f5-automatico-test.html) — solo
-  los invoca y muestra su resultado. El botón Moneyline no toca
-  Coincidencia ni O/U existentes: corre en su propio flujo, con su propia
-  consola y su propia lista de resultados.
+  los invoca (o, en el caso de moneyline-test.html, solo enlaza a ella) y
+  muestra su resultado.
 
   CORRECCIÓN ANTERIOR (sin cambios en esta pasada):
   Se quitó el +180 reintroducido en actualizarExplorer() (var degVieneDe =
@@ -173,9 +135,8 @@
   .go-f5-auto { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#fff; background:linear-gradient(180deg,#7ee787,#238636); cursor:pointer; margin-top:12px; }
   .go-brujula { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#0d1117; background:linear-gradient(180deg,#7ee8e0,#1f9e93); cursor:pointer; margin-bottom:12px; }
   .go-brujula .sub2 { display:block; font-size:11px; font-weight:600; opacity:0.8; margin-top:3px; }
-  .go-moneyline { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#0d1117; background:linear-gradient(180deg,#ffe08a,#c9953a); cursor:pointer; margin-top:12px; }
-  .go-moneyline:disabled { background:#30363d; color:#8b949e; }
-  .go-moneyline .sub2 { display:block; font-size:11px; font-weight:600; opacity:0.85; color:#3a2c0a; }
+  .go-moneyline-test { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#fff; background:#0e7c66; cursor:pointer; margin-top:12px; }
+  .go-moneyline-test .sub2 { display:block; font-size:11px; font-weight:600; opacity:0.85; margin-top:3px; }
 
   .juego { background:#161b22; border:1px solid #30363d; border-radius:14px; padding:16px; margin-top:14px; }
 
@@ -270,20 +231,6 @@
     font-family:-apple-system,sans-serif;
   }
   #appContenido { display:none; }
-
-  /* NUEVO: sección Moneyline */
-  .money-aviso { background:#2d2408; border:1px solid #6b5416; border-radius:8px; padding:10px 12px; font-size:12px; color:#ffd60a; margin-top:14px; }
-  .money-cobertura { background:#0d1117; border:1px solid #30363d; border-radius:8px; padding:8px; margin:8px 0; font-size:12px; }
-  .money-bloques { display:grid; grid-template-columns: repeat(auto-fill, minmax(140px,1fr)); gap:6px; margin:8px 0; }
-  .money-chip { font-size:11px; border-radius:6px; padding:6px 8px; border:1px solid #30363d; background:#0d1117; }
-  .money-chip.ok { border-color:#3fb950; color:#3fb950; }
-  .money-chip.no { border-color:#484f58; color:#8b949e; }
-  .money-chip .nombre { font-weight:700; display:block; }
-  .money-chip .estado { font-size:10px; opacity:0.85; }
-  .money-linea { background:#0d1117; border:1px dashed #30363d; border-radius:8px; padding:10px; margin:8px 0; font-size:12px; }
-  .money-linea .val { font-size:15px; font-weight:800; color:#ffd60a; }
-  #moneylineConsole { margin-top:16px; background:#010409; border:1px solid #30363d; border-radius:8px; padding:12px; min-height:50px; max-height:25vh; overflow:auto; font-family:ui-monospace,monospace; font-size:12px; white-space:pre-wrap; }
-  pre.money-raw { background:#010409; border:1px solid #30363d; border-radius:6px; padding:10px; font-size:10px; overflow:auto; max-height:40vh; white-space:pre-wrap; }
 </style>
 </head>
 <body>
@@ -350,16 +297,13 @@
   <button id="goF5" class="go-f5">🏁 F5 · COINCIDENCIA<span class="sub2">Motor F1-F5 · Carreraje · MoneyLine (prueba manual)</span></button>
   <button id="goF5Auto" class="go-f5-auto">🤖 F5 · AUTOMÁTICO<span class="sub2">Motor F1-F5 · Carreraje · MoneyLine (juegos reales de hoy, sin tocar nada a mano)</span></button>
 
-  <button id="goMoneyline" class="go-moneyline">💰 MONEYLINE (INTEGRACIÓN REAL)<span class="sub2">roster · lineup · pitcheo · arsenal vs lineup · clima · línea pregame — sin pesos ni pick, solo cobertura real</span></button>
+  <button id="goMoneylineTest" class="go-moneyline-test">
+    Moneyline
+    <span class="sub2">Abrir Moneyline MLBPro</span>
+  </button>
 
   <div id="lista"></div>
   <div id="console">Pulsa el botón.</div>
-
-  <div class="money-aviso">
-    ⚠️ MONEYLINE: fuerza_equipo aparecerá como NO_CONFIRMADO — esa capa todavía no existe. Todo lo demás (roster, lineup, pitcheo, arsenal vs lineup, clima, línea pregame) es real.
-  </div>
-  <div id="moneylineLista"></div>
-  <div id="moneylineConsole">Pulsa "MONEYLINE (INTEGRACIÓN REAL)".</div>
 </main>
 <script src="mlb-routes.js"></script>
 <script src="estadios.js"></script>
@@ -388,7 +332,6 @@
 <script src="jalar-bullpen.js"></script>
 <script src="factor-arsenal-lineup.js"></script>
 <script src="factor-pitcheo-completo.js"></script>
-<script src="moneyline-data.js"></script>
 <script>
   var consoleEl = document.getElementById("console");
   var listaEl = document.getElementById("lista");
@@ -399,11 +342,10 @@
     return d.getFullYear()+"-"+("0"+(d.getMonth()+1)).slice(-2)+"-"+("0"+d.getDate()).slice(-2);
   }
 
-  // AGREGADO 17 jul 2026: mismo criterio de exclusión que
-  // moneylinePrimerValor() (definido más abajo en la sección Moneyline),
-  // pero declarado aquí porque este bloque de script se ejecuta primero
-  // y necesita su propia copia. Devuelve el primer valor no nulo/vacío/
-  // "NO_CONFIRMADO" entre los candidatos.
+  // AGREGADO 17 jul 2026: descarta null/undefined/""/"NO_CONFIRMADO" y
+  // devuelve el primer valor real entre los candidatos. Usado para elegir
+  // el abridor confirmado (roster ya resuelto, con el schedule solo como
+  // respaldo) al calcular la LÍNEA F.H.
   function primerAbridorValido(){
     for (var i = 0; i < arguments.length; i++){
       var v = arguments[i];
@@ -445,6 +387,7 @@
   document.getElementById("goK6").addEventListener("click",function(){ location.href="k6-test.html"; });
   document.getElementById("goF5").addEventListener("click",function(){ location.href="f5-test.html"; });
   document.getElementById("goF5Auto").addEventListener("click",function(){ location.href="f5-automatico-test.html"; });
+  document.getElementById("goMoneylineTest").addEventListener("click",function(){ location.href="moneyline-test.html"; });
 
   function toggleJuego(idx){
     var cab = document.getElementById('cab_'+idx);
@@ -678,8 +621,7 @@ if (lineasCache) {
         // CORREGIDO 17 jul 2026: los IDs para calcular resAway/resHome
         // ahora toman primero el abridor confirmado del roster ya
         // resuelto (rosterHoy), con pitcherAwayId/pitcherHomeId del
-        // schedule solo como respaldo — mismo criterio que ya aplicaba
-        // Moneyline (moneylineResolverPitcheo).
+        // schedule solo como respaldo.
         var pitcherAwayIdParaFH = rosterHoy
           ? primerAbridorValido(
               rosterHoy.pitcher_away_id,
@@ -1000,279 +942,6 @@ if (lineasCache) {
       '</div>'+
     '</div>';
   }
-</script>
-<script>
-  // ===== NUEVO: sección MONEYLINE (integración real, sin pesos/pick) =====
-  var moneylineConsoleEl = document.getElementById("moneylineConsole");
-  var moneylineListaEl = document.getElementById("moneylineLista");
-
-  function moneylineLog(t){
-    var d=document.createElement("div");
-    d.textContent=t;
-    moneylineConsoleEl.appendChild(d);
-    moneylineConsoleEl.scrollTop = moneylineConsoleEl.scrollHeight;
-  }
-
-  function moneylineChipHtml(nombre, estadoObj){
-    var cls = estadoObj.confirmado ? "ok" : "no";
-    return '<div class="money-chip '+cls+'">'+
-      '<span class="nombre">'+nombre+'</span>'+
-      '<span class="estado">'+estadoObj.estado+'</span>'+
-    '</div>';
-  }
-
-  // Devuelve el primer valor no nulo/vacío/"NO_CONFIRMADO" entre varios
-  // candidatos, en el mismo espíritu que valorConfirmado()/primerValor()
-  // de moneyline-data.js.
-  function moneylinePrimerValor(){
-    for (var i = 0; i < arguments.length; i++){
-      var v = arguments[i];
-      if (
-        v !== null &&
-        v !== undefined &&
-        v !== "" &&
-        v !== "NO_CONFIRMADO"
-      ) {
-        return v;
-      }
-    }
-    return null;
-  }
-
-  // Replica EXACTAMENTE la misma llamada a calcularFactorPitcheoCompleto()
-  // que ya usa el botón COINCIDENCIA DATAPRO más arriba en este mismo
-  // archivo (pitcher away vs lineup home, pitcher home vs lineup away).
-  // Toma primero bloquesTrabajo.roster.pitcher_away_id/.pitcher_home_id,
-  // y solo si el roster no trae nada cae de vuelta a los IDs del
-  // schedule como respaldo.
-  //
-  // Acepta cada lado cuando su factor_final es numérico y finito, sin
-  // exigir .confirmado. Devuelve confirmado:false y
-  // estado:"PITCHEO_PARCIAL" mientras la cobertura no sea completa (ambos
-  // lados con .confirmado === true).
-  async function moneylineResolverPitcheo(juego, bloquesTrabajo){
-    try {
-      var roster = bloquesTrabajo.roster || {};
-
-      var pitcherAwayId = moneylinePrimerValor(
-        roster.pitcher_away_id,
-        roster.away_pitcher_id,
-        roster.pitcherAwayId,
-        juego.raw ? juego.raw.pitcher_away_id : null
-      );
-
-      var pitcherHomeId = moneylinePrimerValor(
-        roster.pitcher_home_id,
-        roster.home_pitcher_id,
-        roster.pitcherHomeId,
-        juego.raw ? juego.raw.pitcher_home_id : null
-      );
-
-      var hoyFecha = juego.raw ? juego.raw.moneyline_hoy_fecha : null;
-
-      var lineup = bloquesTrabajo.lineup;
-      if (!lineup) {
-        return { confirmado:false, estado:"SIN_LINEUP_PARA_PITCHEO" };
-      }
-
-      var lineupHome = lineup.lineup_home || [];
-      var lineupAway = lineup.lineup_away || [];
-
-      var resAway = (pitcherAwayId && juego.away.id && lineupHome.length)
-        ? await calcularFactorPitcheoCompleto(juego.away.id, pitcherAwayId, lineupHome, hoyFecha)
-        : null;
-
-      var resHome = (pitcherHomeId && juego.home.id && lineupAway.length)
-        ? await calcularFactorPitcheoCompleto(juego.home.id, pitcherHomeId, lineupAway, hoyFecha)
-        : null;
-
-      var awayFactorValido = resAway && typeof resAway.factor_final === "number" && Number.isFinite(resAway.factor_final);
-      var homeFactorValido = resHome && typeof resHome.factor_final === "number" && Number.isFinite(resHome.factor_final);
-
-      if (awayFactorValido && homeFactorValido) {
-        var pitcheoCompleto = resAway.confirmado === true && resHome.confirmado === true;
-        return {
-          confirmado: pitcheoCompleto,
-          estado: pitcheoCompleto ? "OK" : "PITCHEO_PARCIAL",
-          factor_away: resAway,
-          factor_home: resHome
-        };
-      }
-
-      return {
-        confirmado: false,
-        estado: (!lineupHome.length && !lineupAway.length) ? "SIN_LINEUP_CONFIRMADO" : "DATOS_PARCIALES",
-        factor_away: resAway,
-        factor_home: resHome
-      };
-    } catch (error) {
-      return {
-        confirmado: false,
-        estado: "ERROR_PITCHEO",
-        nota: error && error.message ? error.message : String(error)
-      };
-    }
-  }
-
-  // CONECTADO 17 jul 2026: llama a calcularFactorArsenalLineup(pitcherId,
-  // lineupRival) — función pública real de factor-arsenal-lineup.js
-  // (cerrado, validado 6/6, firma confirmada por Perez directamente
-  // contra el repo). Sin cambios en esta pasada.
-  async function moneylineResolverArsenal(juego, bloquesTrabajo) {
-    var roster = bloquesTrabajo.roster || {};
-    var lineup = bloquesTrabajo.lineup || {};
-    var pitcherAwayId = moneylinePrimerValor(
-      roster.pitcher_away_id,
-      roster.away_pitcher_id,
-      roster.pitcherAwayId,
-      juego.raw ? juego.raw.pitcher_away_id : null
-    );
-    var pitcherHomeId = moneylinePrimerValor(
-      roster.pitcher_home_id,
-      roster.home_pitcher_id,
-      roster.pitcherHomeId,
-      juego.raw ? juego.raw.pitcher_home_id : null
-    );
-    var lineupHome = lineup.lineup_home || [];
-    var lineupAway = lineup.lineup_away || [];
-    var arsenalAway = pitcherAwayId && lineupHome.length
-      ? calcularFactorArsenalLineup(pitcherAwayId, lineupHome)
-      : null;
-    var arsenalHome = pitcherHomeId && lineupAway.length
-      ? calcularFactorArsenalLineup(pitcherHomeId, lineupAway)
-      : null;
-    var confirmado = !!(
-      arsenalAway &&
-      arsenalHome &&
-      arsenalAway.confirmado &&
-      arsenalHome.confirmado
-    );
-    return {
-      confirmado: confirmado,
-      estado: confirmado ? "OK" : "DATOS_PARCIALES",
-      factor_away: arsenalAway,
-      factor_home: arsenalHome
-    };
-  }
-
-  function moneylineRenderJuego(idx, awayNombre, homeNombre, venueNombre, data){
-    var bloques = data.cobertura.detalle;
-    var chips = "";
-    for (var nombre in bloques) {
-      if (bloques.hasOwnProperty(nombre)) chips += moneylineChipHtml(nombre, bloques[nombre]);
-    }
-
-    var lineaHtml;
-    if (data.linea_pregame && data.linea_pregame.confirmado) {
-      lineaHtml = '<div class="money-linea">Línea PREGAME confirmada · '+
-        awayNombre+' <span class="val">'+data.linea_pregame.moneyline_away+'</span> · '+
-        homeNombre+' <span class="val">'+data.linea_pregame.moneyline_home+'</span>'+
-        (data.linea_pregame.total !== null ? ' · O/U <span class="val">'+data.linea_pregame.total+'</span>' : '')+
-        (data.linea_pregame.moneyline_bookie ? ' · '+data.linea_pregame.moneyline_bookie : '')+
-      '</div>';
-    } else {
-      lineaHtml = '<div class="money-linea">Línea PREGAME: <b style="color:#8b949e;">'+(data.linea_pregame ? data.linea_pregame.estado : "NO_CONFIRMADO")+'</b></div>';
-    }
-
-    return '<div class="juego" id="moneyJuego_'+idx+'">'+
-      '<div class="matchup">'+awayNombre+' @ '+homeNombre+'</div>'+
-      '<div class="estadio">'+venueNombre+'</div>'+
-      '<div class="money-cobertura">Cobertura: <b>'+data.cobertura.confirmados+'/'+data.cobertura.total+'</b> ('+data.cobertura.porcentaje+'%) · moneylineData estado: <b>'+data.estado+'</b></div>'+
-      '<div class="money-bloques">'+chips+'</div>'+
-      lineaHtml+
-      (data.notas.length ? '<div style="font-size:11px;color:#8b949e;">Notas: '+data.notas.join(', ')+'</div>' : '')+
-      '<details class="fold"><summary>Ver moneylineData completo (JSON crudo)</summary><pre class="money-raw">'+JSON.stringify(data, null, 2)+'</pre></details>'+
-    '</div>';
-  }
-
-  document.getElementById("goMoneyline").addEventListener("click", async function(){
-    var btn = this;
-    btn.disabled = true;
-    btn.innerHTML = 'TRABAJANDO…';
-    moneylineConsoleEl.textContent = "";
-    moneylineListaEl.innerHTML = "";
-
-    try {
-      moneylineLog("Jalando clima (histórico + hoy)...");
-      await jalarClima(moneylineLog);
-
-      moneylineLog("Jalando líneas pregame...");
-      try {
-        await jalarLineas(moneylineLog);
-      } catch (el) {
-        moneylineLog("AVISO líneas: "+(el && el.message ? el.message : el));
-      }
-
-      moneylineLog("Trayendo juegos de hoy...");
-      // Usa climaHoyISO() (clima-cache.js) para el corte de "hoy" en vez
-      // de repetir en código nuevo el descuento fijo de 6 horas que usa
-      // hoyISO() más arriba en este mismo archivo (bug ya corregido en
-      // moneyline-test.html; no se toca hoyISO() ni el botón existente).
-      var hoy = climaHoyISO();
-      var mlbUrl = "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date="+hoy+"&hydrate=probablePitcher";
-      var resp = await fetch(MLB_ROUTES.WORKER_BASE + encodeURIComponent(mlbUrl));
-      if (!resp.ok) throw new Error("Schedule hoy HTTP "+resp.status);
-      var dataSched = await resp.json();
-      var games = (dataSched.dates && dataSched.dates[0]) ? dataSched.dates[0].games : [];
-      games.sort(function(a,b){ return new Date(a.gameDate) - new Date(b.gameDate); });
-      moneylineLog("Juegos hoy: "+games.length);
-
-      if (games.length === 0) {
-        moneylineLog("No hay juegos hoy ("+hoy+").");
-        return;
-      }
-
-      var html = "";
-      for (var i=0; i<games.length; i++) {
-        var g = games[i];
-        var venue = g.venue ? g.venue.name : "";
-        var awayNombre = (g.teams && g.teams.away && g.teams.away.team) ? g.teams.away.team.name : "?";
-        var homeNombre = (g.teams && g.teams.home && g.teams.home.team) ? g.teams.home.team.name : "?";
-        var awayTeamId = (g.teams && g.teams.away && g.teams.away.team) ? g.teams.away.team.id : null;
-        var homeTeamId = (g.teams && g.teams.home && g.teams.home.team) ? g.teams.home.team.id : null;
-        var pitcherAwayId = (g.teams && g.teams.away && g.teams.away.probablePitcher) ? g.teams.away.probablePitcher.id : null;
-        var pitcherHomeId = (g.teams && g.teams.home && g.teams.home.probablePitcher) ? g.teams.home.probablePitcher.id : null;
-
-        var juegoEntrada = {
-          gamePk: g.gamePk,
-          away_team: awayNombre,
-          home_team: homeNombre,
-          away_id: awayTeamId,
-          home_id: homeTeamId,
-          venue: venue,
-          game_date: g.gameDate,
-          status: g.status && g.status.detailedState ? g.status.detailedState : null,
-          pitcher_away_id: pitcherAwayId,
-          pitcher_home_id: pitcherHomeId,
-          moneyline_hoy_fecha: hoy
-        };
-
-        // roster y lineup: resolución automática de moneyline-data.js
-        // (jalarRoster/jalarLineup), sin resolver manual.
-        // pitcheo: resolverPitcheo real, acepta factor_final numérico y
-        // finito por lado, marcando PITCHEO_PARCIAL si no ambos lados
-        // están completamente confirmados.
-        // arsenal: resolverArsenal real (calcularFactorArsenalLineup),
-        // mismo criterio de fuente de abridor (sin cambios).
-        // fuerza_equipo: sin resolver (único bloque NO_CONFIRMADO honesto,
-        // la capa no existe todavía).
-        var data = await moneylineData(juegoEntrada, {
-          resolverPitcheo: moneylineResolverPitcheo,
-          resolverArsenal: moneylineResolverArsenal
-        });
-
-        html += moneylineRenderJuego(i, awayNombre, homeNombre, venue, data);
-      }
-
-      moneylineListaEl.innerHTML = html;
-      moneylineLog("LISTO. "+games.length+" juego(s) procesados por moneylineData. Sin pesos, sin probabilidad, sin pick.");
-    } catch (e) {
-      moneylineLog("ERROR: "+(e && e.message ? e.message : e));
-    } finally {
-      btn.disabled = false;
-      btn.innerHTML = '💰 MONEYLINE (INTEGRACIÓN REAL)<span class="sub2">roster · lineup · pitcheo · arsenal vs lineup · clima · línea pregame — sin pesos ni pick, solo cobertura real</span>';
-    }
-  });
 </script>
 <script>
   function entrarApp(){
