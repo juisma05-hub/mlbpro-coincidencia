@@ -79,9 +79,30 @@
 // Si no se entrega roster ni resolverRoster, usa global.jalarRoster().
 // Si no se entrega lineup ni resolverLineup, usa global.jalarLineup().
 //
+// Si no se entrega fuerza_equipo ni resolverFuerzaEquipo, usa
+// global.calcularFuerzaEquipo(homeTeam, awayTeam, fechaCorteISO) — en ese
+// orden exacto de prioridad:
+//   1) bloques.fuerza_equipo (si llega, se usa tal cual)
+//   2) bloques.resolverFuerzaEquipo(juego, bloquesTrabajo) (si es función)
+//   3) global.calcularFuerzaEquipo(juego.home.name, juego.away.name,
+//      global.MLBPRO_CORE.hoyISO())
+//        — HOME primero, AWAY después, exactamente como exige el
+//          contrato de fuerza-equipo.js.
+//        — fechaCorteISO se obtiene SIEMPRE de global.MLBPRO_CORE.hoyISO(),
+//          nunca se recalcula "hoy" en este archivo. Esto excluye el
+//          juego de hoy y cualquier juego posterior, igual que exige
+//          fuerza-equipo.js internamente.
+// Si falta global.calcularFuerzaEquipo, global.MLBPRO_CORE, o
+// MLBPRO_CORE.hoyISO, fuerza_equipo queda como bloque NO_CONFIRMADO
+// (confirmado:false, estado:"DEPENDENCIA_FALTANTE") — nunca como 1.0 ni
+// ningún valor neutral inventado.
+//
 // ADAPTADORES:
 // jalar-roster.js y jalar-lineup.js mantienen intacto su contrato original.
 // Este integrador agrega confirmado/estado únicamente al objeto integrado.
+// fuerza_equipo NO se adapta ni se reescribe: el objeto que devuelve
+// calcularFuerzaEquipo() (o el resolver externo) se conserva completo,
+// incluidos los perfiles home y away y ventana_reciente: "ULTIMOS_10".
 //
 // ROSTER CONFIRMADO:
 // Requiere ambos abridores reales:
@@ -100,6 +121,8 @@
 // DEPENDENCIAS GLOBALES:
 // - jalarRoster(gamePk)
 // - jalarLineup(gamePk, awayTeamId, homeTeamId)
+// - calcularFuerzaEquipo(homeTeam, awayTeam, fechaCorteISO)  [fuerza-equipo.js]
+// - MLBPRO_CORE.hoyISO()                                    [mlbpro-core.js]
 // - climaHoyLeer(gameId)
 // - calcularCoincidencia(today)
 // - lineasBuscarJuego(away, home, venue)
@@ -112,6 +135,9 @@
 //   pitcheo,
 //   arsenal_vs_lineup,
 //   fuerza_equipo,
+//   senal_unanimidad,
+//   confirmado_unanimidad,
+//   detalle_unanimidad,
 //   clima,
 //   coincidencia,
 //   linea_pregame,
@@ -120,6 +146,13 @@
 //   estado,
 //   notas
 // }
+//
+// senal_unanimidad, confirmado_unanimidad y detalle_unanimidad se toman
+// DIRECTAMENTE de fuerzaEquipo.senal_unanimidad,
+// fuerzaEquipo.confirmado_unanimidad y fuerzaEquipo.detalle_unanimidad —
+// no se recalculan aquí. Si fuerza_equipo no está disponible o no trae
+// esos campos, quedan en null / false / null respectivamente (nunca en
+// un valor neutral inventado).
 //
 // REGLA:
 // Cada bloque faltante queda en null o NO_CONFIRMADO. El objeto general se
@@ -152,6 +185,27 @@
 //   Coincidencia es válida" — sin exigir top. Se quita la condición
 //   extra sobre top; confirmado depende solo de estado === null, tal
 //   como el contrato original establece.
+//
+// CORREGIDO 19 jul 2026 (integración automática de Fuerza de Equipo):
+// - fuerza_equipo ya NO depende únicamente de que bloques entregue
+//   fuerza_equipo o resolverFuerzaEquipo a mano. Se agregó
+//   resolverFuerzaEquipoAutomatico(), que respeta ese mismo orden y,
+//   si ninguno de los dos llega, llama directamente a
+//   global.calcularFuerzaEquipo(juego.home.name, juego.away.name,
+//   global.MLBPRO_CORE.hoyISO()) — HOME primero, AWAY después.
+// - Si global.calcularFuerzaEquipo, global.MLBPRO_CORE o
+//   MLBPRO_CORE.hoyISO no existen, fuerza_equipo queda como bloque
+//   NO_CONFIRMADO explícito (confirmado:false,
+//   estado:"DEPENDENCIA_FALTANTE"), nunca como 1.0 ni ningún valor
+//   neutral.
+// - La salida principal ahora expone senal_unanimidad,
+//   confirmado_unanimidad y detalle_unanimidad, tomados directamente
+//   del bloque fuerza_equipo ya resuelto. fuerza_equipo se conserva
+//   completo (perfiles home/away, ventana_reciente: "ULTIMOS_10",
+//   etc.) sin adaptarlo ni recortarlo.
+// - No se tocó roster, lineup, arsenal, pitcheo, clima, Coincidencia,
+//   línea de mercado, ni el bug pendiente de empates (no corregido en
+//   fuerza-equipo.js, y por lo tanto tampoco aquí).
 //
 // ESTADO:
 // PENDIENTE DE PRUEBA DE INTEGRACIÓN.
@@ -655,6 +709,71 @@
     return null;
   }
 
+  // Fuerza de Equipo: resolución automática con el mismo patrón de
+  // prioridad que roster/lineup:
+  //   1) bloques.fuerza_equipo (valor directo, se conserva completo)
+  //   2) bloques.resolverFuerzaEquipo(juego, bloquesTrabajo)
+  //   3) global.calcularFuerzaEquipo(juego.home.name, juego.away.name,
+  //      global.MLBPRO_CORE.hoyISO())  — HOME primero, AWAY después.
+  //
+  // fuerza-equipo.js NO se modifica ni se toca aquí; este resolver solo
+  // lo invoca con los argumentos correctos. Si faltan las dependencias
+  // globales necesarias (calcularFuerzaEquipo, MLBPRO_CORE, hoyISO) o
+  // los nombres de los equipos, se devuelve un bloque NO_CONFIRMADO
+  // explícito — nunca 1.0 ni ningún valor neutral inventado.
+  async function resolverFuerzaEquipoAutomatico(juego, bloquesTrabajo) {
+    if (bloquesTrabajo.fuerza_equipo !== undefined) {
+      return bloquesTrabajo.fuerza_equipo;
+    }
+
+    if (typeof bloquesTrabajo.resolverFuerzaEquipo === "function") {
+      try {
+        return await bloquesTrabajo.resolverFuerzaEquipo(
+          juego,
+          bloquesTrabajo
+        );
+      } catch (error) {
+        return crearErrorBloque("fuerza_equipo", error);
+      }
+    }
+
+    var dependenciasListas =
+      typeof global.calcularFuerzaEquipo === "function" &&
+      !!global.MLBPRO_CORE &&
+      typeof global.MLBPRO_CORE.hoyISO === "function";
+
+    if (!dependenciasListas) {
+      return {
+        confirmado: false,
+        estado: "DEPENDENCIA_FALTANTE",
+        nota:
+          "global.calcularFuerzaEquipo, global.MLBPRO_CORE o " +
+          "MLBPRO_CORE.hoyISO no están disponibles."
+      };
+    }
+
+    if (!textoValido(juego.home.name) || !textoValido(juego.away.name)) {
+      return {
+        confirmado: false,
+        estado: "EQUIPOS_NO_CONFIRMADOS",
+        nota:
+          "Falta el nombre de home o away para calcular Fuerza de Equipo."
+      };
+    }
+
+    try {
+      var fechaCorte = global.MLBPRO_CORE.hoyISO();
+
+      return await global.calcularFuerzaEquipo(
+        juego.home.name,
+        juego.away.name,
+        fechaCorte
+      );
+    } catch (error) {
+      return crearErrorBloque("fuerza_equipo", error);
+    }
+  }
+
   function obtenerClimaHoy(juego, climaBloque) {
     if (climaBloque !== null && climaBloque !== undefined) {
       return climaBloque;
@@ -889,6 +1008,35 @@
     };
   }
 
+  // Extrae senal_unanimidad, confirmado_unanimidad y detalle_unanimidad
+  // DIRECTAMENTE del bloque fuerza_equipo ya resuelto — no se recalculan
+  // aquí. Si fuerza_equipo no es un objeto (null, NO_CONFIRMADO sin esos
+  // campos, bloque de error) los tres quedan en null / false / null.
+  function extraerUnanimidad(fuerzaEquipo) {
+    if (!fuerzaEquipo || typeof fuerzaEquipo !== "object") {
+      return {
+        senal_unanimidad: null,
+        confirmado_unanimidad: false,
+        detalle_unanimidad: null
+      };
+    }
+
+    return {
+      senal_unanimidad:
+        fuerzaEquipo.senal_unanimidad !== undefined
+          ? fuerzaEquipo.senal_unanimidad
+          : null,
+
+      confirmado_unanimidad:
+        fuerzaEquipo.confirmado_unanimidad === true,
+
+      detalle_unanimidad:
+        fuerzaEquipo.detalle_unanimidad !== undefined
+          ? fuerzaEquipo.detalle_unanimidad
+          : null
+    };
+  }
+
   async function moneylineData(
     juegoEntrada,
     bloquesEntrada
@@ -909,6 +1057,9 @@
         pitcheo: null,
         arsenal_vs_lineup: null,
         fuerza_equipo: null,
+        senal_unanimidad: null,
+        confirmado_unanimidad: false,
+        detalle_unanimidad: null,
         clima: null,
         coincidencia: null,
         linea_pregame: null,
@@ -968,13 +1119,14 @@
 
     trabajo.pitcheo = pitcheo;
 
-    var fuerzaEquipo = await resolverBloque(
-      "fuerza_equipo",
+    var fuerzaEquipo = await resolverFuerzaEquipoAutomatico(
       juego,
       trabajo
     );
 
     trabajo.fuerza_equipo = fuerzaEquipo;
+
+    var unanimidad = extraerUnanimidad(fuerzaEquipo);
 
     var climaResuelto = await resolverBloque(
       "clima",
@@ -1114,6 +1266,10 @@
       pitcheo: pitcheo,
       arsenal_vs_lineup: arsenal,
       fuerza_equipo: fuerzaEquipo,
+
+      senal_unanimidad: unanimidad.senal_unanimidad,
+      confirmado_unanimidad: unanimidad.confirmado_unanimidad,
+      detalle_unanimidad: unanimidad.detalle_unanimidad,
 
       clima: clima,
       coincidencia: coincidencia,
