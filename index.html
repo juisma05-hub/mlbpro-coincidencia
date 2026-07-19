@@ -1,120 +1,191 @@
 <!--
-  MLBPro · index.html
+  moneyline-test.html
 
-  FUNCIÓN:
-  Pantalla principal "COINCIDENCIA DATAPRO". Orquesta la cadena completa
-  para los juegos de HOY: clima (histórico + hoy), línea de mercado,
-  lineup/factor humano, catcher/umpire/roster, brújula del viento, y arma
-  la tarjeta visual de cada juego. No define ninguna fórmula propia: solo
-  llama a los módulos que sí las definen y renderiza lo que devuelven.
+  RUTA: Pantalla de prueba manual para moneyline-data.js y
+  moneyline-motor.js. Está fuera de la cadena de producción — no la usa
+  index.html todavía (por decisión explícita: primero se prueba aquí).
 
-  ENTRADAS:
-  Botón "COINCIDENCIA DATAPRO" (click). Internamente: schedule de hoy
-  (MLB StatsAPI vía MLB_ROUTES.WORKER_BASE), y los datos devueltos por
-  jalarClima(), jalarLineas(), jalarLineup(), jalarCondition(), jalarRoster(),
-  climaFetchWeather()/climaKeyTZ()/climaBuscarHoraCercana(),
-  calcularCoincidencia(), calcularFactorPitcheoCompleto().
+  RECIBE DE: mlb-routes.js, estadios.js, clima-cache.js, jalar-clima.js,
+  parques-orientacion.js, score-match.js, calcular-coincidencia.js,
+  jalar-linea.js, mlbpro-core.js, fuerza-equipo.js, arsenal-master.js,
+  batters-vspitch.js, jalar-roster.js, jalar-lineup.js, jalar-bullpen.js,
+  factor-arsenal-lineup.js, factor-pitcheo-completo.js, moneyline-data.js,
+  moneyline-motor.js.
 
-  MONEYLINE: existe un botón "Moneyline" (id="goMoneylineTest") que
-  únicamente navega a moneyline-test.html (location.href) — la pantalla
-  real de prueba de Moneyline, con sus propios resolvers de roster,
-  lineup, arsenal_vs_lineup, pitcheo y fuerza de equipo. Este archivo no
-  ejecuta moneylineData() ni ninguna lógica de Moneyline directamente:
-  solo abre esa pantalla.
+  ENTREGA A: nada — es una pantalla de prueba, no alimenta ningún otro
+  módulo.
 
-  CORREGIDO 19 jul 2026 (eliminado el flujo inline de Moneyline): antes
-  existía un segundo botón ("MONEYLINE (INTEGRACIÓN REAL)", id=
-  "goMoneyline") que ejecutaba moneylineData() dentro de esta misma
-  página, con su propia consola (#moneylineConsole), su propia lista
-  (#moneylineLista), su aviso (.money-aviso) y sus resolvers locales
-  (moneylineResolverPitcheo, moneylineResolverArsenal,
-  moneylinePrimerValor, etc.). Todo eso se elimina de este archivo: el
-  botón, los estilos .go-moneyline/.money-*, los divs #moneylineLista/
-  #moneylineConsole/.money-aviso, la carga de moneyline-data.js (ya no
-  se usa en ningún otro punto de este archivo) y el bloque completo de
-  script de esa sección. Queda un único botón "Moneyline" que abre
-  moneyline-test.html, que es donde vive esa integración real ahora.
-  No se tocó moneyline-test.html, ni ningún otro botón, estilo o lógica
-  de este archivo (Coincidencia, Brújula, K6, F5, clima).
+  NO TOCA: histórico, localStorage directamente (delega toda escritura a
+  climaGuardarCache()/lineasGuardarCache() vía jalarClima()/jalarLineas(),
+  igual que index.html; fuerza-equipo.js NO escribe histórico — solo LEE
+  el histórico ya existente vía MLBPRO_CORE.leerHistoricoCache()),
+  Coincidencia, K6, F5.
 
-  CORREGIDO 17 jul 2026 (validación de factorH.factor_final en tarjeta()
-  era insuficiente): la condición usaba
-  factorH.factor_final !== null && factorH.factor_final !== undefined,
-  que no descarta strings, NaN u otros valores no numéricos que
-  pudieran colarse. Se reemplaza por
-  typeof factorH.factor_final === "number" && Number.isFinite(factorH.factor_final),
-  validación real de número finito, igual criterio que ya se usa en
-  el resto del stack (esNumeroReal).
+  ORDEN OBLIGATORIO DE SCRIPTS (módulos de Moneyline):
+    mlb-routes.js
+    mlbpro-core.js
+    fuerza-equipo.js
+    arsenal-master.js
+    batters-vspitch.js
+    jalar-roster.js
+    jalar-lineup.js
+    jalar-bullpen.js
+    factor-arsenal-lineup.js
+    factor-pitcheo-completo.js
+    moneyline-data.js
+    moneyline-motor.js
 
-  CORREGIDO 17 jul 2026 (LÍNEA F.H. seguía calculando con los abridores
-  del schedule en vez del roster ya resuelto): dentro del botón
-  COINCIDENCIA DATAPRO, resAway/resHome se calculaban con
-  pitcherAwayId/pitcherHomeId (IDs de probablePitcher del schedule),
-  aunque justo antes ya se había ejecutado
-  rosterHoy = await jalarRoster(g.gamePk), cuyo abridor confirmado puede
-  ser distinto o estar disponible cuando el schedule no lo trae. Se
-  agrega el helper local primerAbridorValido() (descarta null/undefined/
-  ""/"NO_CONFIRMADO") y ahora se toma primero
-  rosterHoy.pitcher_away_id / rosterHoy.pitcher_home_id (con las mismas
-  variantes de nombre: away_pitcher_id/home_pitcher_id, pitcherAwayId/
-  pitcherHomeId), cayendo a pitcherAwayId/pitcherHomeId del schedule solo
-  como respaldo. No se tocó arsenal, la brújula, F5, ni el promedio del
-  desplegable de los 5 juegos parecidos.
+  Razón del orden:
+    - mlb-routes.js debe existir antes de jalar-roster, jalar-lineup y
+      jalar-bullpen (los tres usan MLB_ROUTES.WORKER_BASE).
+    - mlbpro-core.js debe cargar antes de fuerza-equipo.js.
+    - arsenal-master.js y batters-vspitch.js deben cargar antes de
+      ejecutar calcularFactorArsenalLineup() (dependen de
+      ARSENAL_MASTER_2026 y BATTERS_VSPITCH_2026 como globales).
+    - jalar-bullpen.js debe cargar antes de calcularFactorPitcheoCompleto()
+      (usa jalarBullpenAyer() y pitchersNoDisponiblesHoy()).
+    - factor-arsenal-lineup.js debe cargar antes de
+      factor-pitcheo-completo.js (este último llama a
+      calcularFactorArsenalLineup() para abridor y cada relevista).
+    - moneyline-data.js debe cargar después de todas las funciones y datos
+      que va a resolver.
+    - moneyline-motor.js queda al final.
 
-  SALIDAS / MODIFICACIONES:
-  Solo pinta HTML en #lista/#console. No escribe directamente en
-  localStorage — delega toda escritura de histórico a
-  climaGuardarCache() (dentro de clima-cache.js, llamado indirectamente vía
-  jalarClima()). Lee climaLeerCache() (solo lectura) para respaldo de clima
-  y para la brújula explorable.
+  Los scripts de clima, Coincidencia y línea (clima-cache.js,
+  jalar-clima.js, parques-orientacion.js, score-match.js,
+  calcular-coincidencia.js, jalar-linea.js) se conservan en su posición
+  existente, antes de la cadena de Moneyline — no se tocan ni se mueven.
 
-  DEPENDENCIAS:
-  mlb-routes.js, estadios.js, clima-cache.js, jalar-clima.js,
-  parques-orientacion.js, rellenar-carreras.js, score-match.js,
-  calcular-coincidencia.js, jalar-condition.js, brisa-geo-parques.js,
-  pitchers-master.js, jalar-roster.js, traducir-pitcher.js,
-  catchers-master.js, traducir-catcher.js, umpires-master.js,
-  traducir-umpire.js, bloques-serie.js, bloques-trayectoria.js,
-  jalar-linea.js, arsenal-master.js, batters-vspitch.js, park-factors.js,
-  jalar-lineup.js, jalar-bullpen.js, factor-arsenal-lineup.js,
-  factor-pitcheo-completo.js (todos cargados como <script> antes del
-  bloque principal).
+  BLOQUES CONECTADOS EN ESTA PRUEBA (todos con función real, ninguno
+  simulado):
+    - roster: automático dentro de moneyline-data.js, vía
+      jalarRoster(gamePk). No se pasa resolver manual — se apoya en la
+      resolución automática ya integrada en moneyline-data.js.
+    - lineup: automático dentro de moneyline-data.js, vía
+      jalarLineup(gamePk, awayTeamId, homeTeamId). Requiere que el juego
+      traiga away_id/home_id (agregados abajo desde el schedule real),
+      porque moneyline-data.js necesita juego.away.id/juego.home.id para
+      llamar el fallback automático.
+    - arsenal_vs_lineup: resolverArsenal manual en esta pantalla
+      (resolverArsenalTest), que llama a calcularFactorArsenalLineup()
+      DOS veces:
+        arsenal.away = calcularFactorArsenalLineup(pitcher AWAY, lineup HOME)
+        arsenal.home = calcularFactorArsenalLineup(pitcher HOME, lineup AWAY)
+      (el pitcher de cada lado se enfrenta al lineup del lado contrario).
+    - pitcheo: resolverPitcheo manual en esta pantalla
+      (resolverPitcheoTest), que llama a calcularFactorPitcheoCompleto()
+      DOS veces:
+        pitcheo.away = calcularFactorPitcheoCompleto(team AWAY, pitcher AWAY, lineup HOME, MLBPRO_CORE.hoyISO())
+        pitcheo.home = calcularFactorPitcheoCompleto(team HOME, pitcher HOME, lineup AWAY, MLBPRO_CORE.hoyISO())
+    - fuerza_equipo: automático (ya integrado en moneyline-data.js desde
+      la ronda anterior), vía calcularFuerzaEquipo(home, away, hoyISO()).
+    - clima, coincidencia, línea pregame: sin cambios, iguales a antes.
 
-  NO TOCA:
-  No modifica la lógica interna de clima-cache.js, jalar-clima.js,
-  score-match.js, calcular-coincidencia.js, jalar-linea.js (mercado),
-  moneyline-test.html, factor-arsenal-lineup.js, factor-pitcheo-completo.js,
-  K6 (k6-test.html) ni F5 (f5-test.html / f5-automatico-test.html) — solo
-  los invoca (o, en el caso de moneyline-test.html, solo enlaza a ella) y
-  muestra su resultado.
+  IMPORTANTE — NO SE INVENTA UN "CONFIRMADO GENERAL" DE ARSENAL NI DE
+  PITCHEO: como cada uno de esos dos bloques necesita representar DOS
+  cálculos (away y home) bajo una sola clave (arsenal_vs_lineup, pitcheo),
+  el objeto combinado que devuelven resolverArsenalTest/resolverPitcheoTest
+  expone:
+    { away: <objeto real devuelto por la función>,
+      home: <objeto real devuelto por la función>,
+      confirmado: <AND exacto de away.confirmado && home.confirmado>,
+      estado: <concatenación de las notas/cobertura reales de cada lado> }
+  confirmado y estado del combinado NUNCA se calculan con un criterio
+  nuevo — son exactamente los valores .confirmado/.nota/.cobertura que ya
+  devuelve calcularFactorArsenalLineup() y calcularFactorPitcheoCompleto()
+  para cada lado, solo combinados con AND para poder exponer un único
+  bloque tal como espera moneyline-data.js.
 
-  CORRECCIÓN ANTERIOR (sin cambios en esta pasada):
-  Se quitó el +180 reintroducido en actualizarExplorer() (var degVieneDe =
-  ((degReal+180)%360+360)%360;), que hacía que la flecha azul del explorador
-  de viento consultara el bucket opuesto al real. Ahora degVieneDe = degReal,
-  sin offset (confirmado: sigue intacto en esta pasada, no se tocó). Además
-  se actualizó la llamada a jalarLineup(g.gamePk, awayTeamId, homeTeamId)
-  para pasar los equipos (necesario para el fallback de lineup ya
-  corregido en jalar-lineup.js), y se agregó el rótulo visual "CONFIRMADO"
-  / "ÚLTIMO CONFIRMADO" en LÍNEA F.H.
+  LIMITACIÓN YA DOCUMENTADA EN factor-pitcheo-completo.js (punto 16 de su
+  propio prólogo): confirmado=true en calcularFactorPitcheoCompleto() solo
+  ocurre si cobertura==="COMPLETO", estado que HOY no es alcanzable (no
+  existe fuente de bullpen completo real). Por lo tanto pitcheo.away.
+  confirmado y pitcheo.home.confirmado —y por extensión pitcheo.confirmado
+  combinado— serán casi siempre false con las fuentes actuales. Esto es
+  intencional y esperado, no un bug de esta pantalla.
 
-  NOTA (no corregida en esta pasada, por instrucción explícita de no tocar
-  nada más que lo pedido): hoyISO() usa un descuento fijo de 6 horas que
-  no representa correctamente America/New_York con DST. El promedio
-  dentro del desplegable de los 5 juegos parecidos tampoco se tocó.
+  PESOS DEL MOTOR: esta pantalla NO trae ningún peso por defecto. Los
+  campos de peso están vacíos a propósito — el operador decide qué pesos
+  usar y los escribe a mano antes de correr el motor. Si se deja un campo
+  vacío, ese bloque queda sin peso configurado (PESO_NO_CONFIRMADO).
 
-  FECHA:
-  17 jul 2026.
+  CORREGIDO 17 jul 2026 (bug de fecha): la función local hoyISO() usaba
+  `new Date(Date.now() - 6*60*60*1000)`, un descuento fijo de 6 horas que
+  NO representa correctamente America/New_York (no ajusta por horario de
+  verano, y depende de la hora/zona local del dispositivo, no de la zona
+  MLB real) — el mismo tipo de error que ya se corrigió en clima-cache.js
+  como [FIX-1]. Se elimina hoyISO() por completo y se usa climaHoyISO()
+  (de clima-cache.js, ya cargado en esta página), que resuelve la fecha
+  vía Intl.DateTimeFormat con America/New_York real y cae a un fallback
+  seguro si la timezone fallara. Mismo corte de "hoy" que usan
+  jalar-clima.js y jalar-linea.js.
 
-  ESTADO:
-  NO_CONFIRMADO — pendiente de tu aprobación tras esta corrección.
+  CORREGIDO 19 jul 2026 (integración real de prueba — Fuerza de Equipo):
+  - Se agregan <script src="../mlbpro-clima-match/mlbpro-core.js"> y
+    <script src="../mlbpro-clima-match/fuerza-equipo.js"> antes de
+    moneyline-data.js, para que la resolución automática de Fuerza de
+    Equipo (ya integrada en moneyline-data.js) tenga sus dependencias
+    reales disponibles en esta página.
+  - Cada tarjeta de juego muestra un bloque dedicado de Fuerza de Equipo:
+    confirmado/estado, ventana_reciente, resumen de los perfiles
+    completos home y away (juegos, % victorias, últimos 5/6/10, récord
+    local/visitante), y el desglose de senal_unanimidad,
+    confirmado_unanimidad y detalle_unanimidad.
+  - Se agrega una verificación de coherencia: compara
+    data.cobertura.detalle.fuerza_equipo.confirmado contra
+    data.fuerza_equipo.confirmado y avisa en consola si no coinciden.
+  - Se agrega un botón de diagnóstico aislado, "PROBAR DEPENDENCIA
+    FALTANTE", que retira temporalmente window.calcularFuerzaEquipo y
+    window.MLBPRO_CORE, llama a moneylineData() con un juego sintético,
+    confirma que fuerza_equipo.estado sea DEPENDENCIA_FALTANTE, y
+    restaura ambas dependencias globales al terminar.
+  - Se agrega un listener de window.onerror para que cualquier error de
+    script no capturado se vea en la consola de esta página.
+
+  CORREGIDO 19 jul 2026 (segunda ronda — roster, lineup, arsenal_vs_lineup
+  y pitcheo):
+  - Se agregan al orden de carga: arsenal-master.js, batters-vspitch.js,
+    jalar-roster.js, jalar-lineup.js, jalar-bullpen.js,
+    factor-arsenal-lineup.js, factor-pitcheo-completo.js — en el orden
+    obligatorio documentado arriba.
+  - juegoEntrada ahora incluye away_id/home_id (del schedule real de MLB),
+    necesarios para que la resolución automática de lineup
+    (jalarLineup(gamePk, awayTeamId, homeTeamId)) funcione.
+  - roster y lineup ya NO se dejan sin resolver: se apoyan en la
+    resolución automática que moneyline-data.js ya tenía integrada
+    (jalarRoster(gamePk) / jalarLineup(gamePk, awayTeamId, homeTeamId)) —
+    no se duplica esa lógica aquí, solo se le dan las dependencias reales.
+  - Se agregan resolverArsenalTest y resolverPitcheoTest, pasados como
+    bloques.resolverArsenal / bloques.resolverPitcheo, que llaman
+    calcularFactorArsenalLineup() y calcularFactorPitcheoCompleto() dos
+    veces cada una (away y home) con los argumentos exactos: pitcher de
+    un lado contra lineup del lado contrario para arsenal; team+pitcher+
+    lineup contrario+fecha de hoy para pitcheo. Ver nota sobre
+    "NO SE INVENTA UN CONFIRMADO GENERAL" arriba.
+  - Se agrega un bloque visual breve (arsenalPitcheoDetalleHtml) para
+    arsenal_vs_lineup y pitcheo, mostrando el factor y el
+    confirmado/cobertura reales de cada lado (away/home) tal como los
+    devuelven las funciones reales — sin resumir ni inventar un único
+    valor.
+  - Se actualiza el aviso inicial: ya no quedan bloques sin conectar
+    (salvo lo que las dependencias reales digan honestamente que no
+    pueden confirmarse, p. ej. pitcheo casi siempre NO_CONFIRMADO por la
+    limitación ya documentada en factor-pitcheo-completo.js).
+  - No se modifica moneyline-data.js, moneyline-motor.js, fuerza-equipo.js,
+    mlbpro-core.js, jalar-roster.js, jalar-lineup.js, jalar-bullpen.js,
+    factor-arsenal-lineup.js ni factor-pitcheo-completo.js. No se toca
+    clima, Coincidencia, línea pregame ni pesos. No se toca el bug
+    pendiente de empates.
+
+  SI ESTE ARCHIVO FALLA: no afecta nada más — es una herramienta de
+  prueba aislada.
 -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<title>DataPro · Coincidencia</title>
+<title>MLBPro · Moneyline TEST</title>
 <style>
   :root { color-scheme: dark; }
   * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
@@ -122,838 +193,798 @@
   header { padding:14px 16px; border-bottom:1px solid #30363d; }
   h1 { font-size:17px; margin:0; }
   main { padding:16px; max-width:900px; margin:0 auto; }
-  .go { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#fff; background:#238636; cursor:pointer; }
+  .go { width:100%; border:0; border-radius:10px; padding:16px; font-size:16px; font-weight:800; color:#fff; background:#238636; cursor:pointer; margin-bottom:8px; }
   .go:disabled { background:#30363d; color:#8b949e; }
-  .go .sub2 { display:block; font-size:11px; font-weight:600; opacity:0.85; margin-top:3px; }
-  button .sub2 { display:block; font-size:11px; font-weight:600; opacity:0.85; margin-top:3px; }
-  .go-venideros { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#fff; background:#1f6feb; cursor:pointer; margin-top:12px; pointer-events:auto !important; opacity:1 !important; }
-  .go-pasados { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#fff; background:#d2691e; cursor:pointer; margin-top:12px; pointer-events:auto !important; opacity:1 !important; }
-  .go-hunter { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#fff; background:#8957e5; cursor:pointer; margin-top:12px; }
-  .go-auditoria { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#fff; background:#da3633; cursor:pointer; margin-top:12px; }
-  .go-k6 { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#fff; background:#5b3da8; cursor:pointer; margin-top:12px; }
-  .go-f5 { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#fff; background:linear-gradient(180deg,#a8d5ff,#2563eb); cursor:pointer; margin-top:12px; }
-  .go-f5-auto { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#fff; background:linear-gradient(180deg,#7ee787,#238636); cursor:pointer; margin-top:12px; }
-  .go-brujula { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#0d1117; background:linear-gradient(180deg,#7ee8e0,#1f9e93); cursor:pointer; margin-bottom:12px; }
-  .go-brujula .sub2 { display:block; font-size:11px; font-weight:600; opacity:0.8; margin-top:3px; }
-  .go-moneyline-test { width:100%; border:0; border-radius:10px; padding:18px; font-size:17px; font-weight:800; color:#fff; background:#0e7c66; cursor:pointer; margin-top:12px; }
-  .go-moneyline-test .sub2 { display:block; font-size:11px; font-weight:600; opacity:0.85; margin-top:3px; }
+  .go-motor { width:100%; border:0; border-radius:10px; padding:16px; font-size:16px; font-weight:800; color:#fff; background:#5b3da8; cursor:pointer; margin-top:14px; }
+  .go-motor:disabled { background:#30363d; color:#8b949e; }
+  .go-diag { width:100%; border:0; border-radius:10px; padding:14px; font-size:14px; font-weight:800; color:#fff; background:#8a4b08; cursor:pointer; margin-top:10px; }
 
-  .juego { background:#161b22; border:1px solid #30363d; border-radius:14px; padding:16px; margin-top:14px; }
+  .aviso { background:#2d2408; border:1px solid #6b5416; border-radius:8px; padding:10px 12px; font-size:12px; color:#ffd60a; margin-bottom:14px; }
 
-  .juego-cab { cursor:pointer; display:flex; justify-content:space-between; align-items:center; gap:10px; }
-  .juego-cab .chev { color:#8b949e; font-size:14px; transition:transform 0.2s; flex-shrink:0; }
-  .juego-cab.abierto .chev { transform:rotate(90deg); }
-  .juego-cab .coin-mini { font-size:16px; font-weight:800; padding:5px 12px; border-radius:8px; flex-shrink:0; }
-  .juego-cab .coin-mini.ok  { color:#3fb950; background:#0d2818; }
-  .juego-cab .coin-mini.mid { color:#ffd60a; background:#2d2408; }
-  .juego-cab .coin-mini.bad { color:#ff453a; background:#2d0d0d; }
-  .juego-cuerpo { display:none; margin-top:14px; }
-  .juego-cuerpo.abierto { display:block; }
+  .pesos-box { background:#161b22; border:1px solid #30363d; border-radius:12px; padding:14px; margin-top:14px; }
+  .pesos-box .hdr { font-size:13px; font-weight:800; color:#e6edf3; margin-bottom:10px; }
+  .pesos-grid { display:grid; grid-template-columns: 1fr 1fr; gap:8px; }
+  .pcampo { display:flex; flex-direction:column; gap:3px; }
+  .pcampo label { font-size:11px; color:#8b949e; }
+  .pcampo input { background:#0d1117; border:1px solid #30363d; border-radius:6px; padding:8px; color:#e6edf3; font-size:13px; }
+  .pfila { display:flex; align-items:center; gap:6px; margin-top:8px; font-size:12px; color:#c9d1d9; }
 
-  .matchup { font-size:18px; font-weight:800; }
-  .estadio { font-size:13px; color:#8b949e; margin:3px 0; }
-  .hoychips { display:flex; flex-wrap:wrap; gap:6px; margin:10px 0; }
-  .chip { font-size:12px; background:#0d1117; border:1px solid #30363d; border-radius:6px; padding:4px 9px; color:#c9d1d9; }
-  .chip b { color:#fff; }
-  .brisachip { border-color:#3a4250; }
-  .panel { display:flex; gap:8px; margin:12px 0 4px; }
-  .pbox { flex:1; background:#0d1117; border:1px solid #30363d; border-radius:10px; padding:10px; text-align:center; }
-  .pbox .lbl { font-size:10px; color:#8b949e; letter-spacing:0.3px; }
-  .pbox .val { font-size:23px; font-weight:800; margin-top:2px; }
-  .v-coin { color:#3fb950; } .v-run { color:#79c0ff; }
-  .v-coin.mid{color:#ffd60a;} .v-coin.bad{color:#ff453a;}
-  .lineas { display:flex; gap:8px; margin:8px 0 2px; }
-  .lbox { flex:1; background:#0d1117; border:1px solid #30363d; border-radius:10px; padding:10px; text-align:center; }
-  .lbox .lbl { font-size:10px; color:#8b949e; letter-spacing:0.3px; }
-  .lbox .val { font-size:20px; font-weight:800; margin-top:2px; color:#79c0ff; }
-  .lbox.mercado { border-style:dashed; }
-  .lbox.mercado .val { font-size:20px; color:#ffd60a; font-weight:800; }
-  .lbox.mercado .val.pendiente { font-size:13px; color:#8b949e; font-weight:700; }
-  .lbox.fh .val { color:#ff9f0a; }
-  .lbox.fh .val.pendiente { font-size:13px; color:#8b949e; font-weight:700; }
-  .lbox .sub { font-size:9px; color:#6e7681; margin-top:2px; }
-  details.fold { margin-top:10px; border-top:1px solid #30363d; padding-top:8px; }
-  details.fold > summary { font-size:13px; color:#79c0ff; font-weight:700; cursor:pointer; list-style:none; padding:6px 0; }
+  .diag-box { background:#161b22; border:1px solid #30363d; border-radius:12px; padding:14px; margin-top:14px; }
+  .diag-box .hdr { font-size:13px; font-weight:800; color:#e6edf3; margin-bottom:6px; }
+  .diag-box .desc { font-size:11px; color:#8b949e; margin-bottom:8px; }
+  #diagResultado { margin-top:8px; }
+
+  .juego { background:#161b22; border:1px solid #30363d; border-radius:14px; padding:14px; margin-top:14px; }
+  .matchup { font-size:16px; font-weight:800; }
+  .estadio { font-size:12px; color:#8b949e; margin:3px 0 8px; }
+
+  .cobertura-bar { background:#0d1117; border:1px solid #30363d; border-radius:8px; padding:8px; margin:8px 0; font-size:12px; }
+  .cobertura-bar b { color:#79c0ff; }
+
+  .bloques-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(140px,1fr)); gap:6px; margin:8px 0; align-items:stretch; }
+  .bloque-chip {
+    font-size:11px; border-radius:6px; padding:6px 8px; border:1px solid #30363d; background:#0d1117;
+    display:flex; flex-direction:column; justify-content:center;
+    height:50px; overflow:hidden;
+  }
+  .bloque-chip.ok { border-color:#3fb950; color:#3fb950; }
+  .bloque-chip.no { border-color:#484f58; color:#8b949e; }
+  .bloque-chip .nombre { font-weight:700; display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .bloque-chip .estado { font-size:10px; opacity:0.85; display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-top:2px; }
+
+  .fe-box { background:#0d1117; border:1px solid #30363d; border-radius:8px; padding:10px; margin:8px 0; font-size:12px; }
+  .fe-hdr { font-size:12px; font-weight:700; color:#c9d1d9; margin-bottom:6px; }
+  .fe-perfil { border-top:1px dashed #30363d; padding-top:6px; margin-top:6px; }
+  .fe-perfil-tit { font-weight:700; color:#79c0ff; font-size:11px; margin-bottom:2px; }
+  .fe-perfil-linea { font-size:11px; color:#c9d1d9; margin-top:1px; }
+
+  .linea-box { background:#0d1117; border:1px dashed #30363d; border-radius:8px; padding:10px; margin:8px 0; font-size:12px; }
+  .linea-box .val { font-size:15px; font-weight:800; color:#ffd60a; }
+
+  .motor-box { background:#0d1117; border:1px solid #5b3da8; border-radius:8px; padding:10px; margin-top:8px; font-size:12px; }
+  .motor-box .pick { font-size:15px; font-weight:800; }
+  .motor-box .pick.confirmado { color:#3fb950; }
+  .motor-box .pick.no-confirmado { color:#8b949e; }
+
+  details.fold { margin-top:8px; border-top:1px solid #30363d; padding-top:6px; }
+  details.fold > summary { font-size:12px; color:#79c0ff; font-weight:700; cursor:pointer; list-style:none; padding:4px 0; }
   details.fold > summary::-webkit-details-marker { display:none; }
-  details.fold > summary::before { content:"\25B6  "; font-size:11px; }
-  details.fold[open] > summary::before { content:"\25BC  "; }
-  .sub { background:#0d1117; border:1px solid #21262d; border-radius:8px; padding:10px; margin:8px 0; }
-  .sub .top { font-size:13px; font-weight:700; margin-bottom:6px; }
-  .sub .fecha { color:#79c0ff; }
-  .sub .nums { display:flex; flex-wrap:wrap; gap:5px; }
-  .serie-hdr { font-size:11px; color:#8b949e; font-weight:700; letter-spacing:0.5px; margin:10px 0 4px; }
-  .serieparque { margin-top:12px; border-top:1px solid #30363d; padding-top:10px; }
-  .serieparque .sphdr { font-size:12px; color:#8b949e; font-weight:700; letter-spacing:0.5px; }
-  .serieparque .spsub { font-size:13px; color:#bbb; margin:3px 0; }
-  .serieparque .sptray { font-size:13px; font-weight:700; margin:3px 0; }
-  .sp-up{color:#ff9f0a;} .sp-down{color:#64d2ff;} .sp-flat{color:#8b949e;}
-  .serieparque .spsalto { font-size:12px; color:#ffd60a; margin:2px 0; }
-  .serieparque .spprom { text-align:center; margin-top:8px; padding-top:8px; }
-  .serieparque .spprom .lbl { font-size:12px; color:#8b949e; }
-  .serieparque .spprom .val { font-size:20px; font-weight:800; color:#79c0ff; }
-  #console { margin-top:16px; background:#010409; border:1px solid #30363d; border-radius:8px; padding:12px; min-height:60px; max-height:30vh; overflow:auto; font-family:ui-monospace,monospace; font-size:12px; white-space:pre-wrap; }
+  pre.raw { background:#010409; border:1px solid #30363d; border-radius:6px; padding:10px; font-size:10px; overflow:auto; max-height:40vh; white-space:pre-wrap; }
 
-  .brujula-explorer-wrap { text-align:center; padding:10px 0 6px; margin:6px 0; border-bottom:1px solid #21262d; touch-action:none; cursor:grab; }
-  .brujula-explorer-wrap:active { cursor:grabbing; }
-  .brujula-explorer-wrap svg { width:190px; height:194px; display:block; margin:0 auto; }
-  .explorer-txt { font-size:12px; color:#8b949e; margin-top:3px; }
-  .explorer-txt b { color:#58a6ff; }
-  .viento-va-chip { display:inline-block; background:#ff2222; color:#fff; font-weight:800; font-size:15px; padding:6px 18px; border-radius:8px; margin-top:6px; letter-spacing:0.5px; }
-  .viento-va-chip .flecha { font-size:16px; margin:0 4px; }
-  .explorer-hint { font-size:10px; color:#6e7681; margin-top:6px; font-style:italic; }
-
-  #portada {
-    position:fixed; inset:0; z-index:9999;
-    background: linear-gradient(180deg, #030303 0%, #0A0908 45%, #11100E 100%);
-    display:flex; flex-direction:column; align-items:center; justify-content:center;
-    padding:50px 24px;
-  }
-  #portada::before, #portada::after {
-    content:""; position:absolute; width:60px; height:60px; border:1px solid #4A3212;
-  }
-  #portada::before { top:24px; left:24px; border-right:0; border-bottom:0; }
-  #portada::after  { top:24px; right:24px; border-left:0; border-bottom:0; }
-  .p-sub { font-size:11px; letter-spacing:5px; color:#A9782D; margin-bottom:6px; text-transform:uppercase; }
-  .p-tri { width:0; height:0; border-left:6px solid transparent; border-right:6px solid transparent; border-top:7px solid #A9782D; margin-bottom:30px; }
-  .p-logo { width:200px; height:200px; margin-bottom:24px; }
-  .p-titulo { font-size:36px; font-weight:900; letter-spacing:3px; margin:8px 0; font-family:'Arial Black',Impact,sans-serif;
-    background: linear-gradient(180deg, #FFF0B0 0%, #F6D77A 20%, #C9953A 45%, #6F4B1C 75%, #E4B85A 100%);
-    -webkit-background-clip: text; background-clip:text; color:transparent; }
-  .p-linea { width:80%; height:1px; background:linear-gradient(90deg,transparent,#C9953A,transparent); margin:10px 0; }
-  .p-desc { font-size:11px; color:#B8B0A2; margin-bottom:18px; letter-spacing:0.5px; text-align:center; }
-  .p-autor { font-size:13px; color:#B8B0A2; margin-bottom:32px; }
-  .p-autor b { color:#E4B85A; font-weight:700; }
-  #btnEntrar {
-    background: linear-gradient(180deg, #FFF0B0 0%, #E4B85A 18%, #A9782D 50%, #6F4B1C 100%);
-    color:#11100E; border:0; border-radius:8px; padding:18px 80px;
-    font-size:18px; font-weight:800; letter-spacing:1px; cursor:pointer;
-    box-shadow: 0 0 18px #F6D77A55, 0 4px 14px #00000066;
-    font-family:-apple-system,sans-serif;
-  }
-  #appContenido { display:none; }
+  #console { margin-top:16px; background:#010409; border:1px solid #30363d; border-radius:8px; padding:12px; min-height:50px; max-height:25vh; overflow:auto; font-family:ui-monospace,monospace; font-size:12px; white-space:pre-wrap; }
 </style>
 </head>
 <body>
-<div id="portada">
-  <div class="p-sub">Sport Tradition</div>
-  <div class="p-tri"></div>
-  <svg class="p-logo" viewBox="0 0 220 220">
-    <defs>
-      <linearGradient id="goldRing" x1="0%" y1="0%" x2="0%" y2="100%">
-        <stop offset="0%" stop-color="#FFF0B0"/>
-        <stop offset="20%" stop-color="#F6D77A"/>
-        <stop offset="45%" stop-color="#C9953A"/>
-        <stop offset="75%" stop-color="#6F4B1C"/>
-        <stop offset="100%" stop-color="#E4B85A"/>
-      </linearGradient>
-      <radialGradient id="bgBlack" cx="50%" cy="45%" r="60%">
-        <stop offset="0%" stop-color="#11100E"/>
-        <stop offset="100%" stop-color="#030303"/>
-      </radialGradient>
-    </defs>
-    <circle cx="110" cy="110" r="104" fill="none" stroke="url(#goldRing)" stroke-width="7"/>
-    <circle cx="110" cy="110" r="96" fill="url(#bgBlack)"/>
-    <circle cx="110" cy="110" r="96" fill="none" stroke="#C9953A" stroke-width="1.5" opacity="0.7"/>
-    <path d="M 50,55 Q 110,95 170,55" fill="none" stroke="#C9953A" stroke-width="2.5"/>
-    <path d="M 50,165 Q 110,125 170,165" fill="none" stroke="#C9953A" stroke-width="2.5"/>
-    <g stroke="#E4B85A" stroke-width="1.8">
-      <line x1="58" y1="58" x2="62" y2="48"/><line x1="68" y1="68" x2="74" y2="59"/>
-      <line x1="79" y1="76" x2="86" y2="68"/><line x1="91" y1="82" x2="97" y2="75"/>
-      <line x1="103" y1="86" x2="107" y2="78"/><line x1="116" y1="86" x2="113" y2="78"/>
-      <line x1="128" y1="82" x2="123" y2="75"/><line x1="140" y1="76" x2="134" y2="68"/>
-      <line x1="151" y1="68" x2="146" y2="59"/><line x1="161" y1="58" x2="158" y2="48"/>
-    </g>
-    <g stroke="#E4B85A" stroke-width="1.8">
-      <line x1="58" y1="162" x2="62" y2="172"/><line x1="68" y1="152" x2="74" y2="161"/>
-      <line x1="79" y1="144" x2="86" y2="152"/><line x1="91" y1="138" x2="97" y2="145"/>
-      <line x1="103" y1="134" x2="107" y2="142"/><line x1="116" y1="134" x2="113" y2="142"/>
-      <line x1="128" y1="138" x2="123" y2="145"/><line x1="140" y1="144" x2="134" y2="152"/>
-      <line x1="151" y1="152" x2="146" y2="161"/><line x1="161" y1="162" x2="158" y2="172"/>
-    </g>
-    <text x="110" y="40" fill="#C9953A" font-size="13" text-anchor="middle" letter-spacing="6">★ ★ ★</text>
-    <text x="110" y="190" fill="#C9953A" font-size="13" text-anchor="middle" letter-spacing="6">★ ★ ★</text>
-    <text x="110" y="118" fill="url(#goldRing)" font-size="34" font-weight="900" font-family="Georgia,serif" text-anchor="middle">MLB<tspan font-style="italic" font-weight="400">Pro</tspan></text>
-  </svg>
-  <div class="p-titulo">FACTOR CLIMA</div>
-  <div class="p-linea"></div>
-  <div class="p-desc">ANÁLISIS DEL TIEMPO · IMPACTO DEL PARQUE · ESCENA DEL JUEGO</div>
-  <div class="p-autor">by <b>Juan Isidro Pérez</b></div>
-  <button id="btnEntrar">ENTRAR</button>
-</div>
-
-<div id="appContenido">
-<header><h1>DataPro · Coincidencia</h1></header>
+<header><h1>MLBPro · Moneyline TEST</h1></header>
+<a href="index.html" style="display:block; text-align:center; color:#5b9fd8; font-size:13px; padding:8px; text-decoration:none;">← Volver al inicio</a>
 <main>
-  <button id="goBrujula" class="go-brujula">🧭 BRÚJULA DEL VIENTO POR PARQUE<span class="sub2">Ver rango de viento favorable/desfavorable de cualquier parque</span></button>
-  <button id="goMedirOrientacion" class="go-brujula" style="background:linear-gradient(180deg,#ffd580,#c98f1f);">📐 MEDIR ORIENTACIÓN (herramienta)<span class="sub2">Calibrar a mano la orientación real de cada parque</span></button>
-  <button id="goTorearPonches" class="go-brujula" style="background:linear-gradient(180deg,#ff9d9d,#c0392b);">🔥 TOREAR EL PONCHE<span class="sub2">Historial de ponches de abridores según el viento de cada parque</span></button>
+  <div class="aviso">
+    ℹ️ AVISO: roster (jalarRoster), lineup (jalarLineup, con fallback a
+    último confirmado), arsenal_vs_lineup (calcularFactorArsenalLineup,
+    away vs lineup home / home vs lineup away), pitcheo
+    (calcularFactorPitcheoCompleto) y fuerza_equipo (calcularFuerzaEquipo)
+    ya están conectados con sus funciones reales. Clima, coincidencia y
+    línea pregame siguen igual que antes. pitcheo.confirmado será casi
+    siempre false — es intencional, documentado en el propio prólogo de
+    factor-pitcheo-completo.js (no existe hoy fuente de bullpen completo
+    real). El bug de empates sigue sin corregirse.
+  </div>
 
-  <button id="go" class="go">COINCIDENCIA DATAPRO<span class="sub2">Money Line · clima de hoy vs histórico</span></button>
-  <button id="goVenideros" class="go-venideros">SERIES VENIDERAS (7 días)</button>
-  <button id="goPasados" class="go-pasados">DÍAS PASADOS</button>
-  <button id="goHunter" class="go-hunter">DATAPRO HUNTER</button>
-  <button id="goAuditoria" class="go-auditoria">AUDITORÍA</button>
-  <button id="goK6" class="go-k6">K6 · PONCHES<span class="sub2">Proyección de ponches del pitcher a 6 IP</span></button>
-  <button id="goF5" class="go-f5">🏁 F5 · COINCIDENCIA<span class="sub2">Motor F1-F5 · Carreraje · MoneyLine (prueba manual)</span></button>
-  <button id="goF5Auto" class="go-f5-auto">🤖 F5 · AUTOMÁTICO<span class="sub2">Motor F1-F5 · Carreraje · MoneyLine (juegos reales de hoy, sin tocar nada a mano)</span></button>
+  <button id="goCargar" class="go">CARGAR JUEGOS DE HOY (moneyline-data)</button>
 
-  <button id="goMoneylineTest" class="go-moneyline-test">
-    Moneyline
-    <span class="sub2">Abrir Moneyline MLBPro</span>
-  </button>
+  <div class="pesos-box">
+    <div class="hdr">PESOS DEL MOTOR (vacío = sin peso, no inventado)</div>
+    <div class="pesos-grid">
+      <div class="pcampo"><label>pitcheo</label><input type="number" id="pesoPitcheo" step="any" placeholder="—"></div>
+      <div class="pcampo"><label>arsenal_vs_lineup</label><input type="number" id="pesoArsenal" step="any" placeholder="—"></div>
+      <div class="pcampo"><label>fuerza_equipo</label><input type="number" id="pesoFuerza" step="any" placeholder="—"></div>
+      <div class="pcampo"><label>clima</label><input type="number" id="pesoClima" step="any" placeholder="—"></div>
+      <div class="pcampo"><label>coincidencia</label><input type="number" id="pesoCoincidencia" step="any" placeholder="—"></div>
+      <div class="pcampo"><label>lineup</label><input type="number" id="pesoLineup" step="any" placeholder="—"></div>
+    </div>
+    <div class="pfila"><label>cobertura_minima (0–1)</label><input type="number" id="coberturaMinima" step="any" style="width:80px;background:#0d1117;border:1px solid #30363d;border-radius:6px;padding:6px;color:#e6edf3;" placeholder="1"></div>
+    <div class="pfila"><label>ventaja_minima</label><input type="number" id="ventajaMinima" step="any" style="width:80px;background:#0d1117;border:1px solid #30363d;border-radius:6px;padding:6px;color:#e6edf3;" placeholder="0"></div>
+    <div class="pfila"><label>edge_minimo</label><input type="number" id="edgeMinimo" step="any" style="width:80px;background:#0d1117;border:1px solid #30363d;border-radius:6px;padding:6px;color:#e6edf3;" placeholder="0"></div>
+    <div class="pfila"><label><input type="checkbox" id="exigirLinea" checked style="width:auto;"> exigir_linea</label></div>
+  </div>
+
+  <button id="goMotor" class="go-motor" disabled>CORRER MOTOR (moneyline-motor) CON ESTOS PESOS</button>
+
+  <div class="diag-box">
+    <div class="hdr">DIAGNÓSTICO — Fuerza de Equipo</div>
+    <div class="desc">
+      Prueba aislada: retira temporalmente calcularFuerzaEquipo y
+      MLBPRO_CORE, llama a moneylineData() con un juego sintético, y
+      confirma que fuerza_equipo quede como DEPENDENCIA_FALTANTE. Restaura
+      ambas dependencias al terminar. No afecta el resto de la página.
+    </div>
+    <button id="goDiagFaltante" class="go-diag">PROBAR DEPENDENCIA FALTANTE (fuerza_equipo)</button>
+    <div id="diagResultado"></div>
+  </div>
 
   <div id="lista"></div>
-  <div id="console">Pulsa el botón.</div>
+  <div id="console">Pulsa "CARGAR JUEGOS DE HOY".</div>
 </main>
+
 <script src="mlb-routes.js"></script>
 <script src="estadios.js"></script>
 <script src="clima-cache.js"></script>
 <script src="jalar-clima.js"></script>
 <script src="parques-orientacion.js?v=3"></script>
-<script src="rellenar-carreras.js"></script>
 <script src="score-match.js"></script>
 <script src="calcular-coincidencia.js"></script>
-<script src="jalar-condition.js"></script>
-<script src="brisa-geo-parques.js"></script>
-<script src="pitchers-master.js"></script>
-<script src="jalar-roster.js"></script>
-<script src="traducir-pitcher.js"></script>
-<script src="catchers-master.js"></script>
-<script src="traducir-catcher.js"></script>
-<script src="umpires-master.js"></script>
-<script src="traducir-umpire.js"></script>
-<script src="bloques-serie.js"></script>
-<script src="bloques-trayectoria.js"></script>
 <script src="jalar-linea.js"></script>
+<script src="../mlbpro-clima-match/mlbpro-core.js"></script>
+<script src="../mlbpro-clima-match/fuerza-equipo.js"></script>
 <script src="arsenal-master.js"></script>
 <script src="batters-vspitch.js"></script>
-<script src="park-factors.js"></script>
+<script src="jalar-roster.js"></script>
 <script src="jalar-lineup.js"></script>
 <script src="jalar-bullpen.js"></script>
 <script src="factor-arsenal-lineup.js"></script>
 <script src="factor-pitcheo-completo.js"></script>
+<script src="moneyline-data.js"></script>
+<script src="moneyline-motor.js"></script>
+
 <script>
   var consoleEl = document.getElementById("console");
   var listaEl = document.getElementById("lista");
-  function log(t){ var d=document.createElement("div"); d.textContent=t; consoleEl.appendChild(d); consoleEl.scrollTop=consoleEl.scrollHeight; }
+  var datosJuegos = []; // guarda la salida real de moneylineData() por juego, para reusar al correr el motor
 
-  function hoyISO(){
-    var d=new Date(Date.now()-6*60*60*1000);
-    return d.getFullYear()+"-"+("0"+(d.getMonth()+1)).slice(-2)+"-"+("0"+d.getDate()).slice(-2);
-  }
+  function log(t) { var d = document.createElement("div"); d.textContent = t; consoleEl.appendChild(d); consoleEl.scrollTop = consoleEl.scrollHeight; }
 
-  // AGREGADO 17 jul 2026: descarta null/undefined/""/"NO_CONFIRMADO" y
-  // devuelve el primer valor real entre los candidatos. Usado para elegir
-  // el abridor confirmado (roster ya resuelto, con el schedule solo como
-  // respaldo) al calcular la LÍNEA F.H.
-  function primerAbridorValido(){
-    for (var i = 0; i < arguments.length; i++){
-      var v = arguments[i];
-      if (
-        v !== null &&
-        v !== undefined &&
-        v !== "" &&
-        v !== "NO_CONFIRMADO"
-      ) {
-        return v;
-      }
-    }
-    return null;
-  }
+  // Cualquier error de script no capturado se ve en esta consola, en vez
+  // de fallar en silencio. Solo diagnóstico — no cambia ninguna lógica.
+  window.addEventListener("error", function (e) {
+    log("ERROR NO CAPTURADO: " + (e && e.message ? e.message : e));
+  });
 
-  var MESES_CORTOS={"01":"Ene","02":"Feb","03":"Mar","04":"Abr","05":"May","06":"Jun","07":"Jul","08":"Ago","09":"Sep","10":"Oct","11":"Nov","12":"Dic"};
-  function fechaBonita(date){
-    if(!date||typeof date!=="string"||date.length<10) return date||"?";
-    var yy=date.slice(0,4),mm=date.slice(5,7),dd=date.slice(8,10);
-    return dd+" "+(MESES_CORTOS[mm]||mm)+" "+yy.slice(2);
-  }
-
-  function horaBonita(gameDateISO){
-    if(!gameDateISO) return "";
-    try {
-      var d = new Date(gameDateISO);
-      if (isNaN(d.getTime())) return "";
-      return d.toLocaleTimeString('es', {hour:'numeric', minute:'2-digit', hour12:true});
-    } catch(e) { return ""; }
-  }
-
-  document.getElementById("goBrujula").addEventListener("click",function(){ location.href="casar-series-test.html"; });
-  document.getElementById("goMedirOrientacion").addEventListener("click",function(){ location.href="medir-orientacion.html"; });
-  document.getElementById("goTorearPonches").addEventListener("click",function(){ location.href="torear-ponches-test.html"; });
-  document.getElementById("goVenideros").addEventListener("click",function(){ location.href="venideros-test.html"; });
-  document.getElementById("goPasados").addEventListener("click",function(){ location.href="dia-pasado-test.html"; });
-  document.getElementById("goHunter").addEventListener("click",function(){ location.href="dataprohunter.html"; });
-  document.getElementById("goAuditoria").addEventListener("click",function(){ location.href="auditoria.html"; });
-  document.getElementById("goK6").addEventListener("click",function(){ location.href="k6-test.html"; });
-  document.getElementById("goF5").addEventListener("click",function(){ location.href="f5-test.html"; });
-  document.getElementById("goF5Auto").addEventListener("click",function(){ location.href="f5-automatico-test.html"; });
-  document.getElementById("goMoneylineTest").addEventListener("click",function(){ location.href="moneyline-test.html"; });
-
-  function toggleJuego(idx){
-    var cab = document.getElementById('cab_'+idx);
-    var cuerpo = document.getElementById('cuerpo_'+idx);
-    if(!cab || !cuerpo) return;
-    var abierto = cuerpo.classList.toggle('abierto');
-    cab.classList.toggle('abierto', abierto);
-  }
-
-  function svgBrujulaJuego(idx, venue, hpACF, hoyDir, hoyVel){
-    var cx=100, cy=100;
-    var venueEsc0 = String(venue||"").replace(/&/g,"&amp;").replace(/"/g,"&quot;");
-    if (hpACF===null || hpACF===undefined) {
-      return '<div class="brujula-explorer-wrap" data-idx="'+idx+'" data-venue="'+venueEsc0+'" data-hp="0">'+
-        '<svg viewBox="0 0 200 205">'+
-          '<circle cx="'+cx+'" cy="'+cy+'" r="95" fill="none" stroke="#333" stroke-width="1"/>'+
-          '<text x="'+cx+'" y="'+cy+'" fill="#8b949e" font-size="13" font-weight="700" text-anchor="middle">NO_CONFIRMADO</text>'+
-        '</svg>'+
-        '<div class="explorer-txt">'+venueEsc0+' · orientación de parque sin medir</div>'+
-      '</div>';
-    }
-    var hp = hpACF;
-    var puntos16=[
-      {g:0,t:"N"},{g:22.5,t:"NNE"},{g:45,t:"NE"},{g:67.5,t:"ENE"},
-      {g:90,t:"E"},{g:112.5,t:"ESE"},{g:135,t:"SE"},{g:157.5,t:"SSE"},
-      {g:180,t:"S"},{g:202.5,t:"SSW"},{g:225,t:"SW"},{g:247.5,t:"WSW"},
-      {g:270,t:"W"},{g:292.5,t:"WNW"},{g:315,t:"NW"},{g:337.5,t:"NNW"}
-    ];
-    var cardHtml="", degHtml="";
-    puntos16.forEach(function(p){
-      var gAjustado = p.g;
-      cardHtml+='<g transform="rotate('+gAjustado+' '+cx+' '+cy+')"><text x="'+cx+'" y="14" font-size="9" font-weight="700" fill="#9b59ff" text-anchor="middle">'+p.t+'</text></g>';
-      degHtml+='<g transform="rotate('+gAjustado+' '+cx+' '+cy+')"><text x="'+cx+'" y="38" font-size="7" font-weight="700" fill="#fff" text-anchor="middle">'+Math.round(p.g)+'°</text></g>';
-    });
-
-    var hoyFlechaHtml = "";
-    var hoyTxt = "N/C";
-    var hoyVaTxt = null;
-    if (hoyDir !== null && hoyDir !== undefined && hoyDir !== "" && !isNaN(Number(hoyDir))) {
-      var vieneDe = ((Number(hoyDir)%360)+360)%360;
-      var vaHacia = (vieneDe+180)%360;
-      hoyFlechaHtml =
-        '<g transform="rotate('+vaHacia+' '+cx+' '+cy+')">'+
-          '<line x1="'+cx+'" y1="'+(cy+25)+'" x2="'+cx+'" y2="'+(cy-19)+'" stroke="#ff2222" stroke-width="2" stroke-linecap="round"/>'+
-          '<polygon points="'+cx+','+(cy-23)+' '+(cx-6)+','+(cy-9)+' '+(cx+6)+','+(cy-9)+'" fill="#ff2222"/>'+
-          '<circle cx="'+cx+'" cy="'+(cy+25)+'" r="6" fill="#ff2222" stroke="#fff" stroke-width="1.5"/>'+
-        '</g>';
-      hoyTxt = Math.round(vieneDe)+"°";
-      hoyVaTxt = Math.round(vaHacia)+"°";
-    }
-
-    var venueEsc = venueEsc0;
-
-    return '<div class="brujula-explorer-wrap" data-idx="'+idx+'" data-venue="'+venueEsc+'" data-hp="'+hp+'">'+
-      '<svg viewBox="0 0 200 205">'+
-        '<circle cx="'+cx+'" cy="'+cy+'" r="95" fill="none" stroke="#333" stroke-width="1"/>'+
-        '<circle cx="'+cx+'" cy="'+cy+'" r="68" fill="none" stroke="#333" stroke-width="1"/>'+
-        '<circle cx="'+cx+'" cy="'+cy+'" r="66" fill="#0e1420" stroke="#222" stroke-width="1"/>'+
-        cardHtml + degHtml +
-        '<g transform="rotate('+(((hp%360)+360)%360)+' '+cx+' '+cy+')">'+
-          '<line x1="'+cx+'" y1="'+(cy+60)+'" x2="'+cx+'" y2="'+(cy-60)+'" stroke="#ff9f0a" stroke-width="1" stroke-dasharray="3,3" opacity="0.8"/>'+
-          '<path d="M '+cx+' '+(cy+42)+' L '+(cx-45)+' '+(cy-21)+' A 60 60 0 0 1 '+(cx+45)+' '+(cy-21)+' Z" fill="#1a4d2e" stroke="#2d7a4a" stroke-width="1" opacity="0.9"/>'+
-          '<path d="M '+(cx-21)+' '+(cy+42)+' Q '+cx+' '+(cy+18)+' '+(cx+21)+' '+(cy+42)+'" fill="none" stroke="#c9a94d" stroke-width="1" opacity="0.8"/>'+
-          '<path d="M '+(cx-27)+' '+(cy+42)+' Q '+cx+' '+(cy+9)+' '+(cx+27)+' '+(cy+42)+'" fill="none" stroke="#c9a94d" stroke-width="0.7" opacity="0.5"/>'+
-          '<g stroke="#c9a94d" stroke-width="1.5" fill="none">'+
-            '<polygon points="'+cx+','+cy+' '+(cx+18)+','+(cy+21)+' '+cx+','+(cy+42)+' '+(cx-18)+','+(cy+21)+'"/>'+
-            '<circle cx="'+cx+'" cy="'+cy+'" r="2.5" fill="#c9a94d"/>'+
-            '<circle cx="'+(cx+18)+'" cy="'+(cy+21)+'" r="2" fill="#c9a94d"/>'+
-            '<circle cx="'+cx+'" cy="'+(cy+42)+'" r="2" fill="#c9a94d"/>'+
-            '<circle cx="'+(cx-18)+'" cy="'+(cy+21)+'" r="2" fill="#c9a94d"/>'+
-          '</g>'+
-        '</g>'+
-        hoyFlechaHtml+
-        '<g id="explorerArrow_'+idx+'" transform="rotate(0 '+cx+' '+cy+')">'+
-          '<line x1="'+cx+'" y1="'+(cy+50)+'" x2="'+cx+'" y2="'+(cy-38)+'" stroke="#1f6feb" stroke-width="2" stroke-dasharray="4,3" stroke-linecap="round"/>'+
-          '<polygon points="'+cx+','+(cy-46)+' '+(cx-6)+','+(cy-32)+' '+(cx+6)+','+(cy-32)+'" fill="#1f6feb"/>'+
-        '</g>'+
-        '<circle cx="'+cx+'" cy="'+cy+'" r="3" fill="#e6edf3" opacity="0.9"/>'+
-      '</svg>'+
-      '<div class="explorer-txt">🔴 viento de hoy: <b>'+hoyTxt+(hoyVel!==null&&hoyVel!==undefined&&typeof hoyVel==="number"?' · '+hoyVel.toFixed(0)+' mph':'')+'</b></div>'+
-      (hoyVaTxt ? '<div class="viento-va-chip">'+hoyTxt+' <span class="flecha">➜</span> '+hoyVaTxt+'</div>' : '')+
-      '<div class="explorer-txt">🔵 explorando: <b id="explorerRango_'+idx+'">arrastra la flecha azul</b></div>'+
-      '<div class="explorer-txt">históricamente: <b id="explorerCarr_'+idx+'">—</b></div>'+
-      '<div class="explorer-hint">mové el dedo apretado sobre la brújula para ver otros rangos de viento</div>'+
+  function bloqueChipHtml(nombre, estadoObj) {
+    var cls = estadoObj.confirmado ? "ok" : "no";
+    return '<div class="bloque-chip ' + cls + '" title="' + nombre + ': ' + estadoObj.estado + '">' +
+      '<span class="nombre">' + nombre + '</span>' +
+      '<span class="estado">' + estadoObj.estado + '</span>' +
     '</div>';
   }
 
-  function carrerasDeHist(g){
-    var ar=g.away_runs, hr=g.home_runs;
-    if(ar!==null&&ar!==undefined&&hr!==null&&hr!==undefined) return Number(ar)+Number(hr);
-    return null;
+  function valorOND(v) {
+    return (v === null || v === undefined) ? "N/D" : v;
   }
 
-  function venueCanon(v) {
-    if (typeof stadiumCanonName === "function") return stadiumCanonName(v);
-    return (typeof STADIUM_ALIAS_2026 !== "undefined" && STADIUM_ALIAS_2026[v]) ? STADIUM_ALIAS_2026[v] : v;
+  function perfilResumenHtml(perfil, etiqueta) {
+    if (!perfil || typeof perfil !== "object") {
+      return '<div class="fe-perfil">' +
+        '<div class="fe-perfil-tit">' + etiqueta + '</div>' +
+        '<div class="fe-perfil-linea">Sin perfil (NO_CONFIRMADO)</div>' +
+      '</div>';
+    }
+
+    var u5 = perfil.ultimos_5 ? (perfil.ultimos_5.ganados + '-' + perfil.ultimos_5.perdidos + ' (' + perfil.ultimos_5.juegos + 'j)') : 'N/D';
+    var u6 = perfil.ultimos_6 ? (perfil.ultimos_6.ganados + '-' + perfil.ultimos_6.perdidos + ' (' + perfil.ultimos_6.juegos + 'j)') : 'N/D';
+    var u10 = perfil.ultimos_10 ? (perfil.ultimos_10.ganados + '-' + perfil.ultimos_10.perdidos + ' (' + perfil.ultimos_10.juegos + 'j)') : 'N/D';
+    var rl = perfil.record_local ? (perfil.record_local.ganados + '-' + perfil.record_local.perdidos) : 'N/D';
+    var rv = perfil.record_visitante ? (perfil.record_visitante.ganados + '-' + perfil.record_visitante.perdidos) : 'N/D';
+
+    return '<div class="fe-perfil">' +
+      '<div class="fe-perfil-tit">' + etiqueta + ' — ' + valorOND(perfil.equipo) + '</div>' +
+      '<div class="fe-perfil-linea">confirmado: ' + (perfil.confirmado ? 'sí' : 'no') + ' · juegos_totales: ' + valorOND(perfil.juegos_totales) + ' · % victorias: ' + valorOND(perfil.porcentaje_victorias) + '</div>' +
+      '<div class="fe-perfil-linea">Últimos 5: ' + u5 + ' · Últimos 6: ' + u6 + ' · Últimos 10: ' + u10 + '</div>' +
+      '<div class="fe-perfil-linea">Récord local: ' + rl + ' · Récord visitante: ' + rv + '</div>' +
+    '</div>';
   }
 
-  function actualizarExplorer(wrap, deg){
-    var idx = wrap.getAttribute('data-idx');
-    var venue = wrap.getAttribute('data-venue');
-    var venueReal = venueCanon(venue);
-            var degReal = ((deg%360)+360)%360;
-        var degVieneDe = degReal;
-        var lo = Math.floor(degVieneDe/30)*30, hi = lo+30;
-    var arrow = document.getElementById('explorerArrow_'+idx);
-    if(arrow) arrow.setAttribute('transform','rotate('+deg+' 100 100)');
-    var rangoEl = document.getElementById('explorerRango_'+idx);
-    if(rangoEl) rangoEl.textContent = lo+'°–'+hi+'°';
-    var carrEl = document.getElementById('explorerCarr_'+idx);
-    try{
-      var cache = climaLeerCache();
-      var juegos = cache.filter(function(g){
-        return g && venueCanon(g.venue)===venueReal && g.wind_dir!==undefined && g.wind_dir!==null && g.wind_dir!=="" &&
-               !isNaN(Number(g.wind_dir)) && (Number(g.wind_dir)%360)>=lo && (Number(g.wind_dir)%360)<hi;
-      });
-      var carreras=[], vels=[];
-      juegos.forEach(function(g){
-        var c=carrerasDeHist(g); if(c!==null) carreras.push(c);
-        if(typeof g.windspeed_mph==="number") vels.push(g.windspeed_mph);
-      });
-      var prom = carreras.length ? (carreras.reduce(function(a,b){return a+b;},0)/carreras.length) : null;
-      var promV = vels.length ? (vels.reduce(function(a,b){return a+b;},0)/vels.length) : null;
-      if(carrEl){
-        if(!juegos.length){
-          carrEl.textContent = 'sin juegos en cache para este rango';
-        } else if(prom===null){
-          carrEl.textContent = juegos.length+' juego(s) en este rango · sin marcadores en cache'+(promV!==null?' · '+promV.toFixed(1)+' mph avg':'');
-        } else {
-          var sinMarcador = juegos.length - carreras.length;
-          carrEl.textContent = prom.toFixed(1)+' carreras prom. ('+carreras.length+' juego(s) con marcador'+(sinMarcador>0?' · '+sinMarcador+' sin marcador':'')+(promV!==null?' · '+promV.toFixed(1)+' mph avg':'')+')';
-        }
+  function filaSenalHtml(nombre, obj) {
+    if (!obj || typeof obj !== "object") {
+      return '<div class="fe-perfil-linea">' + nombre + ': N/D</div>';
+    }
+
+    var extra = "";
+    if (obj.ventana_completa !== undefined) {
+      extra = " (ventana completa: " + (obj.ventana_completa ? "sí" : "no") + ")";
+    }
+
+    return '<div class="fe-perfil-linea">' + nombre + extra + ': home=' + valorOND(obj.home) +
+      ' away=' + valorOND(obj.away) +
+      ' → ' + (obj.prediccion || 'sin predicción') + '</div>';
+  }
+
+  function fuerzaEquipoDetalleHtml(fe) {
+    if (!fe || typeof fe !== "object") {
+      return '<div class="fe-box"><div class="fe-hdr">Fuerza de Equipo: <b style="color:#8b949e;">NO_CONFIRMADO (sin datos)</b></div></div>';
+    }
+
+    var confirmadoTxt = fe.confirmado
+      ? '<b style="color:#3fb950;">CONFIRMADO</b>'
+      : '<b style="color:#8b949e;">' + (fe.estado || 'NO_CONFIRMADO') + '</b>';
+
+    var ventana = fe.ventana_reciente ? fe.ventana_reciente : 'N/D';
+
+    var unanimidadTxt;
+    if (fe.senal_unanimidad === "home" || fe.senal_unanimidad === "away") {
+      unanimidadTxt = '<b style="color:#3fb950;">' + String(fe.senal_unanimidad).toUpperCase() + '</b>';
+    } else {
+      unanimidadTxt = '<b style="color:#8b949e;">SIN UNANIMIDAD</b>';
+    }
+
+    var detalleHtml = "";
+    if (fe.detalle_unanimidad && typeof fe.detalle_unanimidad === "object") {
+      var du = fe.detalle_unanimidad;
+      detalleHtml =
+        filaSenalHtml('Récord general', du.record_general) +
+        filaSenalHtml('Local/Visitante', du.record_local_visitante) +
+        filaSenalHtml('Últimos 10', du.ultimos_10);
+    }
+
+    return '<div class="fe-box">' +
+      '<div class="fe-hdr">Fuerza de Equipo: ' + confirmadoTxt + ' · ventana_reciente: <b>' + ventana + '</b></div>' +
+      perfilResumenHtml(fe.home, 'HOME') +
+      perfilResumenHtml(fe.away, 'AWAY') +
+      '<div class="fe-perfil" style="border-top-color:#5b3da8;">' +
+        '<div class="fe-perfil-tit" style="color:#c9a6ff;">UNANIMIDAD (récord general + local/visitante + últimos 10)</div>' +
+        '<div class="fe-perfil-linea">confirmado_unanimidad: <b>' + (fe.confirmado_unanimidad ? 'true' : 'false') + '</b> · senal_unanimidad: ' + unanimidadTxt + '</div>' +
+        detalleHtml +
+      '</div>' +
+    '</div>';
+  }
+
+  // Bloque visual breve para arsenal_vs_lineup y pitcheo: muestra el
+  // valor real de cada lado (away/home) tal como lo devuelve
+  // calcularFactorArsenalLineup()/calcularFactorPitcheoCompleto() — no
+  // resume ni inventa un único valor combinado.
+  function arsenalPitcheoDetalleHtml(titulo, bloque, campoValor) {
+    if (!bloque || typeof bloque !== "object") {
+      return '<div class="fe-box"><div class="fe-hdr">' + titulo + ': <b style="color:#8b949e;">NO_CONFIRMADO (sin datos)</b></div></div>';
+    }
+
+    function ladoHtml(etiqueta, obj) {
+      if (!obj || typeof obj !== "object") {
+        return '<div class="fe-perfil-linea">' + etiqueta + ': N/D</div>';
       }
-    }catch(e){ if(carrEl) carrEl.textContent='ERROR: '+e.message; }
+
+      var valor = obj[campoValor];
+      var confirmadoTxt = obj.confirmado ? 'confirmado' : 'no confirmado';
+      var extra = "";
+
+      if (obj.cobertura !== undefined) {
+        extra += ", cobertura " + obj.cobertura;
+      }
+
+      if (obj.nota !== undefined) {
+        extra += ", nota " + obj.nota;
+      }
+
+      return '<div class="fe-perfil-linea">' + etiqueta + ': ' + campoValor + '=' + valorOND(valor) +
+        ' (' + confirmadoTxt + extra + ')</div>';
+    }
+
+    return '<div class="fe-box">' +
+      '<div class="fe-hdr">' + titulo + '</div>' +
+      ladoHtml('AWAY', bloque.away) +
+      ladoHtml('HOME', bloque.home) +
+    '</div>';
   }
 
-  function clienteASvgPoint(svg, clientX, clientY){
-    var pt = svg.createSVGPoint();
-    pt.x=clientX; pt.y=clientY;
-    var ctm = svg.getScreenCTM();
-    if(!ctm) return {x:100,y:100};
-    return pt.matrixTransform(ctm.inverse());
-  }
+  // Arsenal vs Lineup: el pitcher de un lado se enfrenta al lineup del
+  // lado CONTRARIO. Se llama calcularFactorArsenalLineup() dos veces,
+  // sin alterar su contrato ni inventar un factor combinado.
+  async function resolverArsenalTest(juego, bloques) {
+    var roster = bloques.roster;
+    var lineup = bloques.lineup;
 
-  function degDesdeEvento(wrap, clientX, clientY){
-    var svg = wrap.querySelector('svg');
-    var p = clienteASvgPoint(svg, clientX, clientY);
-    var dx = p.x-100, dy = p.y-100;
-    var deg = Math.atan2(dx, -dy)*180/Math.PI;
-    if(deg<0) deg+=360;
-    return deg;
-  }
+    if (!roster || !lineup) return null;
+    if (typeof calcularFactorArsenalLineup !== "function") return null;
 
-  listaEl.addEventListener('pointerdown', function(e){
-    var wrap = e.target.closest ? e.target.closest('.brujula-explorer-wrap') : null;
-    if(!wrap) return;
-    wrap.setAttribute('data-dragging','1');
-    actualizarExplorer(wrap, degDesdeEvento(wrap, e.clientX, e.clientY));
-    e.preventDefault();
-  });
-  listaEl.addEventListener('pointermove', function(e){
-    var wrap = e.target.closest ? e.target.closest('.brujula-explorer-wrap') : null;
-    if(!wrap || wrap.getAttribute('data-dragging')!=='1') return;
-    actualizarExplorer(wrap, degDesdeEvento(wrap, e.clientX, e.clientY));
-    e.preventDefault();
-  });
-  function pararArrastreGlobal(){
-    var wraps = listaEl.querySelectorAll('.brujula-explorer-wrap');
-    wraps.forEach(function(w){ w.setAttribute('data-dragging','0'); });
-  }
-  listaEl.addEventListener('pointerup', pararArrastreGlobal);
-  listaEl.addEventListener('pointercancel', pararArrastreGlobal);
+    var lineupAwayArr = Array.isArray(lineup.lineup_away) ? lineup.lineup_away : [];
+    var lineupHomeArr = Array.isArray(lineup.lineup_home) ? lineup.lineup_home : [];
 
-  var lineasCache=null;
+    var arsenalAway = null;
+    var arsenalHome = null;
 
-  document.getElementById("go").addEventListener("click",async function(){
-    var btn=this; btn.disabled=true; btn.textContent="TRABAJANDO…";
-    consoleEl.textContent=""; listaEl.innerHTML="";
     try {
+      // Pitcher AWAY contra lineup HOME (a quién se enfrenta de verdad).
+      arsenalAway = await calcularFactorArsenalLineup(roster.pitcher_away_id, lineupHomeArr);
+    } catch (errAway) {
+      arsenalAway = null;
+    }
+
+    try {
+      // Pitcher HOME contra lineup AWAY.
+      arsenalHome = await calcularFactorArsenalLineup(roster.pitcher_home_id, lineupAwayArr);
+    } catch (errHome) {
+      arsenalHome = null;
+    }
+
+    return {
+      away: arsenalAway,
+      home: arsenalHome,
+      // confirmado/estado combinados = EXACTAMENTE los valores reales de
+      // cada lado (AND de .confirmado, concatenación de .nota) — no se
+      // inventa ningún criterio nuevo de confirmación.
+      confirmado: !!(arsenalAway && arsenalAway.confirmado === true && arsenalHome && arsenalHome.confirmado === true),
+      estado: (arsenalAway ? arsenalAway.nota : "SIN_DATOS") + "_AWAY|" + (arsenalHome ? arsenalHome.nota : "SIN_DATOS") + "_HOME"
+    };
+  }
+
+  // Pitcheo completo: equipo + pitcher abridor de un lado, contra el
+  // lineup del lado CONTRARIO. Se llama calcularFactorPitcheoCompleto()
+  // dos veces, sin alterar su contrato ni inventar un confirmado general.
+  async function resolverPitcheoTest(juego, bloques) {
+    var roster = bloques.roster;
+    var lineup = bloques.lineup;
+
+    if (!roster || !lineup) return null;
+    if (typeof calcularFactorPitcheoCompleto !== "function") return null;
+
+    var fechaHoy = (typeof MLBPRO_CORE !== "undefined" && typeof MLBPRO_CORE.hoyISO === "function")
+      ? MLBPRO_CORE.hoyISO()
+      : null;
+
+    var lineupAwayArr = Array.isArray(lineup.lineup_away) ? lineup.lineup_away : [];
+    var lineupHomeArr = Array.isArray(lineup.lineup_home) ? lineup.lineup_home : [];
+
+    var pitcheoAway = null;
+    var pitcheoHome = null;
+
+    try {
+      // Equipo AWAY, pitcher AWAY, contra lineup HOME.
+      pitcheoAway = await calcularFactorPitcheoCompleto(juego.away.id, roster.pitcher_away_id, lineupHomeArr, fechaHoy);
+    } catch (errAway) {
+      pitcheoAway = null;
+    }
+
+    try {
+      // Equipo HOME, pitcher HOME, contra lineup AWAY.
+      pitcheoHome = await calcularFactorPitcheoCompleto(juego.home.id, roster.pitcher_home_id, lineupAwayArr, fechaHoy);
+    } catch (errHome) {
+      pitcheoHome = null;
+    }
+
+    return {
+      away: pitcheoAway,
+      home: pitcheoHome,
+      // Igual que arsenal: confirmado/estado combinados son EXACTAMENTE
+      // el AND de pitcheoAway.confirmado/pitcheoHome.confirmado y sus
+      // coberturas reales — no se inventa un "pitcheo completo" aparte.
+      // Con las fuentes actuales esto será casi siempre false (ver
+      // prólogo, limitación ya documentada en factor-pitcheo-completo.js).
+      confirmado: !!(pitcheoAway && pitcheoAway.confirmado === true && pitcheoHome && pitcheoHome.confirmado === true),
+      estado: (pitcheoAway ? pitcheoAway.cobertura : "SIN_DATOS") + "_AWAY|" + (pitcheoHome ? pitcheoHome.cobertura : "SIN_DATOS") + "_HOME"
+    };
+  }
+
+  // ---- Resumen de favoritos por posición (solo presentación: lee
+  // campos ya devueltos por moneyline-data.js y por los resolvers de
+  // esta pantalla; no recalcula ningún factor, no toca resolvers, no
+  // toca moneyline-data.js/moneyline-motor.js). ----
+
+  function esFinito(v) {
+    return typeof v === "number" && Number.isFinite(v);
+  }
+
+  // Moneyline americano: si ambas son negativas, la más negativa (más
+  // lejos de 0) es favorita; si una es negativa y otra positiva, la
+  // negativa es favorita; si ambas son positivas, la menor positiva es
+  // favorita. Si faltan o no son finitas: null (NO_CONFIRMADO).
+  function favorMercado(lineaPregame) {
+    if (!lineaPregame) return null;
+    var a = lineaPregame.moneyline_away;
+    var h = lineaPregame.moneyline_home;
+    if (!esFinito(a) || !esFinito(h)) return null;
+    if (a === h) return "empate";
+    var aNeg = a < 0, hNeg = h < 0;
+    if (aNeg && hNeg) return a < h ? "away" : "home";
+    if (aNeg && !hNeg) return "away";
+    if (!aNeg && hNeg) return "home";
+    return a < h ? "away" : "home";
+  }
+
+  // Regla compartida por arsenal_vs_lineup y pitcheo: factor más bajo
+  // gana. Si faltan o no son finitos: null (NO_CONFIRMADO).
+  function favorFactorMenorGana(factorAway, factorHome) {
+    if (!esFinito(factorAway) || !esFinito(factorHome)) return null;
+    if (factorAway === factorHome) return "empate";
+    return factorAway < factorHome ? "away" : "home";
+  }
+
+  // A partir de un bloque {home, away, prediccion} de
+  // fuerza_equipo.detalle_unanimidad: distingue NO_CONFIRMADO (valores
+  // no finitos) de EMPATE (valores finitos pero sin predicción por
+  // empate exacto) de home/away.
+  function favorDesdeDetalle(obj) {
+    if (!obj || typeof obj !== "object") return null;
+    if (!esFinito(obj.home) || !esFinito(obj.away)) return null;
+    if (obj.prediccion === "home" || obj.prediccion === "away") return obj.prediccion;
+    return "empate";
+  }
+
+  function favorEtiqueta(valor, awayNombre, homeNombre) {
+    if (valor === "home") return String(homeNombre || "HOME").toUpperCase();
+    if (valor === "away") return String(awayNombre || "AWAY").toUpperCase();
+    if (valor === "empate") return "EMPATE";
+    return "NO_CONFIRMADO";
+  }
+
+  function resumenFavoritosHtml(data, awayNombre, homeNombre) {
+    var fe = data.fuerza_equipo;
+    var detalle = fe && fe.detalle_unanimidad;
+
+    var favMercado = favorMercado(data.linea_pregame);
+    var favFuerzaGeneral = favorDesdeDetalle(detalle && detalle.record_general);
+    var favLocalVisitante = favorDesdeDetalle(detalle && detalle.record_local_visitante);
+    var favUltimos10 = favorDesdeDetalle(detalle && detalle.ultimos_10);
+
+    var senalUnanimidad = (fe && (fe.senal_unanimidad === "home" || fe.senal_unanimidad === "away"))
+      ? fe.senal_unanimidad
+      : null;
+
+    // Campos reales de esta pantalla: data.arsenal_vs_lineup.away/.home
+    // y data.pitcheo.away/.home (resolverArsenalTest/resolverPitcheoTest
+    // ya devuelven así — no factor_away/factor_home).
+    var arsenal = data.arsenal_vs_lineup;
+    var arsenalAway = (arsenal && arsenal.away) ? arsenal.away.factor : undefined;
+    var arsenalHome = (arsenal && arsenal.home) ? arsenal.home.factor : undefined;
+    var favArsenal = favorFactorMenorGana(arsenalAway, arsenalHome);
+
+    var pitcheo = data.pitcheo;
+    var pitcheoAway = (pitcheo && pitcheo.away) ? pitcheo.away.factor_final : undefined;
+    var pitcheoHome = (pitcheo && pitcheo.home) ? pitcheo.home.factor_final : undefined;
+    var favPitcheo = favorFactorMenorGana(pitcheoAway, pitcheoHome);
+    var pitcheoConfirmadoCompleto = !!(pitcheo && pitcheo.confirmado === true);
+
+    // Conteo de posiciones confirmadas: Mercado, Fuerza general,
+    // Local/Visitante, Últimos 10 y Arsenal SIEMPRE se cuentan (incluso
+    // como NO_CONFIRMADO). Pitcheo solo suma si ambos lados están
+    // completamente confirmados (pitcheo.confirmado === true); si no,
+    // se muestra pero no se cuenta. Unanimidad y Coincidencia nunca
+    // suman (unanimidad resume las mismas tres señales de fuerza y
+    // duplicaría votos; coincidencia es climática/histórica, no de
+    // ganador).
+    var conteo = { home: 0, away: 0, empate: 0, no_confirmado: 0 };
+
+    function sumar(valor) {
+      if (valor === "home") conteo.home++;
+      else if (valor === "away") conteo.away++;
+      else if (valor === "empate") conteo.empate++;
+      else conteo.no_confirmado++;
+    }
+
+    // "Posiciones confirmadas" debe contar SOLO bloques que vinieron
+    // realmente confirmados (confirmado === true), no solo porque haya
+    // un valor numérico finito. El bloque visual sigue mostrando el
+    // favorito de cada dato aunque venga parcial (favMercado,
+    // favFuerzaGeneral, etc. no cambian) — lo único que cambia es qué
+    // entra al conteo de posiciones.
+    var mercadoConfirmado = !!(data.linea_pregame && data.linea_pregame.confirmado === true);
+    var fuerzaConfirmada = !!(fe && fe.confirmado === true);
+    var arsenalConfirmado = !!(arsenal && arsenal.confirmado === true);
+
+    sumar(mercadoConfirmado ? favMercado : null);
+    sumar(fuerzaConfirmada ? favFuerzaGeneral : null);
+    sumar(fuerzaConfirmada ? favLocalVisitante : null);
+    sumar(fuerzaConfirmada ? favUltimos10 : null);
+    sumar(arsenalConfirmado ? favArsenal : null);
+
+    if (pitcheoConfirmadoCompleto) {
+      sumar(favPitcheo);
+    }
+
+    var totalValidas = conteo.home + conteo.away + conteo.empate;
+    var ventajaGeneral;
+    if (totalValidas === 0) {
+      ventajaGeneral = "NO_CONFIRMADA";
+    } else if (conteo.home > conteo.away) {
+      ventajaGeneral = String(homeNombre || "HOME").toUpperCase();
+    } else if (conteo.away > conteo.home) {
+      ventajaGeneral = String(awayNombre || "AWAY").toUpperCase();
+    } else {
+      ventajaGeneral = "DIVIDIDA";
+    }
+
+    var pitcheoTxt = favorEtiqueta(favPitcheo, awayNombre, homeNombre);
+    if (favPitcheo !== null && !pitcheoConfirmadoCompleto) {
+      pitcheoTxt += " (PARCIAL)";
+    }
+
+    // Coincidencia: solo informativa. Nunca declara HOME/AWAY, nunca
+    // suma en posiciones. El contrato exacto de calcular-coincidencia.js
+    // no está confirmado en esta pantalla, así que se prueban varios
+    // nombres de campo posibles para el score/porcentaje sin asumir
+    // ninguno como obligatorio; si no aparece ninguno, se muestra solo
+    // el estado.
+    var coincidencia = data.coincidencia;
+    var coincidenciaScore = null;
+    if (coincidencia && typeof coincidencia === "object") {
+      if (coincidencia.top && esFinito(coincidencia.top.score)) coincidenciaScore = coincidencia.top.score;
+      else if (esFinito(coincidencia.score)) coincidenciaScore = coincidencia.score;
+      else if (esFinito(coincidencia.porcentaje)) coincidenciaScore = coincidencia.porcentaje;
+    }
+    var coincidenciaTxt = "Coincidencia climática/histórica: " +
+      (coincidenciaScore !== null
+        ? coincidenciaScore + "%"
+        : (coincidencia && coincidencia.estado !== undefined ? String(coincidencia.estado) : "NO_CONFIRMADO"));
+
+    return '<div class="fe-box">' +
+      '<div class="fe-hdr">VENTAJA GENERAL: <b style="color:#ffd60a;">' + ventajaGeneral + '</b></div>' +
+      '<div class="fe-perfil-linea">Posiciones confirmadas: HOME ' + conteo.home + ' · AWAY ' + conteo.away + ' · EMPATES ' + conteo.empate + ' · NO_CONFIRMADOS ' + conteo.no_confirmado + '</div>' +
+      '<div class="fe-perfil" style="margin-top:8px;">' +
+        '<div class="fe-perfil-linea">Mercado: ' + favorEtiqueta(favMercado, awayNombre, homeNombre) + '</div>' +
+        '<div class="fe-perfil-linea">Fuerza general: ' + favorEtiqueta(favFuerzaGeneral, awayNombre, homeNombre) + '</div>' +
+        '<div class="fe-perfil-linea">Local/Visitante: ' + favorEtiqueta(favLocalVisitante, awayNombre, homeNombre) + '</div>' +
+        '<div class="fe-perfil-linea">Últimos 10: ' + favorEtiqueta(favUltimos10, awayNombre, homeNombre) + '</div>' +
+        '<div class="fe-perfil-linea">Unanimidad: ' + (senalUnanimidad ? favorEtiqueta(senalUnanimidad, awayNombre, homeNombre) : "SIN UNANIMIDAD") + '</div>' +
+        '<div class="fe-perfil-linea">Arsenal: ' + favorEtiqueta(favArsenal, awayNombre, homeNombre) + '</div>' +
+        '<div class="fe-perfil-linea">Pitcheo: ' + pitcheoTxt + '</div>' +
+        '<div class="fe-perfil-linea">' + coincidenciaTxt + '</div>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function renderJuegoData(idx, juegoRaw, data) {
+    var away = (juegoRaw.teams && juegoRaw.teams.away && juegoRaw.teams.away.team) ? juegoRaw.teams.away.team.name : "?";
+    var home = (juegoRaw.teams && juegoRaw.teams.home && juegoRaw.teams.home.team) ? juegoRaw.teams.home.team.name : "?";
+    var venue = juegoRaw.venue ? juegoRaw.venue.name : "?";
+
+    var bloques = data.cobertura.detalle;
+    var chips = "";
+    for (var nombre in bloques) {
+      if (bloques.hasOwnProperty(nombre)) chips += bloqueChipHtml(nombre, bloques[nombre]);
+    }
+
+    // Verificación de coherencia entre cobertura.detalle.fuerza_equipo y
+    // data.fuerza_equipo — deben coincidir siempre. Solo diagnóstico de
+    // esta pantalla, no cambia moneyline-data.js.
+    if (bloques.fuerza_equipo) {
+      var confirmadoEnCobertura = bloques.fuerza_equipo.confirmado === true;
+      var confirmadoEnBloque = !!(data.fuerza_equipo && data.fuerza_equipo.confirmado === true);
+      if (confirmadoEnCobertura !== confirmadoEnBloque) {
+        log("AVISO coherencia (juego " + idx + "): cobertura.detalle.fuerza_equipo.confirmado (" + confirmadoEnCobertura + ") no coincide con fuerza_equipo.confirmado (" + confirmadoEnBloque + ").");
+      }
+    }
+
+    var lineaHtml;
+    if (data.linea_pregame && data.linea_pregame.confirmado) {
+      lineaHtml = '<div class="linea-box">Línea PREGAME confirmada · ' +
+        away + ' <span class="val">' + data.linea_pregame.moneyline_away + '</span> · ' +
+        home + ' <span class="val">' + data.linea_pregame.moneyline_home + '</span>' +
+        (data.linea_pregame.total !== null ? ' · O/U <span class="val">' + data.linea_pregame.total + '</span>' : '') +
+        (data.linea_pregame.moneyline_bookie ? ' · ' + data.linea_pregame.moneyline_bookie : '') +
+      '</div>';
+    } else {
+      lineaHtml = '<div class="linea-box">Línea PREGAME: <b style="color:#8b949e;">' + (data.linea_pregame ? data.linea_pregame.estado : "NO_CONFIRMADO") + '</b></div>';
+    }
+
+    return '<div class="juego" id="juego_' + idx + '">' +
+      '<div class="matchup">' + away + ' @ ' + home + '</div>' +
+      '<div class="estadio">' + venue + '</div>' +
+      resumenFavoritosHtml(data, away, home) +
+      '<div class="cobertura-bar">Cobertura: <b>' + data.cobertura.confirmados + '/' + data.cobertura.total + '</b> (' + data.cobertura.porcentaje + '%) · moneylineData estado: <b>' + data.estado + '</b></div>' +
+      '<div class="bloques-grid">' + chips + '</div>' +
+      fuerzaEquipoDetalleHtml(data.fuerza_equipo) +
+      arsenalPitcheoDetalleHtml('Arsenal vs Lineup', data.arsenal_vs_lineup, 'factor') +
+      arsenalPitcheoDetalleHtml('Pitcheo completo', data.pitcheo, 'factor_final') +
+      lineaHtml +
+      (data.notas.length ? '<div style="font-size:11px;color:#8b949e;">Notas: ' + data.notas.join(', ') + '</div>' : '') +
+      '<div id="motor_' + idx + '"></div>' +
+      '<details class="fold"><summary>Ver moneylineData completo (JSON crudo)</summary><pre class="raw">' + JSON.stringify(data, null, 2) + '</pre></details>' +
+    '</div>';
+  }
+
+  document.getElementById("goCargar").addEventListener("click", async function () {
+    var btn = this;
+    btn.disabled = true;
+    btn.textContent = "TRABAJANDO…";
+    consoleEl.textContent = "";
+    listaEl.innerHTML = "";
+    datosJuegos = [];
+    document.getElementById("goMotor").disabled = true;
+
+    try {
+      var calcDisponible = typeof window.calcularFuerzaEquipo === "function";
+      var coreDisponible = typeof window.MLBPRO_CORE !== "undefined" && typeof window.MLBPRO_CORE.hoyISO === "function";
+      log("Fuerza de Equipo — calcularFuerzaEquipo disponible: " + calcDisponible + " · MLBPRO_CORE.hoyISO disponible: " + coreDisponible);
+
+      var rosterDisponible = typeof window.jalarRoster === "function";
+      var lineupDisponible = typeof window.jalarLineup === "function";
+      var arsenalDisponible = typeof window.calcularFactorArsenalLineup === "function";
+      var pitcheoDisponible = typeof window.calcularFactorPitcheoCompleto === "function";
+      log("jalarRoster disponible: " + rosterDisponible + " · jalarLineup disponible: " + lineupDisponible + " · calcularFactorArsenalLineup disponible: " + arsenalDisponible + " · calcularFactorPitcheoCompleto disponible: " + pitcheoDisponible);
+
+      log("Jalando clima (histórico + hoy)...");
       await jalarClima(log);
-      try{ lineasCache=await jalarLineas(log); }catch(el){ log("AVISO líneas: "+(el&&el.message?el.message:el)); lineasCache=null; }
-      log("Trayendo juegos de hoy...");
-      var hoy=hoyISO();
-      var mlbUrl="https://statsapi.mlb.com/api/v1/schedule?sportId=1&date="+hoy+"&hydrate=probablePitcher";
-      var resp=await fetch(MLB_ROUTES.WORKER_BASE+encodeURIComponent(mlbUrl));
-      if(!resp.ok) throw new Error("Schedule hoy HTTP "+resp.status);
-      var data=await resp.json();
-      var games=(data.dates&&data.dates[0])?data.dates[0].games:[];
-      games.sort(function(a,b){ return new Date(a.gameDate) - new Date(b.gameDate); });
-      log("Juegos hoy: "+games.length);
-      if(games.length===0){ log("No hay juegos hoy ("+hoy+")."); return; }
-      var bloquesSerie=[];
-      try{ var cacheSerie=climaLeerCache(); bloquesSerie=armarBloques(cacheSerie); log("Bloques de serie en cache: "+bloquesSerie.length); }
-      catch(eb){ log("AVISO serie: "+(eb&&eb.message?eb.message:eb)); }
-      var rosterMap={};
-      try{
-        var idsAPrecargar=[];
-        for(var iv=0;iv<games.length;iv++){
-          var gv=games[iv],venueV=gv.venue?gv.venue.name:"",bloqueV=serieDelParque(venueV,bloquesSerie);
-          if(bloqueV&&bloqueV.juegos){ for(var jv=0;jv<bloqueV.juegos.length;jv++){ var gj=bloqueV.juegos[jv]; if(gj.game_id&&idsAPrecargar.indexOf(gj.game_id)===-1) idsAPrecargar.push(gj.game_id); } }
-        }
-        log("Precargando roster de "+idsAPrecargar.length+" juego(s) de series...");
-        var rosters=await Promise.all(idsAPrecargar.map(function(id){ return jalarRoster(id); }));
-        for(var ir=0;ir<rosters.length;ir++) rosterMap[rosters[ir].game_id]=rosters[ir];
-      }catch(er){ log("AVISO roster series: "+(er&&er.message?er.message:er)); }
-      var html="";
-      for(var i=0;i<games.length;i++){
-        var g=games[i];
-        var venue=g.venue?g.venue.name:"";
-        var away=(g.teams&&g.teams.away&&g.teams.away.team)?g.teams.away.team.name:"?";
-        var home=(g.teams&&g.teams.home&&g.teams.home.team)?g.teams.home.team.name:"?";
-        var awayTeamId=(g.teams&&g.teams.away&&g.teams.away.team)?g.teams.away.team.id:null;
-        var homeTeamId=(g.teams&&g.teams.home&&g.teams.home.team)?g.teams.home.team.id:null;
-        var pitcherAway=(g.teams&&g.teams.away&&g.teams.away.probablePitcher)?g.teams.away.probablePitcher.fullName:"TBD";
-        var pitcherHome=(g.teams&&g.teams.home&&g.teams.home.probablePitcher)?g.teams.home.probablePitcher.fullName:"TBD";
-        var pitcherAwayId=(g.teams&&g.teams.away&&g.teams.away.probablePitcher)?g.teams.away.probablePitcher.id:null;
-        var pitcherHomeId=(g.teams&&g.teams.home&&g.teams.home.probablePitcher)?g.teams.home.probablePitcher.id:null;
-        var rosterHoy=await jalarRoster(g.gamePk);
-        var catcherAwayId=rosterHoy?rosterHoy.catcher_away_id:"NO_CONFIRMADO";
-        var catcherHomeId=rosterHoy?rosterHoy.catcher_home_id:"NO_CONFIRMADO";
-        var umpireHomeHoy=rosterHoy?rosterHoy.umpire_home:"NO_CONFIRMADO";
-        var lineaMercado = null;
-if (lineasCache) {
-  if (typeof lineasBuscarJuego === "function") {
-    lineaMercado = lineasBuscarJuego(away, home, venue);
-  } else {
-    lineaMercado = lineasBuscarVenue(venue);
-  }
-}
 
-        // CORREGIDO 17 jul 2026: los IDs para calcular resAway/resHome
-        // ahora toman primero el abridor confirmado del roster ya
-        // resuelto (rosterHoy), con pitcherAwayId/pitcherHomeId del
-        // schedule solo como respaldo.
-        var pitcherAwayIdParaFH = rosterHoy
-          ? primerAbridorValido(
-              rosterHoy.pitcher_away_id,
-              rosterHoy.away_pitcher_id,
-              rosterHoy.pitcherAwayId,
-              pitcherAwayId
-            )
-          : pitcherAwayId;
-
-        var pitcherHomeIdParaFH = rosterHoy
-          ? primerAbridorValido(
-              rosterHoy.pitcher_home_id,
-              rosterHoy.home_pitcher_id,
-              rosterHoy.pitcherHomeId,
-              pitcherHomeId
-            )
-          : pitcherHomeId;
-
-        var factorH = { factor_final: null, confirmado: false, nota: "PENDIENTE" };
-        try {
-          var lineupData = await jalarLineup(g.gamePk, awayTeamId, homeTeamId);
-          var resAway = (pitcherAwayIdParaFH && awayTeamId && lineupData.lineup_home.length)
-            ? await calcularFactorPitcheoCompleto(awayTeamId, pitcherAwayIdParaFH, lineupData.lineup_home, hoy)
-            : null;
-          var resHome = (pitcherHomeIdParaFH && homeTeamId && lineupData.lineup_away.length)
-            ? await calcularFactorPitcheoCompleto(homeTeamId, pitcherHomeIdParaFH, lineupData.lineup_away, hoy)
-            : null;
-
-          // Acepta cada lado cuando su factor_final es numérico y finito,
-          // sin exigir además .confirmado === true. Si ambos lados son
-          // válidos pero no ambos vienen con .confirmado === true, se
-          // marca explícitamente como PITCHEO_PARCIAL (nunca completo).
-          var awayFactorValido = resAway && typeof resAway.factor_final === "number" && Number.isFinite(resAway.factor_final);
-          var homeFactorValido = resHome && typeof resHome.factor_final === "number" && Number.isFinite(resHome.factor_final);
-
-          if (awayFactorValido && homeFactorValido) {
-            var factorCombinado = (resAway.factor_final + resHome.factor_final) / 2;
-            factorH.factor_final = Math.round(factorCombinado * 1000) / 1000;
-            var pitcheoCompleto = resAway.confirmado === true && resHome.confirmado === true;
-            factorH.confirmado = pitcheoCompleto;
-            factorH.nota = pitcheoCompleto ? "OK" : "PITCHEO_PARCIAL";
-          } else {
-            factorH.nota = !lineupData.lineup_home.length && !lineupData.lineup_away.length
-              ? "SIN_LINEUP_CONFIRMADO" : "DATOS_PARCIALES";
-          }
-
-          // Fuente real de cada lineup usado (para mostrar en la tarjeta si
-          // el F.H. se calculó con el lineup de HOY o con el ÚLTIMO
-          // CONFIRMADO real del equipo). resAway usa lineup_home (bateadores
-          // que enfrenta el pitcher away); resHome usa lineup_away.
-          factorH.fuente_home = lineupData.fuente_home;
-          factorH.fuente_away = lineupData.fuente_away;
-        } catch (efh) {
-          log("AVISO factor humano "+away+" @ "+home+": "+(efh&&efh.message?efh.message:efh));
-          factorH.nota = "ERROR";
-        }
-
-        var s=(typeof stadiumGet==="function")?stadiumGet(venue):STADIUM_INDEX.get(stadiumNorm(venue));
-        var horaTxt = horaBonita(g.gameDate);
-        if(!s){ html+=tarjeta(away,home,venue,horaTxt,null,i,null,pitcherAway,pitcherHome,pitcherAwayId,pitcherHomeId,bloquesSerie,rosterMap,catcherAwayId,catcherHomeId,umpireHomeHoy,lineaMercado,factorH); continue; }
-                var w=await climaFetchWeather(s,hoy,hoy);
-        var keyTZ = climaKeyTZ(g.gameDate, s.timezone);
-        var hit = w.get(keyTZ) || climaBuscarHoraCercana(w, keyTZ);
-        
-        if(!hit){
-          var cacheResp = climaLeerCache();
-          var respaldo = cacheResp.find(function(r){ return r.game_id === g.gamePk; });
-          if(!respaldo){
-            var venueHoyCanon = venueCanon(venue);
-            respaldo = cacheResp.find(function(r){ return r.date === hoy && venueCanon(r.venue) === venueHoyCanon; });
-          }
-          if(respaldo){
-            hit = { temperature_f: respaldo.temperature_f, windspeed_mph: respaldo.windspeed_mph, humidity_pct: respaldo.humidity_pct, precipitation_mm: respaldo.precipitation_mm, wind_dir: respaldo.wind_dir };
-          }
-        }
-        if(!hit){ html+=tarjeta(away,home,venue,horaTxt,null,i,null,pitcherAway,pitcherHome,pitcherAwayId,pitcherHomeId,bloquesSerie,rosterMap,catcherAwayId,catcherHomeId,umpireHomeHoy,lineaMercado,factorH); continue; }
-
-        var condHoy=await jalarCondition(g.gamePk);
-        var today={temperature_f:hit.temperature_f,windspeed_mph:hit.windspeed_mph,humidity_pct:hit.humidity_pct,precipitation_mm:hit.precipitation_mm,wind_dir:hit.wind_dir,venueName:venue,condition:condHoy};
-        log("condition "+venue+": "+condHoy);
-        var r=calcularCoincidencia(today);
-        html+=tarjeta(away,home,venue,horaTxt,r,i,today,pitcherAway,pitcherHome,pitcherAwayId,pitcherHomeId,bloquesSerie,rosterMap,catcherAwayId,catcherHomeId,umpireHomeHoy,lineaMercado,factorH);
+      log("Jalando líneas pregame...");
+      var lineasCache = null;
+      try {
+        lineasCache = await jalarLineas(log);
+      } catch (el) {
+        log("AVISO líneas: " + (el && el.message ? el.message : el));
       }
-      listaEl.innerHTML=html;
-      log("LISTO.");
-    }catch(e){ log("ERROR: "+(e&&e.message?e.message:e)); }
-    finally{ btn.disabled=false; btn.innerHTML='COINCIDENCIA DATAPRO<span class="sub2">Money Line · clima de hoy vs histórico</span>'; }
+
+      log("Trayendo juegos de hoy...");
+      // CORREGIDO: se usa climaHoyISO() (clima-cache.js) en vez de un
+      // descuento fijo de horas — mismo corte de "hoy" que jalar-clima.js
+      // y jalar-linea.js, correcto en America/New_York con DST.
+      var hoy = climaHoyISO();
+      var mlbUrl = "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=" + hoy;
+      var resp = await fetch(MLB_ROUTES.WORKER_BASE + encodeURIComponent(mlbUrl));
+      if (!resp.ok) throw new Error("Schedule hoy HTTP " + resp.status);
+      var dataSched = await resp.json();
+      var games = (dataSched.dates && dataSched.dates[0]) ? dataSched.dates[0].games : [];
+      games.sort(function (a, b) { return new Date(a.gameDate) - new Date(b.gameDate); });
+      log("Juegos hoy: " + games.length);
+
+      if (games.length === 0) {
+        log("No hay juegos hoy (" + hoy + ").");
+        return;
+      }
+
+      var html = "";
+      for (var i = 0; i < games.length; i++) {
+        var g = games[i];
+        var juegoEntrada = {
+          gamePk: g.gamePk,
+          away_team: (g.teams && g.teams.away && g.teams.away.team) ? g.teams.away.team.name : null,
+          home_team: (g.teams && g.teams.home && g.teams.home.team) ? g.teams.home.team.name : null,
+          // Necesarios para que moneyline-data.js resuelva lineup
+          // automáticamente vía jalarLineup(gamePk, awayId, homeId), y
+          // para que resolverPitcheoTest use el teamId real.
+          away_id: (g.teams && g.teams.away && g.teams.away.team) ? g.teams.away.team.id : null,
+          home_id: (g.teams && g.teams.home && g.teams.home.team) ? g.teams.home.team.id : null,
+          venue: g.venue ? g.venue.name : null,
+          game_date: g.gameDate,
+          status: g.status && g.status.detailedState ? g.status.detailedState : null
+        };
+
+        // roster y lineup: sin resolver manual — se apoyan en la
+        // resolución automática ya integrada en moneyline-data.js
+        // (jalarRoster(gamePk) / jalarLineup(gamePk, awayId, homeId)).
+        // arsenal_vs_lineup y pitcheo: resolvers manuales de esta
+        // pantalla, porque moneyline-data.js no tiene fallback
+        // automático para esos dos bloques (solo para roster/lineup).
+        // fuerza_equipo: automático, ya integrado desde la ronda
+        // anterior (calcularFuerzaEquipo + MLBPRO_CORE.hoyISO()).
+        var data = await moneylineData(juegoEntrada, {
+          resolverArsenal: resolverArsenalTest,
+          resolverPitcheo: resolverPitcheoTest
+        });
+
+        datosJuegos.push({ juegoRaw: g, data: data });
+
+        html += renderJuegoData(i, g, data);
+      }
+
+      listaEl.innerHTML = html;
+      document.getElementById("goMotor").disabled = false;
+      log("LISTO. " + datosJuegos.length + " juego(s) procesados por moneylineData.");
+    } catch (e) {
+      log("ERROR: " + (e && e.message ? e.message : e));
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "CARGAR JUEGOS DE HOY (moneyline-data)";
+    }
   });
 
-  function serieDelParque(venue,bloquesSerie){
-    if(!venue||!bloquesSerie||!bloquesSerie.length) return null;
-    var v=stadiumNorm(venueCanon(venue));
-    var candidatos=bloquesSerie.filter(function(b){ return stadiumNorm(venueCanon(b.venue))===v; });
-    if(!candidatos.length) return null;
-    candidatos.sort(function(a,b){ return a.fecha_inicio<b.fecha_inicio?1:-1; });
-    return candidatos[0];
+  // Diagnóstico aislado: confirma que, si faltan las dependencias
+  // globales de Fuerza de Equipo (calcularFuerzaEquipo / MLBPRO_CORE /
+  // MLBPRO_CORE.hoyISO), moneyline-data.js deja fuerza_equipo como
+  // DEPENDENCIA_FALTANTE — nunca 1.0 ni un valor neutral inventado.
+  // Restaura ambas dependencias globales en un finally, sin afectar el
+  // resto de la página.
+  document.getElementById("goDiagFaltante").addEventListener("click", async function () {
+    var btn = this;
+    var resultadoEl = document.getElementById("diagResultado");
+    btn.disabled = true;
+    resultadoEl.innerHTML = "";
+
+    var originalCalc = window.calcularFuerzaEquipo;
+    var originalCore = window.MLBPRO_CORE;
+
+    try {
+      delete window.calcularFuerzaEquipo;
+      delete window.MLBPRO_CORE;
+
+      var juegoSintetico = {
+        gamePk: null,
+        away_team: "Equipo Prueba Away",
+        home_team: "Equipo Prueba Home",
+        venue: "Estadio de Prueba",
+        game_date: null,
+        status: null
+      };
+
+      var data = await moneylineData(juegoSintetico, {});
+
+      var fe = data.fuerza_equipo;
+      var esperado = fe && fe.estado === "DEPENDENCIA_FALTANTE" && fe.confirmado === false;
+      var senalNula = data.senal_unanimidad === null;
+      var confirmadoUnanimidadFalso = data.confirmado_unanimidad === false;
+      var detalleNulo = data.detalle_unanimidad === null;
+
+      var pasoTxt = (esperado && senalNula && confirmadoUnanimidadFalso && detalleNulo)
+        ? '<b style="color:#3fb950;">PASÓ</b>'
+        : '<b style="color:#e05252;">FALLÓ</b>';
+
+      resultadoEl.innerHTML =
+        '<div class="fe-box">' +
+          '<div class="fe-hdr">Resultado diagnóstico: ' + pasoTxt + '</div>' +
+          '<div class="fe-perfil-linea">fuerza_equipo.estado: ' + (fe ? fe.estado : 'N/D') + '</div>' +
+          '<div class="fe-perfil-linea">fuerza_equipo.confirmado: ' + (fe ? fe.confirmado : 'N/D') + '</div>' +
+          '<div class="fe-perfil-linea">senal_unanimidad: ' + data.senal_unanimidad + '</div>' +
+          '<div class="fe-perfil-linea">confirmado_unanimidad: ' + data.confirmado_unanimidad + '</div>' +
+          '<div class="fe-perfil-linea">detalle_unanimidad: ' + data.detalle_unanimidad + '</div>' +
+          '<details class="fold"><summary>Ver resultado completo (JSON crudo)</summary><pre class="raw">' + JSON.stringify(data, null, 2) + '</pre></details>' +
+        '</div>';
+
+      log("Diagnóstico dependencia faltante: " + (esperado && senalNula && confirmadoUnanimidadFalso && detalleNulo ? "PASÓ" : "FALLÓ"));
+    } catch (e) {
+      resultadoEl.innerHTML = '<div class="fe-box"><div class="fe-hdr"><b style="color:#e05252;">ERROR en diagnóstico</b></div><div class="fe-perfil-linea">' + (e && e.message ? e.message : e) + '</div></div>';
+      log("ERROR en diagnóstico dependencia faltante: " + (e && e.message ? e.message : e));
+    } finally {
+      window.calcularFuerzaEquipo = originalCalc;
+      window.MLBPRO_CORE = originalCore;
+      btn.disabled = false;
+    }
+  });
+
+  function leerPesoInput(id) {
+    var v = document.getElementById(id).value;
+    if (v === "" || v === null || v === undefined) return undefined;
+    var n = Number(v);
+    return Number.isFinite(n) ? n : undefined;
   }
 
-  function agruparEnSeries(lista){
-    var arr=lista.slice().filter(function(x){ return x&&x.date; });
-    arr.sort(function(a,b){ return a.date<b.date?-1:(a.date>b.date?1:0); });
-    function diffDias(d1,d2){ var a=new Date(d1+"T00:00:00"),b=new Date(d2+"T00:00:00"); return Math.round((b-a)/86400000); }
-    var series=[],actual=null;
-    for(var i=0;i<arr.length;i++){
-      var g=arr[i];
-      if(actual&&g.home_team===actual.home_team&&diffDias(actual.ultima,g.date)<=2){ actual.juegos.push(g); actual.ultima=g.date; }
-      else{ actual={home_team:g.home_team,away_team:g.away_team,primera:g.date,ultima:g.date,juegos:[g]}; series.push(actual); }
-    }
-    return series;
-  }
-
-  function umpireTxt(u){
-    if(!u||u.zone_type==="NO_CONFIRMADO") return (u&&u.nombre?u.nombre:"NO_CONFIRMADO")+" (stats NO_CONFIRMADO)";
-    return u.nombre+" (zona "+u.zone_type+" · K/j "+u.k_per_game+" · BB/j "+u.bb_per_game+" · "+u.k_tier+")";
-  }
-
-  function serieParqueHtml(venue,bloquesSerie,rosterMap){
-    var b=serieDelParque(venue,bloquesSerie);
-    if(!b) return '<div class="serieparque"><div class="sphdr">SERIE EN ESTE PARQUE</div><div class="spsub">Sin serie en cache para este parque todavía.</div></div>';
-    var tr=(typeof analizarTrayectoria==="function")?analizarTrayectoria(b):{tendencia:"ESTABLE",min:null,max:null,saltos:[]};
-    var clsTend=tr.tendencia==="SUBE"?"sp-up":(tr.tendencia==="BAJA"?"sp-down":"sp-flat");
-    var rango=(tr.min!==null&&tr.max!==null)?(" ("+tr.min+"° a "+tr.max+"°)"):"";
-    var trayHtml='<div class="sptray '+clsTend+'">Clima de la serie: '+tr.tendencia+rango+'</div>';
-    var saltosHtml="";
-    if(tr.saltos&&tr.saltos.length){ for(var s=0;s<tr.saltos.length;s++){ var sa=tr.saltos[s]; saltosHtml+='<div class="spsalto">⚠️ Salto '+sa.date+': '+sa.de+'° → '+sa.a+'° ('+(sa.dif>0?"+":"")+sa.dif+'°)</div>'; } }
-    var filas="",sumRuns=0,nRuns=0;
-    var juegosOrden=b.juegos.slice().sort(function(a,b){ return a.date<b.date?1:(a.date>b.date?-1:0); });
-    for(var j=0;j<juegosOrden.length;j++){
-      var g=juegosOrden[j];
-      var ar=(g.away_runs!==undefined&&g.away_runs!==null)?g.away_runs:null;
-      var hr=(g.home_runs!==undefined&&g.home_runs!==null)?g.home_runs:null;
-      var carrChip;
-      if(ar!==null&&hr!==null){ var tot=ar+hr; carrChip='<span class="chip">⚾ <b>'+ar+'-'+hr+'</b> ('+tot+')</span>'; sumRuns+=tot; nRuns++; }
-      else{ carrChip='<span class="chip">⚾ sin marcador</span>'; }
-      var tempChip=(g.temperature_f!==undefined&&g.temperature_f!==null&&g.temperature_f!=="")?'<span class="chip">🌡️ <b>'+g.temperature_f+'°</b></span>':'<span class="chip">🌡️ PEND</span>';
-      var vientoChip='<span class="chip">🌬️ <b>'+(g.windspeed_mph!==undefined?g.windspeed_mph:"?")+'</b></span>';
-      var dirChip='<span class="chip">🧭 dir <b>'+(g.wind_dir!==undefined&&g.wind_dir!==null&&g.wind_dir!==""?g.wind_dir:"N/C")+'</b></span>';
-      var humChip='<span class="chip">💧 <b>'+(g.humidity_pct!==undefined?g.humidity_pct+"%":"?")+'</b></span>';
-      filas+='<div class="sub">'+
-        '<div class="top"><span class="fecha">'+fechaBonita(g.date)+'</span> · '+(g.away_team||"?")+' @ '+(g.home_team||"?")+'</div>'+
-        '<div class="nums">'+tempChip+vientoChip+dirChip+humChip+carrChip+'</div>'+
-      '</div>';
-    }
-    var prom="";
-    if(nRuns>0){ prom='<div class="spprom"><div class="lbl">PROMEDIO DE CARRERAS DE LA SERIE ('+nRuns+' juegos con marcador)</div><div class="val">'+( sumRuns/nRuns).toFixed(1)+'</div></div>'; }
-    else{ prom='<div class="spprom"><div class="lbl">Sin marcadores en esta serie.</div></div>'; }
-    return '<div class="serieparque">'+
-      '<div class="sphdr">SERIE EN ESTE PARQUE</div>'+
-      '<div class="spsub">'+(b.home_team||"?")+' · '+fechaBonita(b.fecha_inicio)+' a '+fechaBonita(b.fecha_fin)+' · '+b.n_juegos+' juegos</div>'+
-      trayHtml+saltosHtml+filas+prom+
-    '</div>';
-  }
-
-  function tarjeta(away,home,venue,horaTxt,r,idx,today,pitcherAway,pitcherHome,pitcherAwayId,pitcherHomeId,bloquesSerie,rosterMap,catcherAwayId,catcherHomeId,umpireHomeHoy,lineaMercado,factorH){
-    var sc=r&&r.top?r.top.score:null,cls=r?r.cls:"bad";
-    var venueReal=venueCanon(venue);
-    var brisaInfo=(typeof BRISA_GEO_PARQUES_MLB_2026!=="undefined"&&BRISA_GEO_PARQUES_MLB_2026[venueReal])?BRISA_GEO_PARQUES_MLB_2026[venueReal]:null;
-    var hoychips="";
-    if(today){
-      hoychips='<div class="hoychips">'+
-        '<span class="chip">🌡️ <b>'+(today.temperature_f!==undefined?today.temperature_f+"°":"?")+'</b></span>'+
-        '<span class="chip">🌬️ <b>'+(today.windspeed_mph!==undefined?today.windspeed_mph:"?")+'</b></span>'+
-        '<span class="chip">🧭 dir <b>'+(today.wind_dir!==undefined&&today.wind_dir!==null&&today.wind_dir!==""?today.wind_dir:"N/C")+'</b></span>'+
-        '<span class="chip">💧 <b>'+(today.humidity_pct!==undefined?today.humidity_pct+"%":"?")+'</b></span>'+
-        (brisaInfo?'<span class="chip brisachip">🌬️ '+brisaInfo.variante+'</span>':'')+
-      '</div>';
-    }else if(brisaInfo){
-      hoychips='<div class="hoychips"><span class="chip brisachip">🌬️ '+brisaInfo.variante+'</span></div>';
-    }
-    var sumScore=0,nScore=0,sumRuns=0,nRuns=0;
-    if(r&&r.ranked&&r.ranked.length){
-      for(var k=0;k<r.ranked.length;k++){
-        var hk=r.ranked[k];
-        var ark=(hk.away_runs!==undefined&&hk.away_runs!==null)?hk.away_runs:null;
-        var hrk=(hk.home_runs!==undefined&&hk.home_runs!==null)?hk.home_runs:null;
-        if(ark!==null&&hrk!==null){ sumRuns+=(ark+hrk); nRuns++; }
-        if(typeof hk.score==="number"){ sumScore+=hk.score; nScore++; }
-      }
-    }
-    var promScore=nScore>0?Math.round(sumScore/nScore):null;
-    var promRuns=nRuns>0?(sumRuns/nRuns).toFixed(1):null;
-    var coinTxt=(sc===null)?"—":(sc+"%");
-    var panel='<div class="panel">'+
-      '<div class="pbox"><div class="lbl">COINCIDENCIA</div><div class="val v-coin '+cls+'">'+coinTxt+'</div></div>'+
-      '<div class="pbox"><div class="lbl">COINC. PROMEDIO</div><div class="val v-run">'+(promScore!==null?promScore+"%":"—")+'</div></div>'+
-    '</div>';
-    var mercadoVal, mercadoClass;
-
-    if (lineaMercado && (lineaMercado.moneyline_away_txt || lineaMercado.moneyline_home_txt)) {
-      mercadoVal =
-        '<div style="font-size:20px;color:#ffd60a;font-weight:800;">' +
-        (lineaMercado.total !== null && lineaMercado.total !== undefined ? lineaMercado.total : "N/C") +
-        '</div>' +
-        '<div style="font-size:10px;color:#c9d1d9;margin-top:4px;">' + away + ' <b style="color:#ffd60a;">' + (lineaMercado.moneyline_away_txt || "N/C") + '</b></div>' +
-        '<div style="font-size:10px;color:#c9d1d9;">' + home + ' <b style="color:#ffd60a;">' + (lineaMercado.moneyline_home_txt || "N/C") + '</b></div>' +
-        (lineaMercado.moneyline_bookie ? '<div style="font-size:9px;color:#6e7681;margin-top:3px;">' + lineaMercado.moneyline_bookie + '</div>' : '');
-
-      mercadoClass = 'val';
-    } else if (lineaMercado && lineaMercado.total !== null) {
-      mercadoVal =
-        'O/U ' + lineaMercado.total +
-        (lineaMercado.bookie ? '<br><span style="font-size:9px;color:#555;">' + lineaMercado.bookie + '</span>' : '');
-
-      mercadoClass = 'val';
-    } else {
-      mercadoVal = 'N/C';
-      mercadoClass = 'val pendiente';
+  document.getElementById("goMotor").addEventListener("click", function () {
+    if (!datosJuegos.length) {
+      log("No hay juegos cargados todavía.");
+      return;
     }
 
-    var fhVal, fhClass, fhSub;
-    // CORREGIDO 17 jul 2026: validación real de número finito, en vez de
-    // solo comprobar !== null && !== undefined.
-    if(
-      factorH &&
-      typeof factorH.factor_final === "number" &&
-      Number.isFinite(factorH.factor_final) &&
-      promRuns !== null
-    ){
-      var lineaFH = parseFloat(promRuns) * factorH.factor_final;
-      var pctCambio = (factorH.factor_final - 1) * 100;
-      fhVal = lineaFH.toFixed(3);
-      fhClass = 'val';
-      fhSub = (pctCambio >= 0 ? '+' : '') + pctCambio.toFixed(2) + '% vs clima';
-      if (!factorH.confirmado) {
-        fhSub += ' · PITCHEO PARCIAL';
-      }
-    } else {
-      fhVal = 'N/C';
-      fhClass = 'val pendiente';
-      fhSub = factorH ? factorH.nota : 'PENDIENTE';
+    var pesos = {
+      pitcheo: leerPesoInput("pesoPitcheo"),
+      arsenal_vs_lineup: leerPesoInput("pesoArsenal"),
+      fuerza_equipo: leerPesoInput("pesoFuerza"),
+      clima: leerPesoInput("pesoClima"),
+      coincidencia: leerPesoInput("pesoCoincidencia"),
+      lineup: leerPesoInput("pesoLineup")
+    };
+
+    var coberturaMinimaVal = leerPesoInput("coberturaMinima");
+    var ventajaMinimaVal = leerPesoInput("ventajaMinima");
+    var edgeMinimoVal = leerPesoInput("edgeMinimo");
+
+    var configuracion = {
+      pesos: pesos,
+      cobertura_minima: coberturaMinimaVal !== undefined ? coberturaMinimaVal : undefined,
+      ventaja_minima: ventajaMinimaVal !== undefined ? ventajaMinimaVal : undefined,
+      edge_minimo: edgeMinimoVal !== undefined ? edgeMinimoVal : undefined,
+      exigir_linea: document.getElementById("exigirLinea").checked
+    };
+
+    log("Corriendo motor con la configuración de pesos indicada...");
+
+    for (var i = 0; i < datosJuegos.length; i++) {
+      var data = datosJuegos[i].data;
+      var resultado = moneylineMotor(data, configuracion);
+
+      var motorDiv = document.getElementById("motor_" + i);
+      if (!motorDiv) continue;
+
+      var pickCls = resultado.pick && resultado.pick.confirmado ? "confirmado" : "no-confirmado";
+      var pickTxt = resultado.pick && resultado.pick.confirmado
+        ? (resultado.pick.equipo || resultado.pick.lado) + " · edge " + (resultado.pick.edge !== null ? (resultado.pick.edge * 100).toFixed(2) + "%" : "N/C")
+        : "SIN PICK (" + resultado.estado + ")";
+
+      motorDiv.innerHTML =
+        '<div class="motor-box">' +
+          '<div class="pick ' + pickCls + '">' + pickTxt + '</div>' +
+          '<div style="font-size:11px;color:#8b949e;margin-top:4px;">Cobertura motor: ' + resultado.cobertura.porcentaje + '% (mín. requerida ' + resultado.cobertura.minima_requerida + '%) · bloques usados: ' + resultado.cobertura.bloques_usados + '</div>' +
+          (resultado.mercado.confirmado ? '<div style="font-size:11px;color:#8b949e;">Mercado: prob. justa home ' + (resultado.mercado.probabilidad_justa_home * 100).toFixed(1) + '% · away ' + (resultado.mercado.probabilidad_justa_away * 100).toFixed(1) + '% · vig ' + (resultado.mercado.vig * 100).toFixed(1) + '%</div>' : '<div style="font-size:11px;color:#8b949e;">Mercado: ' + resultado.mercado.estado + '</div>') +
+          '<details class="fold"><summary>Ver resultado del motor completo (JSON crudo)</summary><pre class="raw">' + JSON.stringify(resultado, null, 2) + '</pre></details>' +
+        '</div>';
     }
 
-    // Indicador visual de la fuente del lineup usado en el F.H.: si
-    // cualquiera de los dos lados usó el ÚLTIMO CONFIRMADO (no el de hoy),
-    // se marca distinto de un CONFIRMADO real de hoy. Nunca oculta la
-    // diferencia, nunca la disfraza de "OK" silencioso.
-    if (factorH && (factorH.fuente_home || factorH.fuente_away)) {
-      var usoUltimo = factorH.fuente_home === "LINEUP_ULTIMO_CONFIRMADO" || factorH.fuente_away === "LINEUP_ULTIMO_CONFIRMADO";
-      var usoConfirmado = factorH.fuente_home === "LINEUP_CONFIRMADO" || factorH.fuente_away === "LINEUP_CONFIRMADO";
-      if (usoUltimo) fhSub += ' · lineup: ÚLTIMO CONFIRMADO';
-      else if (usoConfirmado) fhSub += ' · lineup: CONFIRMADO';
-    }
-
-    var lineas='<div class="lineas">'+
-      '<div class="lbox"><div class="lbl">LÍNEA CLIMA</div><div class="val">'+(promRuns!==null?promRuns:"—")+'</div></div>'+
-      '<div class="lbox fh"><div class="lbl">LÍNEA F.H.</div><div class="'+fhClass+'">'+fhVal+'</div><div class="sub">'+fhSub+'</div></div>'+
-      '<div class="lbox mercado"><div class="lbl">LÍNEA MERCADO</div><div class="'+mercadoClass+'">'+mercadoVal+'</div></div>'+
-    '</div>';
-
-    function xeraTxt(pid){
-      if(pid===null||pid===undefined) return "";
-      var p=(typeof PITCHERS_MASTER_2026!=="undefined")?PITCHERS_MASTER_2026[pid]:null;
-      if(!p||p.xera===undefined||p.xera===null) return " (xERA NO_CONFIRMADO)";
-      return " (xERA "+p.xera+" general)";
-    }
-    var pitchersHoy='⚾ '+(pitcherAway||"TBD")+xeraTxt(pitcherAwayId)+' vs '+(pitcherHome||"TBD")+xeraTxt(pitcherHomeId);
-    var ca=traducirCatcher(catcherAwayId),ch=traducirCatcher(catcherHomeId);
-    function rvTxt(rv){ if(rv===undefined||rv===null||rv==="NO_CONFIRMADO") return " (rv_tot NO_CONFIRMADO)"; return " (rv_tot "+rv+")"; }
-    var catchersHoy='🧤 '+ca.nombre+rvTxt(ca.rv_tot)+' vs '+ch.nombre+rvTxt(ch.rv_tot);
-    var uHoy=traducirUmpire(umpireHomeHoy);
-    var umpireHoy='🧑‍⚖️ Umpire de plato: '+umpireTxt(uHoy);
-    var foldHoy='<details class="fold"><summary>Pitcher / Catcher / Umpire de hoy</summary>'+
-      '<div class="sub">'+
-        '<div class="hrow" style="border:0;padding:3px 0;">'+pitchersHoy+'</div>'+
-        '<div class="hrow" style="border:0;padding:3px 0;">'+catchersHoy+'</div>'+
-        '<div class="hrow" style="border:0;padding:3px 0;">'+umpireHoy+'</div>'+
-      '</div></details>';
-    var det5="";
-    if(r&&r.ranked&&r.ranked.length){
-      var series=agruparEnSeries(r.ranked);
-      series.sort(function(a,b){ return a.ultima<b.ultima?1:(a.ultima>b.ultima?-1:0); });
-      for(var sx=0;sx<series.length;sx++){
-        var serie=series[sx];
-        det5+='<div class="serie-hdr">SERIE · '+(serie.home_team||"?")+' · '+serie.primera+' a '+serie.ultima+' · '+serie.juegos.length+' juego(s)</div>';
-        var js=serie.juegos.slice().sort(function(a,b){ return a.date<b.date?1:(a.date>b.date?-1:0); });
-        for(var jj=0;jj<js.length;jj++){
-          var h=js[jj];
-          var arr2=(h.away_runs!==undefined&&h.away_runs!==null)?h.away_runs:null;
-          var hrr2=(h.home_runs!==undefined&&h.home_runs!==null)?h.home_runs:null;
-          var carrChip2;
-          if(arr2!==null&&hrr2!==null){ var t2=arr2+hrr2; carrChip2='<span class="chip">⚾ <b>'+arr2+'-'+hrr2+'</b> ('+t2+')</span>'; }
-          else{ carrChip2='<span class="chip">⚾ sin marcador</span>'; }
-          det5+='<div class="sub">'+
-            '<div class="top"><span class="fecha">'+fechaBonita(h.date)+'</span> · '+(h.away_team||"?")+' / '+(h.home_team||"?")+'</div>'+
-            '<div class="nums">'+
-              '<span class="chip">🌡️ <b>'+(h.temperature_f!==undefined?h.temperature_f+"°":"?")+'</b></span>'+
-              '<span class="chip">🌬️ <b>'+(h.windspeed_mph!==undefined?h.windspeed_mph:"?")+'</b></span>'+
-              '<span class="chip">🧭 dir <b>'+(h.wind_dir!==undefined&&h.wind_dir!==null&&h.wind_dir!==""?h.wind_dir:"N/C")+'</b></span>'+
-              '<span class="chip">💧 <b>'+(h.humidity_pct!==undefined?h.humidity_pct+"%":"?")+'</b></span>'+
-              '<span class="chip">score <b>'+h.score+'%</b></span>'+
-              carrChip2+
-            '</div></div>';
-        }
-      }
-    }else{ det5='<div class="sub">Sin históricos para mostrar.</div>'; }
-    var fold5='<details class="fold"><summary>Clima en este parque (5 juegos parecidos)</summary><div class="serieparque">'+det5+'</div></details>';
-
-    var serieHtml='<details class="fold"><summary>Serie en este parque (por si ya jugaron en escena parecida)</summary>'+serieParqueHtml(venue,bloquesSerie,rosterMap)+'</details>';
-
-    var hpACFCard = (venue && typeof getOrientacionParque==="function") ? getOrientacionParque(venue) : null;
-    var brujulaHoy = venue ? svgBrujulaJuego(idx, venue, hpACFCard, today?today.wind_dir:null, today?today.windspeed_mph:null) : '';
-
-    return '<div class="juego">'+
-      '<div class="juego-cab" id="cab_'+idx+'" onclick="toggleJuego('+idx+')">'+
-        '<div><div class="matchup">'+away+' @ '+home+'</div><div class="estadio">'+(venue||"SIN PARQUE")+(horaTxt?' · '+horaTxt:'')+'</div></div>'+
-        '<div style="display:flex;align-items:center;gap:8px;">'+
-          '<span class="coin-mini '+cls+'">'+coinTxt+'</span>'+
-          '<span class="chev">▶</span>'+
-        '</div>'+
-      '</div>'+
-      '<div class="juego-cuerpo" id="cuerpo_'+idx+'">'+
-        hoychips+
-        panel+lineas+
-        brujulaHoy+
-        fold5+
-        serieHtml+
-        foldHoy+
-      '</div>'+
-    '</div>';
-  }
+    log("LISTO. Motor corrido sobre " + datosJuegos.length + " juego(s).");
+  });
 </script>
-<script>
-  function entrarApp(){
-    document.getElementById("portada").style.display = "none";
-    document.getElementById("appContenido").style.display = "block";
-    try { sessionStorage.setItem("mlbpro_ya_entro", "1"); } catch(e){}
-  }
-  document.getElementById("btnEntrar").addEventListener("click", entrarApp);
-  try {
-    if (sessionStorage.getItem("mlbpro_ya_entro") === "1") entrarApp();
-  } catch(e){}
-</script>
-</div>
 </body>
 </html>
