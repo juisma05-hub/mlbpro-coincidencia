@@ -7,7 +7,9 @@
 
   RECIBE DE: mlb-routes.js, estadios.js, clima-cache.js, jalar-clima.js,
   parques-orientacion.js, score-match.js, calcular-coincidencia.js,
-  jalar-linea.js, mlbpro-core.js, fuerza-equipo.js, moneyline-data.js,
+  jalar-linea.js, mlbpro-core.js, fuerza-equipo.js, arsenal-master.js,
+  batters-vspitch.js, jalar-roster.js, jalar-lineup.js, jalar-bullpen.js,
+  factor-arsenal-lineup.js, factor-pitcheo-completo.js, moneyline-data.js,
   moneyline-motor.js.
 
   ENTREGA A: nada — es una pantalla de prueba, no alimenta ningún otro
@@ -19,27 +21,88 @@
   el histórico ya existente vía MLBPRO_CORE.leerHistoricoCache()),
   Coincidencia, K6, F5.
 
-  IMPORTANTE — bloques NO conectados en esta prueba (a propósito):
-  roster, lineup, pitcheo y arsenal_vs_lineup NO reciben ningún resolver
-  en esta pantalla. Sus interfaces reales (jalar-roster.js,
-  jalar-lineup.js, factor-pitcheo-completo.js, factor-arsenal-lineup.js)
-  no fueron auditadas en la sesión donde se construyó esta pantalla, y
-  conectarlas sin auditar violaría la regla de "nada inventado". Esos
-  cuatro bloques aparecerán como NO_CONFIRMADO de forma honesta.
+  ORDEN OBLIGATORIO DE SCRIPTS (módulos de Moneyline):
+    mlb-routes.js
+    mlbpro-core.js
+    fuerza-equipo.js
+    arsenal-master.js
+    batters-vspitch.js
+    jalar-roster.js
+    jalar-lineup.js
+    jalar-bullpen.js
+    factor-arsenal-lineup.js
+    factor-pitcheo-completo.js
+    moneyline-data.js
+    moneyline-motor.js
 
-  fuerza_equipo SÍ está conectado en esta prueba: moneyline-data.js ya
-  integra la resolución automática de Fuerza de Equipo (sin necesidad de
-  resolver manual) llamando directamente a
-  calcularFuerzaEquipo(homeTeam, awayTeam, MLBPRO_CORE.hoyISO()), definida
-  en fuerza-equipo.js (que a su vez depende de mlbpro-core.js, ambos
-  cargados en esta página). Si calcularFuerzaEquipo, MLBPRO_CORE o
-  MLBPRO_CORE.hoyISO no estuvieran disponibles, moneyline-data.js deja el
-  bloque como NO_CONFIRMADO (estado DEPENDENCIA_FALTANTE) — nunca 1.0 ni
-  ningún valor neutral inventado. Este archivo agrega una prueba aislada
-  de ese caso (botón "PROBAR DEPENDENCIA FALTANTE").
+  Razón del orden:
+    - mlb-routes.js debe existir antes de jalar-roster, jalar-lineup y
+      jalar-bullpen (los tres usan MLB_ROUTES.WORKER_BASE).
+    - mlbpro-core.js debe cargar antes de fuerza-equipo.js.
+    - arsenal-master.js y batters-vspitch.js deben cargar antes de
+      ejecutar calcularFactorArsenalLineup() (dependen de
+      ARSENAL_MASTER_2026 y BATTERS_VSPITCH_2026 como globales).
+    - jalar-bullpen.js debe cargar antes de calcularFactorPitcheoCompleto()
+      (usa jalarBullpenAyer() y pitchersNoDisponiblesHoy()).
+    - factor-arsenal-lineup.js debe cargar antes de
+      factor-pitcheo-completo.js (este último llama a
+      calcularFactorArsenalLineup() para abridor y cada relevista).
+    - moneyline-data.js debe cargar después de todas las funciones y datos
+      que va a resolver.
+    - moneyline-motor.js queda al final.
 
-  Clima, coincidencia, línea pregame y fuerza_equipo traen datos reales
-  aquí. roster, lineup, pitcheo y arsenal_vs_lineup siguen NO_CONFIRMADO.
+  Los scripts de clima, Coincidencia y línea (clima-cache.js,
+  jalar-clima.js, parques-orientacion.js, score-match.js,
+  calcular-coincidencia.js, jalar-linea.js) se conservan en su posición
+  existente, antes de la cadena de Moneyline — no se tocan ni se mueven.
+
+  BLOQUES CONECTADOS EN ESTA PRUEBA (todos con función real, ninguno
+  simulado):
+    - roster: automático dentro de moneyline-data.js, vía
+      jalarRoster(gamePk). No se pasa resolver manual — se apoya en la
+      resolución automática ya integrada en moneyline-data.js.
+    - lineup: automático dentro de moneyline-data.js, vía
+      jalarLineup(gamePk, awayTeamId, homeTeamId). Requiere que el juego
+      traiga away_id/home_id (agregados abajo desde el schedule real),
+      porque moneyline-data.js necesita juego.away.id/juego.home.id para
+      llamar el fallback automático.
+    - arsenal_vs_lineup: resolverArsenal manual en esta pantalla
+      (resolverArsenalTest), que llama a calcularFactorArsenalLineup()
+      DOS veces:
+        arsenal.away = calcularFactorArsenalLineup(pitcher AWAY, lineup HOME)
+        arsenal.home = calcularFactorArsenalLineup(pitcher HOME, lineup AWAY)
+      (el pitcher de cada lado se enfrenta al lineup del lado contrario).
+    - pitcheo: resolverPitcheo manual en esta pantalla
+      (resolverPitcheoTest), que llama a calcularFactorPitcheoCompleto()
+      DOS veces:
+        pitcheo.away = calcularFactorPitcheoCompleto(team AWAY, pitcher AWAY, lineup HOME, MLBPRO_CORE.hoyISO())
+        pitcheo.home = calcularFactorPitcheoCompleto(team HOME, pitcher HOME, lineup AWAY, MLBPRO_CORE.hoyISO())
+    - fuerza_equipo: automático (ya integrado en moneyline-data.js desde
+      la ronda anterior), vía calcularFuerzaEquipo(home, away, hoyISO()).
+    - clima, coincidencia, línea pregame: sin cambios, iguales a antes.
+
+  IMPORTANTE — NO SE INVENTA UN "CONFIRMADO GENERAL" DE ARSENAL NI DE
+  PITCHEO: como cada uno de esos dos bloques necesita representar DOS
+  cálculos (away y home) bajo una sola clave (arsenal_vs_lineup, pitcheo),
+  el objeto combinado que devuelven resolverArsenalTest/resolverPitcheoTest
+  expone:
+    { away: <objeto real devuelto por la función>,
+      home: <objeto real devuelto por la función>,
+      confirmado: <AND exacto de away.confirmado && home.confirmado>,
+      estado: <concatenación de las notas/cobertura reales de cada lado> }
+  confirmado y estado del combinado NUNCA se calculan con un criterio
+  nuevo — son exactamente los valores .confirmado/.nota/.cobertura que ya
+  devuelve calcularFactorArsenalLineup() y calcularFactorPitcheoCompleto()
+  para cada lado, solo combinados con AND para poder exponer un único
+  bloque tal como espera moneyline-data.js.
+
+  LIMITACIÓN YA DOCUMENTADA EN factor-pitcheo-completo.js (punto 16 de su
+  propio prólogo): confirmado=true en calcularFactorPitcheoCompleto() solo
+  ocurre si cobertura==="COMPLETO", estado que HOY no es alcanzable (no
+  existe fuente de bullpen completo real). Por lo tanto pitcheo.away.
+  confirmado y pitcheo.home.confirmado —y por extensión pitcheo.confirmado
+  combinado— serán casi siempre false con las fuentes actuales. Esto es
+  intencional y esperado, no un bug de esta pantalla.
 
   PESOS DEL MOTOR: esta pantalla NO trae ningún peso por defecto. Los
   campos de peso están vacíos a propósito — el operador decide qué pesos
@@ -58,37 +121,61 @@
   jalar-clima.js y jalar-linea.js.
 
   CORREGIDO 19 jul 2026 (integración real de prueba — Fuerza de Equipo):
-  - Se agregan <script src="mlbpro-core.js"> y <script
-    src="fuerza-equipo.js"> antes de moneyline-data.js, para que la
-    resolución automática de Fuerza de Equipo (ya integrada en
-    moneyline-data.js) tenga sus dependencias reales disponibles en esta
-    página.
-  - El aviso inicial se actualiza: fuerza_equipo deja de listarse como
-    bloque NO conectado a propósito — ahora se resuelve automáticamente,
-    sin resolver manual.
-  - Cada tarjeta de juego ahora muestra un bloque dedicado de Fuerza de
-    Equipo: confirmado/estado, ventana_reciente, resumen de los perfiles
+  - Se agregan <script src="../mlbpro-clima-match/mlbpro-core.js"> y
+    <script src="../mlbpro-clima-match/fuerza-equipo.js"> antes de
+    moneyline-data.js, para que la resolución automática de Fuerza de
+    Equipo (ya integrada en moneyline-data.js) tenga sus dependencias
+    reales disponibles en esta página.
+  - Cada tarjeta de juego muestra un bloque dedicado de Fuerza de Equipo:
+    confirmado/estado, ventana_reciente, resumen de los perfiles
     completos home y away (juegos, % victorias, últimos 5/6/10, récord
     local/visitante), y el desglose de senal_unanimidad,
-    confirmado_unanimidad y detalle_unanimidad (las tres señales:
-    récord general, local/visitante, últimos 10 con ventana oficial).
+    confirmado_unanimidad y detalle_unanimidad.
   - Se agrega una verificación de coherencia: compara
     data.cobertura.detalle.fuerza_equipo.confirmado contra
-    data.fuerza_equipo.confirmado y avisa en consola si no coinciden
-    (no debería ocurrir nunca; es solo una comprobación defensiva de
-    esta pantalla de prueba, no cambia moneyline-data.js).
+    data.fuerza_equipo.confirmado y avisa en consola si no coinciden.
   - Se agrega un botón de diagnóstico aislado, "PROBAR DEPENDENCIA
     FALTANTE", que retira temporalmente window.calcularFuerzaEquipo y
     window.MLBPRO_CORE, llama a moneylineData() con un juego sintético,
     confirma que fuerza_equipo.estado sea DEPENDENCIA_FALTANTE, y
-    restaura ambas dependencias globales al terminar (en un finally,
-    para no afectar el resto de la página ni el flujo normal).
+    restaura ambas dependencias globales al terminar.
   - Se agrega un listener de window.onerror para que cualquier error de
-    script no capturado se vea en la consola de esta página en vez de
-    fallar en silencio.
-  - No se modifica moneyline-data.js, moneyline-motor.js, fuerza-equipo.js
-    ni mlbpro-core.js. No se conectan roster, lineup, pitcheo ni
-    arsenal_vs_lineup. No se toca el bug pendiente de empates.
+    script no capturado se vea en la consola de esta página.
+
+  CORREGIDO 19 jul 2026 (segunda ronda — roster, lineup, arsenal_vs_lineup
+  y pitcheo):
+  - Se agregan al orden de carga: arsenal-master.js, batters-vspitch.js,
+    jalar-roster.js, jalar-lineup.js, jalar-bullpen.js,
+    factor-arsenal-lineup.js, factor-pitcheo-completo.js — en el orden
+    obligatorio documentado arriba.
+  - juegoEntrada ahora incluye away_id/home_id (del schedule real de MLB),
+    necesarios para que la resolución automática de lineup
+    (jalarLineup(gamePk, awayTeamId, homeTeamId)) funcione.
+  - roster y lineup ya NO se dejan sin resolver: se apoyan en la
+    resolución automática que moneyline-data.js ya tenía integrada
+    (jalarRoster(gamePk) / jalarLineup(gamePk, awayTeamId, homeTeamId)) —
+    no se duplica esa lógica aquí, solo se le dan las dependencias reales.
+  - Se agregan resolverArsenalTest y resolverPitcheoTest, pasados como
+    bloques.resolverArsenal / bloques.resolverPitcheo, que llaman
+    calcularFactorArsenalLineup() y calcularFactorPitcheoCompleto() dos
+    veces cada una (away y home) con los argumentos exactos: pitcher de
+    un lado contra lineup del lado contrario para arsenal; team+pitcher+
+    lineup contrario+fecha de hoy para pitcheo. Ver nota sobre
+    "NO SE INVENTA UN CONFIRMADO GENERAL" arriba.
+  - Se agrega un bloque visual breve (arsenalPitcheoDetalleHtml) para
+    arsenal_vs_lineup y pitcheo, mostrando el factor y el
+    confirmado/cobertura reales de cada lado (away/home) tal como los
+    devuelven las funciones reales — sin resumir ni inventar un único
+    valor.
+  - Se actualiza el aviso inicial: ya no quedan bloques sin conectar
+    (salvo lo que las dependencias reales digan honestamente que no
+    pueden confirmarse, p. ej. pitcheo casi siempre NO_CONFIRMADO por la
+    limitación ya documentada en factor-pitcheo-completo.js).
+  - No se modifica moneyline-data.js, moneyline-motor.js, fuerza-equipo.js,
+    mlbpro-core.js, jalar-roster.js, jalar-lineup.js, jalar-bullpen.js,
+    factor-arsenal-lineup.js ni factor-pitcheo-completo.js. No se toca
+    clima, Coincidencia, línea pregame ni pesos. No se toca el bug
+    pendiente de empates.
 
   SI ESTE ARCHIVO FALLA: no afecta nada más — es una herramienta de
   prueba aislada.
@@ -168,7 +255,15 @@
 <a href="index.html" style="display:block; text-align:center; color:#5b9fd8; font-size:13px; padding:8px; text-decoration:none;">← Volver al inicio</a>
 <main>
   <div class="aviso">
-    ⚠️ AVISO: roster, lineup, pitcheo y arsenal_vs_lineup NO están conectados en esta prueba (interfaces no auditadas todavía). Van a salir como NO_CONFIRMADO. fuerza_equipo SÍ está conectado — moneyline-data.js lo resuelve automáticamente llamando a calcularFuerzaEquipo() (fuerza-equipo.js + mlbpro-core.js, cargados en esta página), sin resolver manual. Clima, coincidencia, línea pregame y fuerza_equipo traen datos reales aquí.
+    ℹ️ AVISO: roster (jalarRoster), lineup (jalarLineup, con fallback a
+    último confirmado), arsenal_vs_lineup (calcularFactorArsenalLineup,
+    away vs lineup home / home vs lineup away), pitcheo
+    (calcularFactorPitcheoCompleto) y fuerza_equipo (calcularFuerzaEquipo)
+    ya están conectados con sus funciones reales. Clima, coincidencia y
+    línea pregame siguen igual que antes. pitcheo.confirmado será casi
+    siempre false — es intencional, documentado en el propio prólogo de
+    factor-pitcheo-completo.js (no existe hoy fuente de bullpen completo
+    real). El bug de empates sigue sin corregirse.
   </div>
 
   <button id="goCargar" class="go">CARGAR JUEGOS DE HOY (moneyline-data)</button>
@@ -217,6 +312,13 @@
 <script src="jalar-linea.js"></script>
 <script src="../mlbpro-clima-match/mlbpro-core.js"></script>
 <script src="../mlbpro-clima-match/fuerza-equipo.js"></script>
+<script src="arsenal-master.js"></script>
+<script src="batters-vspitch.js"></script>
+<script src="jalar-roster.js"></script>
+<script src="jalar-lineup.js"></script>
+<script src="jalar-bullpen.js"></script>
+<script src="factor-arsenal-lineup.js"></script>
+<script src="factor-pitcheo-completo.js"></script>
 <script src="moneyline-data.js"></script>
 <script src="moneyline-motor.js"></script>
 
@@ -321,6 +423,131 @@
     '</div>';
   }
 
+  // Bloque visual breve para arsenal_vs_lineup y pitcheo: muestra el
+  // valor real de cada lado (away/home) tal como lo devuelve
+  // calcularFactorArsenalLineup()/calcularFactorPitcheoCompleto() — no
+  // resume ni inventa un único valor combinado.
+  function arsenalPitcheoDetalleHtml(titulo, bloque, campoValor) {
+    if (!bloque || typeof bloque !== "object") {
+      return '<div class="fe-box"><div class="fe-hdr">' + titulo + ': <b style="color:#8b949e;">NO_CONFIRMADO (sin datos)</b></div></div>';
+    }
+
+    function ladoHtml(etiqueta, obj) {
+      if (!obj || typeof obj !== "object") {
+        return '<div class="fe-perfil-linea">' + etiqueta + ': N/D</div>';
+      }
+
+      var valor = obj[campoValor];
+      var confirmadoTxt = obj.confirmado ? 'confirmado' : 'no confirmado';
+      var extra = "";
+
+      if (obj.cobertura !== undefined) {
+        extra += ", cobertura " + obj.cobertura;
+      }
+
+      if (obj.nota !== undefined) {
+        extra += ", nota " + obj.nota;
+      }
+
+      return '<div class="fe-perfil-linea">' + etiqueta + ': ' + campoValor + '=' + valorOND(valor) +
+        ' (' + confirmadoTxt + extra + ')</div>';
+    }
+
+    return '<div class="fe-box">' +
+      '<div class="fe-hdr">' + titulo + '</div>' +
+      ladoHtml('AWAY', bloque.away) +
+      ladoHtml('HOME', bloque.home) +
+    '</div>';
+  }
+
+  // Arsenal vs Lineup: el pitcher de un lado se enfrenta al lineup del
+  // lado CONTRARIO. Se llama calcularFactorArsenalLineup() dos veces,
+  // sin alterar su contrato ni inventar un factor combinado.
+  async function resolverArsenalTest(juego, bloques) {
+    var roster = bloques.roster;
+    var lineup = bloques.lineup;
+
+    if (!roster || !lineup) return null;
+    if (typeof calcularFactorArsenalLineup !== "function") return null;
+
+    var lineupAwayArr = Array.isArray(lineup.lineup_away) ? lineup.lineup_away : [];
+    var lineupHomeArr = Array.isArray(lineup.lineup_home) ? lineup.lineup_home : [];
+
+    var arsenalAway = null;
+    var arsenalHome = null;
+
+    try {
+      // Pitcher AWAY contra lineup HOME (a quién se enfrenta de verdad).
+      arsenalAway = await calcularFactorArsenalLineup(roster.pitcher_away_id, lineupHomeArr);
+    } catch (errAway) {
+      arsenalAway = null;
+    }
+
+    try {
+      // Pitcher HOME contra lineup AWAY.
+      arsenalHome = await calcularFactorArsenalLineup(roster.pitcher_home_id, lineupAwayArr);
+    } catch (errHome) {
+      arsenalHome = null;
+    }
+
+    return {
+      away: arsenalAway,
+      home: arsenalHome,
+      // confirmado/estado combinados = EXACTAMENTE los valores reales de
+      // cada lado (AND de .confirmado, concatenación de .nota) — no se
+      // inventa ningún criterio nuevo de confirmación.
+      confirmado: !!(arsenalAway && arsenalAway.confirmado === true && arsenalHome && arsenalHome.confirmado === true),
+      estado: (arsenalAway ? arsenalAway.nota : "SIN_DATOS") + "_AWAY|" + (arsenalHome ? arsenalHome.nota : "SIN_DATOS") + "_HOME"
+    };
+  }
+
+  // Pitcheo completo: equipo + pitcher abridor de un lado, contra el
+  // lineup del lado CONTRARIO. Se llama calcularFactorPitcheoCompleto()
+  // dos veces, sin alterar su contrato ni inventar un confirmado general.
+  async function resolverPitcheoTest(juego, bloques) {
+    var roster = bloques.roster;
+    var lineup = bloques.lineup;
+
+    if (!roster || !lineup) return null;
+    if (typeof calcularFactorPitcheoCompleto !== "function") return null;
+
+    var fechaHoy = (typeof MLBPRO_CORE !== "undefined" && typeof MLBPRO_CORE.hoyISO === "function")
+      ? MLBPRO_CORE.hoyISO()
+      : null;
+
+    var lineupAwayArr = Array.isArray(lineup.lineup_away) ? lineup.lineup_away : [];
+    var lineupHomeArr = Array.isArray(lineup.lineup_home) ? lineup.lineup_home : [];
+
+    var pitcheoAway = null;
+    var pitcheoHome = null;
+
+    try {
+      // Equipo AWAY, pitcher AWAY, contra lineup HOME.
+      pitcheoAway = await calcularFactorPitcheoCompleto(juego.away.id, roster.pitcher_away_id, lineupHomeArr, fechaHoy);
+    } catch (errAway) {
+      pitcheoAway = null;
+    }
+
+    try {
+      // Equipo HOME, pitcher HOME, contra lineup AWAY.
+      pitcheoHome = await calcularFactorPitcheoCompleto(juego.home.id, roster.pitcher_home_id, lineupAwayArr, fechaHoy);
+    } catch (errHome) {
+      pitcheoHome = null;
+    }
+
+    return {
+      away: pitcheoAway,
+      home: pitcheoHome,
+      // Igual que arsenal: confirmado/estado combinados son EXACTAMENTE
+      // el AND de pitcheoAway.confirmado/pitcheoHome.confirmado y sus
+      // coberturas reales — no se inventa un "pitcheo completo" aparte.
+      // Con las fuentes actuales esto será casi siempre false (ver
+      // prólogo, limitación ya documentada en factor-pitcheo-completo.js).
+      confirmado: !!(pitcheoAway && pitcheoAway.confirmado === true && pitcheoHome && pitcheoHome.confirmado === true),
+      estado: (pitcheoAway ? pitcheoAway.cobertura : "SIN_DATOS") + "_AWAY|" + (pitcheoHome ? pitcheoHome.cobertura : "SIN_DATOS") + "_HOME"
+    };
+  }
+
   function renderJuegoData(idx, juegoRaw, data) {
     var away = (juegoRaw.teams && juegoRaw.teams.away && juegoRaw.teams.away.team) ? juegoRaw.teams.away.team.name : "?";
     var home = (juegoRaw.teams && juegoRaw.teams.home && juegoRaw.teams.home.team) ? juegoRaw.teams.home.team.name : "?";
@@ -361,6 +588,8 @@
       '<div class="cobertura-bar">Cobertura: <b>' + data.cobertura.confirmados + '/' + data.cobertura.total + '</b> (' + data.cobertura.porcentaje + '%) · moneylineData estado: <b>' + data.estado + '</b></div>' +
       '<div class="bloques-grid">' + chips + '</div>' +
       fuerzaEquipoDetalleHtml(data.fuerza_equipo) +
+      arsenalPitcheoDetalleHtml('Arsenal vs Lineup', data.arsenal_vs_lineup, 'factor') +
+      arsenalPitcheoDetalleHtml('Pitcheo completo', data.pitcheo, 'factor_final') +
       lineaHtml +
       (data.notas.length ? '<div style="font-size:11px;color:#8b949e;">Notas: ' + data.notas.join(', ') + '</div>' : '') +
       '<div id="motor_' + idx + '"></div>' +
@@ -381,6 +610,12 @@
       var calcDisponible = typeof window.calcularFuerzaEquipo === "function";
       var coreDisponible = typeof window.MLBPRO_CORE !== "undefined" && typeof window.MLBPRO_CORE.hoyISO === "function";
       log("Fuerza de Equipo — calcularFuerzaEquipo disponible: " + calcDisponible + " · MLBPRO_CORE.hoyISO disponible: " + coreDisponible);
+
+      var rosterDisponible = typeof window.jalarRoster === "function";
+      var lineupDisponible = typeof window.jalarLineup === "function";
+      var arsenalDisponible = typeof window.calcularFactorArsenalLineup === "function";
+      var pitcheoDisponible = typeof window.calcularFactorPitcheoCompleto === "function";
+      log("jalarRoster disponible: " + rosterDisponible + " · jalarLineup disponible: " + lineupDisponible + " · calcularFactorArsenalLineup disponible: " + arsenalDisponible + " · calcularFactorPitcheoCompleto disponible: " + pitcheoDisponible);
 
       log("Jalando clima (histórico + hoy)...");
       await jalarClima(log);
@@ -418,16 +653,28 @@
           gamePk: g.gamePk,
           away_team: (g.teams && g.teams.away && g.teams.away.team) ? g.teams.away.team.name : null,
           home_team: (g.teams && g.teams.home && g.teams.home.team) ? g.teams.home.team.name : null,
+          // Necesarios para que moneyline-data.js resuelva lineup
+          // automáticamente vía jalarLineup(gamePk, awayId, homeId), y
+          // para que resolverPitcheoTest use el teamId real.
+          away_id: (g.teams && g.teams.away && g.teams.away.team) ? g.teams.away.team.id : null,
+          home_id: (g.teams && g.teams.home && g.teams.home.team) ? g.teams.home.team.id : null,
           venue: g.venue ? g.venue.name : null,
           game_date: g.gameDate,
           status: g.status && g.status.detailedState ? g.status.detailedState : null
         };
 
-        // Sin resolvers de roster/lineup/pitcheo/arsenal a propósito (ver
-        // aviso al inicio del archivo). fuerza_equipo NO necesita
-        // resolver aquí: moneyline-data.js lo resuelve automáticamente
-        // llamando a calcularFuerzaEquipo(home, away, MLBPRO_CORE.hoyISO()).
-        var data = await moneylineData(juegoEntrada, {});
+        // roster y lineup: sin resolver manual — se apoyan en la
+        // resolución automática ya integrada en moneyline-data.js
+        // (jalarRoster(gamePk) / jalarLineup(gamePk, awayId, homeId)).
+        // arsenal_vs_lineup y pitcheo: resolvers manuales de esta
+        // pantalla, porque moneyline-data.js no tiene fallback
+        // automático para esos dos bloques (solo para roster/lineup).
+        // fuerza_equipo: automático, ya integrado desde la ronda
+        // anterior (calcularFuerzaEquipo + MLBPRO_CORE.hoyISO()).
+        var data = await moneylineData(juegoEntrada, {
+          resolverArsenal: resolverArsenalTest,
+          resolverPitcheo: resolverPitcheoTest
+        });
 
         datosJuegos.push({ juegoRaw: g, data: data });
 
