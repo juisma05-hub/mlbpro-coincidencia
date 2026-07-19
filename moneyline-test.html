@@ -221,12 +221,16 @@
   .cobertura-bar { background:#0d1117; border:1px solid #30363d; border-radius:8px; padding:8px; margin:8px 0; font-size:12px; }
   .cobertura-bar b { color:#79c0ff; }
 
-  .bloques-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(140px,1fr)); gap:6px; margin:8px 0; }
-  .bloque-chip { font-size:11px; border-radius:6px; padding:6px 8px; border:1px solid #30363d; background:#0d1117; }
+  .bloques-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(140px,1fr)); gap:6px; margin:8px 0; align-items:stretch; }
+  .bloque-chip {
+    font-size:11px; border-radius:6px; padding:6px 8px; border:1px solid #30363d; background:#0d1117;
+    display:flex; flex-direction:column; justify-content:center;
+    height:50px; overflow:hidden;
+  }
   .bloque-chip.ok { border-color:#3fb950; color:#3fb950; }
   .bloque-chip.no { border-color:#484f58; color:#8b949e; }
-  .bloque-chip .nombre { font-weight:700; display:block; }
-  .bloque-chip .estado { font-size:10px; opacity:0.85; }
+  .bloque-chip .nombre { font-weight:700; display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .bloque-chip .estado { font-size:10px; opacity:0.85; display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-top:2px; }
 
   .fe-box { background:#0d1117; border:1px solid #30363d; border-radius:8px; padding:10px; margin:8px 0; font-size:12px; }
   .fe-hdr { font-size:12px; font-weight:700; color:#c9d1d9; margin-bottom:6px; }
@@ -337,7 +341,7 @@
 
   function bloqueChipHtml(nombre, estadoObj) {
     var cls = estadoObj.confirmado ? "ok" : "no";
-    return '<div class="bloque-chip ' + cls + '">' +
+    return '<div class="bloque-chip ' + cls + '" title="' + nombre + ': ' + estadoObj.estado + '">' +
       '<span class="nombre">' + nombre + '</span>' +
       '<span class="estado">' + estadoObj.estado + '</span>' +
     '</div>';
