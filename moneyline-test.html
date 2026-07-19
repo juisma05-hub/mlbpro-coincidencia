@@ -552,6 +552,173 @@
     };
   }
 
+  // ---- Resumen de favoritos por posición (solo presentación: lee
+  // campos ya devueltos por moneyline-data.js y por los resolvers de
+  // esta pantalla; no recalcula ningún factor, no toca resolvers, no
+  // toca moneyline-data.js/moneyline-motor.js). ----
+
+  function esFinito(v) {
+    return typeof v === "number" && Number.isFinite(v);
+  }
+
+  // Moneyline americano: si ambas son negativas, la más negativa (más
+  // lejos de 0) es favorita; si una es negativa y otra positiva, la
+  // negativa es favorita; si ambas son positivas, la menor positiva es
+  // favorita. Si faltan o no son finitas: null (NO_CONFIRMADO).
+  function favorMercado(lineaPregame) {
+    if (!lineaPregame) return null;
+    var a = lineaPregame.moneyline_away;
+    var h = lineaPregame.moneyline_home;
+    if (!esFinito(a) || !esFinito(h)) return null;
+    if (a === h) return "empate";
+    var aNeg = a < 0, hNeg = h < 0;
+    if (aNeg && hNeg) return a < h ? "away" : "home";
+    if (aNeg && !hNeg) return "away";
+    if (!aNeg && hNeg) return "home";
+    return a < h ? "away" : "home";
+  }
+
+  // Regla compartida por arsenal_vs_lineup y pitcheo: factor más bajo
+  // gana. Si faltan o no son finitos: null (NO_CONFIRMADO).
+  function favorFactorMenorGana(factorAway, factorHome) {
+    if (!esFinito(factorAway) || !esFinito(factorHome)) return null;
+    if (factorAway === factorHome) return "empate";
+    return factorAway < factorHome ? "away" : "home";
+  }
+
+  // A partir de un bloque {home, away, prediccion} de
+  // fuerza_equipo.detalle_unanimidad: distingue NO_CONFIRMADO (valores
+  // no finitos) de EMPATE (valores finitos pero sin predicción por
+  // empate exacto) de home/away.
+  function favorDesdeDetalle(obj) {
+    if (!obj || typeof obj !== "object") return null;
+    if (!esFinito(obj.home) || !esFinito(obj.away)) return null;
+    if (obj.prediccion === "home" || obj.prediccion === "away") return obj.prediccion;
+    return "empate";
+  }
+
+  function favorEtiqueta(valor, awayNombre, homeNombre) {
+    if (valor === "home") return String(homeNombre || "HOME").toUpperCase();
+    if (valor === "away") return String(awayNombre || "AWAY").toUpperCase();
+    if (valor === "empate") return "EMPATE";
+    return "NO_CONFIRMADO";
+  }
+
+  function resumenFavoritosHtml(data, awayNombre, homeNombre) {
+    var fe = data.fuerza_equipo;
+    var detalle = fe && fe.detalle_unanimidad;
+
+    var favMercado = favorMercado(data.linea_pregame);
+    var favFuerzaGeneral = favorDesdeDetalle(detalle && detalle.record_general);
+    var favLocalVisitante = favorDesdeDetalle(detalle && detalle.record_local_visitante);
+    var favUltimos10 = favorDesdeDetalle(detalle && detalle.ultimos_10);
+
+    var senalUnanimidad = (fe && (fe.senal_unanimidad === "home" || fe.senal_unanimidad === "away"))
+      ? fe.senal_unanimidad
+      : null;
+
+    // Campos reales de esta pantalla: data.arsenal_vs_lineup.away/.home
+    // y data.pitcheo.away/.home (resolverArsenalTest/resolverPitcheoTest
+    // ya devuelven así — no factor_away/factor_home).
+    var arsenal = data.arsenal_vs_lineup;
+    var arsenalAway = (arsenal && arsenal.away) ? arsenal.away.factor : undefined;
+    var arsenalHome = (arsenal && arsenal.home) ? arsenal.home.factor : undefined;
+    var favArsenal = favorFactorMenorGana(arsenalAway, arsenalHome);
+
+    var pitcheo = data.pitcheo;
+    var pitcheoAway = (pitcheo && pitcheo.away) ? pitcheo.away.factor_final : undefined;
+    var pitcheoHome = (pitcheo && pitcheo.home) ? pitcheo.home.factor_final : undefined;
+    var favPitcheo = favorFactorMenorGana(pitcheoAway, pitcheoHome);
+    var pitcheoConfirmadoCompleto = !!(pitcheo && pitcheo.confirmado === true);
+
+    // Conteo de posiciones confirmadas: Mercado, Fuerza general,
+    // Local/Visitante, Últimos 10 y Arsenal SIEMPRE se cuentan (incluso
+    // como NO_CONFIRMADO). Pitcheo solo suma si ambos lados están
+    // completamente confirmados (pitcheo.confirmado === true); si no,
+    // se muestra pero no se cuenta. Unanimidad y Coincidencia nunca
+    // suman (unanimidad resume las mismas tres señales de fuerza y
+    // duplicaría votos; coincidencia es climática/histórica, no de
+    // ganador).
+    var conteo = { home: 0, away: 0, empate: 0, no_confirmado: 0 };
+
+    function sumar(valor) {
+      if (valor === "home") conteo.home++;
+      else if (valor === "away") conteo.away++;
+      else if (valor === "empate") conteo.empate++;
+      else conteo.no_confirmado++;
+    }
+
+    // "Posiciones confirmadas" debe contar SOLO bloques que vinieron
+    // realmente confirmados (confirmado === true), no solo porque haya
+    // un valor numérico finito. El bloque visual sigue mostrando el
+    // favorito de cada dato aunque venga parcial (favMercado,
+    // favFuerzaGeneral, etc. no cambian) — lo único que cambia es qué
+    // entra al conteo de posiciones.
+    var mercadoConfirmado = !!(data.linea_pregame && data.linea_pregame.confirmado === true);
+    var fuerzaConfirmada = !!(fe && fe.confirmado === true);
+    var arsenalConfirmado = !!(arsenal && arsenal.confirmado === true);
+
+    sumar(mercadoConfirmado ? favMercado : null);
+    sumar(fuerzaConfirmada ? favFuerzaGeneral : null);
+    sumar(fuerzaConfirmada ? favLocalVisitante : null);
+    sumar(fuerzaConfirmada ? favUltimos10 : null);
+    sumar(arsenalConfirmado ? favArsenal : null);
+
+    if (pitcheoConfirmadoCompleto) {
+      sumar(favPitcheo);
+    }
+
+    var totalValidas = conteo.home + conteo.away + conteo.empate;
+    var ventajaGeneral;
+    if (totalValidas === 0) {
+      ventajaGeneral = "NO_CONFIRMADA";
+    } else if (conteo.home > conteo.away) {
+      ventajaGeneral = String(homeNombre || "HOME").toUpperCase();
+    } else if (conteo.away > conteo.home) {
+      ventajaGeneral = String(awayNombre || "AWAY").toUpperCase();
+    } else {
+      ventajaGeneral = "DIVIDIDA";
+    }
+
+    var pitcheoTxt = favorEtiqueta(favPitcheo, awayNombre, homeNombre);
+    if (favPitcheo !== null && !pitcheoConfirmadoCompleto) {
+      pitcheoTxt += " (PARCIAL)";
+    }
+
+    // Coincidencia: solo informativa. Nunca declara HOME/AWAY, nunca
+    // suma en posiciones. El contrato exacto de calcular-coincidencia.js
+    // no está confirmado en esta pantalla, así que se prueban varios
+    // nombres de campo posibles para el score/porcentaje sin asumir
+    // ninguno como obligatorio; si no aparece ninguno, se muestra solo
+    // el estado.
+    var coincidencia = data.coincidencia;
+    var coincidenciaScore = null;
+    if (coincidencia && typeof coincidencia === "object") {
+      if (coincidencia.top && esFinito(coincidencia.top.score)) coincidenciaScore = coincidencia.top.score;
+      else if (esFinito(coincidencia.score)) coincidenciaScore = coincidencia.score;
+      else if (esFinito(coincidencia.porcentaje)) coincidenciaScore = coincidencia.porcentaje;
+    }
+    var coincidenciaTxt = "Coincidencia climática/histórica: " +
+      (coincidenciaScore !== null
+        ? coincidenciaScore + "%"
+        : (coincidencia && coincidencia.estado !== undefined ? String(coincidencia.estado) : "NO_CONFIRMADO"));
+
+    return '<div class="fe-box">' +
+      '<div class="fe-hdr">VENTAJA GENERAL: <b style="color:#ffd60a;">' + ventajaGeneral + '</b></div>' +
+      '<div class="fe-perfil-linea">Posiciones confirmadas: HOME ' + conteo.home + ' · AWAY ' + conteo.away + ' · EMPATES ' + conteo.empate + ' · NO_CONFIRMADOS ' + conteo.no_confirmado + '</div>' +
+      '<div class="fe-perfil" style="margin-top:8px;">' +
+        '<div class="fe-perfil-linea">Mercado: ' + favorEtiqueta(favMercado, awayNombre, homeNombre) + '</div>' +
+        '<div class="fe-perfil-linea">Fuerza general: ' + favorEtiqueta(favFuerzaGeneral, awayNombre, homeNombre) + '</div>' +
+        '<div class="fe-perfil-linea">Local/Visitante: ' + favorEtiqueta(favLocalVisitante, awayNombre, homeNombre) + '</div>' +
+        '<div class="fe-perfil-linea">Últimos 10: ' + favorEtiqueta(favUltimos10, awayNombre, homeNombre) + '</div>' +
+        '<div class="fe-perfil-linea">Unanimidad: ' + (senalUnanimidad ? favorEtiqueta(senalUnanimidad, awayNombre, homeNombre) : "SIN UNANIMIDAD") + '</div>' +
+        '<div class="fe-perfil-linea">Arsenal: ' + favorEtiqueta(favArsenal, awayNombre, homeNombre) + '</div>' +
+        '<div class="fe-perfil-linea">Pitcheo: ' + pitcheoTxt + '</div>' +
+        '<div class="fe-perfil-linea">' + coincidenciaTxt + '</div>' +
+      '</div>' +
+    '</div>';
+  }
+
   function renderJuegoData(idx, juegoRaw, data) {
     var away = (juegoRaw.teams && juegoRaw.teams.away && juegoRaw.teams.away.team) ? juegoRaw.teams.away.team.name : "?";
     var home = (juegoRaw.teams && juegoRaw.teams.home && juegoRaw.teams.home.team) ? juegoRaw.teams.home.team.name : "?";
@@ -589,6 +756,7 @@
     return '<div class="juego" id="juego_' + idx + '">' +
       '<div class="matchup">' + away + ' @ ' + home + '</div>' +
       '<div class="estadio">' + venue + '</div>' +
+      resumenFavoritosHtml(data, away, home) +
       '<div class="cobertura-bar">Cobertura: <b>' + data.cobertura.confirmados + '/' + data.cobertura.total + '</b> (' + data.cobertura.porcentaje + '%) · moneylineData estado: <b>' + data.estado + '</b></div>' +
       '<div class="bloques-grid">' + chips + '</div>' +
       fuerzaEquipoDetalleHtml(data.fuerza_equipo) +
