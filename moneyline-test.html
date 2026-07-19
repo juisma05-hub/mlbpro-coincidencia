@@ -7,24 +7,39 @@
 
   RECIBE DE: mlb-routes.js, estadios.js, clima-cache.js, jalar-clima.js,
   parques-orientacion.js, score-match.js, calcular-coincidencia.js,
-  jalar-linea.js, moneyline-data.js, moneyline-motor.js.
+  jalar-linea.js, mlbpro-core.js, fuerza-equipo.js, moneyline-data.js,
+  moneyline-motor.js.
 
   ENTREGA A: nada — es una pantalla de prueba, no alimenta ningún otro
   módulo.
 
   NO TOCA: histórico, localStorage directamente (delega toda escritura a
   climaGuardarCache()/lineasGuardarCache() vía jalarClima()/jalarLineas(),
-  igual que index.html), Coincidencia, K6, F5.
+  igual que index.html; fuerza-equipo.js NO escribe histórico — solo LEE
+  el histórico ya existente vía MLBPRO_CORE.leerHistoricoCache()),
+  Coincidencia, K6, F5.
 
   IMPORTANTE — bloques NO conectados en esta prueba (a propósito):
-  roster, lineup, pitcheo, arsenal_vs_lineup y fuerza_equipo NO reciben
-  ningún resolver en esta pantalla. Sus interfaces reales
-  (jalar-roster.js, jalar-lineup.js, factor-pitcheo-completo.js,
-  factor-arsenal-lineup.js) no fueron auditadas en la sesión donde se
-  construyó esta pantalla, y conectarlas sin auditar violaría la regla de
-  "nada inventado". Esos cinco bloques aparecerán como NO_CONFIRMADO de
-  forma honesta. Solo clima, coincidencia y linea_pregame traen datos
-  reales aquí.
+  roster, lineup, pitcheo y arsenal_vs_lineup NO reciben ningún resolver
+  en esta pantalla. Sus interfaces reales (jalar-roster.js,
+  jalar-lineup.js, factor-pitcheo-completo.js, factor-arsenal-lineup.js)
+  no fueron auditadas en la sesión donde se construyó esta pantalla, y
+  conectarlas sin auditar violaría la regla de "nada inventado". Esos
+  cuatro bloques aparecerán como NO_CONFIRMADO de forma honesta.
+
+  fuerza_equipo SÍ está conectado en esta prueba: moneyline-data.js ya
+  integra la resolución automática de Fuerza de Equipo (sin necesidad de
+  resolver manual) llamando directamente a
+  calcularFuerzaEquipo(homeTeam, awayTeam, MLBPRO_CORE.hoyISO()), definida
+  en fuerza-equipo.js (que a su vez depende de mlbpro-core.js, ambos
+  cargados en esta página). Si calcularFuerzaEquipo, MLBPRO_CORE o
+  MLBPRO_CORE.hoyISO no estuvieran disponibles, moneyline-data.js deja el
+  bloque como NO_CONFIRMADO (estado DEPENDENCIA_FALTANTE) — nunca 1.0 ni
+  ningún valor neutral inventado. Este archivo agrega una prueba aislada
+  de ese caso (botón "PROBAR DEPENDENCIA FALTANTE").
+
+  Clima, coincidencia, línea pregame y fuerza_equipo traen datos reales
+  aquí. roster, lineup, pitcheo y arsenal_vs_lineup siguen NO_CONFIRMADO.
 
   PESOS DEL MOTOR: esta pantalla NO trae ningún peso por defecto. Los
   campos de peso están vacíos a propósito — el operador decide qué pesos
@@ -41,6 +56,39 @@
   vía Intl.DateTimeFormat con America/New_York real y cae a un fallback
   seguro si la timezone fallara. Mismo corte de "hoy" que usan
   jalar-clima.js y jalar-linea.js.
+
+  CORREGIDO 19 jul 2026 (integración real de prueba — Fuerza de Equipo):
+  - Se agregan <script src="mlbpro-core.js"> y <script
+    src="fuerza-equipo.js"> antes de moneyline-data.js, para que la
+    resolución automática de Fuerza de Equipo (ya integrada en
+    moneyline-data.js) tenga sus dependencias reales disponibles en esta
+    página.
+  - El aviso inicial se actualiza: fuerza_equipo deja de listarse como
+    bloque NO conectado a propósito — ahora se resuelve automáticamente,
+    sin resolver manual.
+  - Cada tarjeta de juego ahora muestra un bloque dedicado de Fuerza de
+    Equipo: confirmado/estado, ventana_reciente, resumen de los perfiles
+    completos home y away (juegos, % victorias, últimos 5/6/10, récord
+    local/visitante), y el desglose de senal_unanimidad,
+    confirmado_unanimidad y detalle_unanimidad (las tres señales:
+    récord general, local/visitante, últimos 10 con ventana oficial).
+  - Se agrega una verificación de coherencia: compara
+    data.cobertura.detalle.fuerza_equipo.confirmado contra
+    data.fuerza_equipo.confirmado y avisa en consola si no coinciden
+    (no debería ocurrir nunca; es solo una comprobación defensiva de
+    esta pantalla de prueba, no cambia moneyline-data.js).
+  - Se agrega un botón de diagnóstico aislado, "PROBAR DEPENDENCIA
+    FALTANTE", que retira temporalmente window.calcularFuerzaEquipo y
+    window.MLBPRO_CORE, llama a moneylineData() con un juego sintético,
+    confirma que fuerza_equipo.estado sea DEPENDENCIA_FALTANTE, y
+    restaura ambas dependencias globales al terminar (en un finally,
+    para no afectar el resto de la página ni el flujo normal).
+  - Se agrega un listener de window.onerror para que cualquier error de
+    script no capturado se vea en la consola de esta página en vez de
+    fallar en silencio.
+  - No se modifica moneyline-data.js, moneyline-motor.js, fuerza-equipo.js
+    ni mlbpro-core.js. No se conectan roster, lineup, pitcheo ni
+    arsenal_vs_lineup. No se toca el bug pendiente de empates.
 
   SI ESTE ARCHIVO FALLA: no afecta nada más — es una herramienta de
   prueba aislada.
@@ -62,6 +110,7 @@
   .go:disabled { background:#30363d; color:#8b949e; }
   .go-motor { width:100%; border:0; border-radius:10px; padding:16px; font-size:16px; font-weight:800; color:#fff; background:#5b3da8; cursor:pointer; margin-top:14px; }
   .go-motor:disabled { background:#30363d; color:#8b949e; }
+  .go-diag { width:100%; border:0; border-radius:10px; padding:14px; font-size:14px; font-weight:800; color:#fff; background:#8a4b08; cursor:pointer; margin-top:10px; }
 
   .aviso { background:#2d2408; border:1px solid #6b5416; border-radius:8px; padding:10px 12px; font-size:12px; color:#ffd60a; margin-bottom:14px; }
 
@@ -72,6 +121,11 @@
   .pcampo label { font-size:11px; color:#8b949e; }
   .pcampo input { background:#0d1117; border:1px solid #30363d; border-radius:6px; padding:8px; color:#e6edf3; font-size:13px; }
   .pfila { display:flex; align-items:center; gap:6px; margin-top:8px; font-size:12px; color:#c9d1d9; }
+
+  .diag-box { background:#161b22; border:1px solid #30363d; border-radius:12px; padding:14px; margin-top:14px; }
+  .diag-box .hdr { font-size:13px; font-weight:800; color:#e6edf3; margin-bottom:6px; }
+  .diag-box .desc { font-size:11px; color:#8b949e; margin-bottom:8px; }
+  #diagResultado { margin-top:8px; }
 
   .juego { background:#161b22; border:1px solid #30363d; border-radius:14px; padding:14px; margin-top:14px; }
   .matchup { font-size:16px; font-weight:800; }
@@ -86,6 +140,12 @@
   .bloque-chip.no { border-color:#484f58; color:#8b949e; }
   .bloque-chip .nombre { font-weight:700; display:block; }
   .bloque-chip .estado { font-size:10px; opacity:0.85; }
+
+  .fe-box { background:#0d1117; border:1px solid #30363d; border-radius:8px; padding:10px; margin:8px 0; font-size:12px; }
+  .fe-hdr { font-size:12px; font-weight:700; color:#c9d1d9; margin-bottom:6px; }
+  .fe-perfil { border-top:1px dashed #30363d; padding-top:6px; margin-top:6px; }
+  .fe-perfil-tit { font-weight:700; color:#79c0ff; font-size:11px; margin-bottom:2px; }
+  .fe-perfil-linea { font-size:11px; color:#c9d1d9; margin-top:1px; }
 
   .linea-box { background:#0d1117; border:1px dashed #30363d; border-radius:8px; padding:10px; margin:8px 0; font-size:12px; }
   .linea-box .val { font-size:15px; font-weight:800; color:#ffd60a; }
@@ -108,7 +168,7 @@
 <a href="index.html" style="display:block; text-align:center; color:#5b9fd8; font-size:13px; padding:8px; text-decoration:none;">← Volver al inicio</a>
 <main>
   <div class="aviso">
-    ⚠️ AVISO: roster, lineup, pitcheo, arsenal_vs_lineup y fuerza_equipo NO están conectados en esta prueba (interfaces no auditadas todavía). Van a salir como NO_CONFIRMADO. Solo clima, coincidencia y línea pregame traen datos reales.
+    ⚠️ AVISO: roster, lineup, pitcheo y arsenal_vs_lineup NO están conectados en esta prueba (interfaces no auditadas todavía). Van a salir como NO_CONFIRMADO. fuerza_equipo SÍ está conectado — moneyline-data.js lo resuelve automáticamente llamando a calcularFuerzaEquipo() (fuerza-equipo.js + mlbpro-core.js, cargados en esta página), sin resolver manual. Clima, coincidencia, línea pregame y fuerza_equipo traen datos reales aquí.
   </div>
 
   <button id="goCargar" class="go">CARGAR JUEGOS DE HOY (moneyline-data)</button>
@@ -131,6 +191,18 @@
 
   <button id="goMotor" class="go-motor" disabled>CORRER MOTOR (moneyline-motor) CON ESTOS PESOS</button>
 
+  <div class="diag-box">
+    <div class="hdr">DIAGNÓSTICO — Fuerza de Equipo</div>
+    <div class="desc">
+      Prueba aislada: retira temporalmente calcularFuerzaEquipo y
+      MLBPRO_CORE, llama a moneylineData() con un juego sintético, y
+      confirma que fuerza_equipo quede como DEPENDENCIA_FALTANTE. Restaura
+      ambas dependencias al terminar. No afecta el resto de la página.
+    </div>
+    <button id="goDiagFaltante" class="go-diag">PROBAR DEPENDENCIA FALTANTE (fuerza_equipo)</button>
+    <div id="diagResultado"></div>
+  </div>
+
   <div id="lista"></div>
   <div id="console">Pulsa "CARGAR JUEGOS DE HOY".</div>
 </main>
@@ -143,6 +215,8 @@
 <script src="score-match.js"></script>
 <script src="calcular-coincidencia.js"></script>
 <script src="jalar-linea.js"></script>
+<script src="../mlbpro-clima-match/mlbpro-core.js"></script>
+<script src="../mlbpro-clima-match/fuerza-equipo.js"></script>
 <script src="moneyline-data.js"></script>
 <script src="moneyline-motor.js"></script>
 
@@ -153,11 +227,97 @@
 
   function log(t) { var d = document.createElement("div"); d.textContent = t; consoleEl.appendChild(d); consoleEl.scrollTop = consoleEl.scrollHeight; }
 
+  // Cualquier error de script no capturado se ve en esta consola, en vez
+  // de fallar en silencio. Solo diagnóstico — no cambia ninguna lógica.
+  window.addEventListener("error", function (e) {
+    log("ERROR NO CAPTURADO: " + (e && e.message ? e.message : e));
+  });
+
   function bloqueChipHtml(nombre, estadoObj) {
     var cls = estadoObj.confirmado ? "ok" : "no";
     return '<div class="bloque-chip ' + cls + '">' +
       '<span class="nombre">' + nombre + '</span>' +
       '<span class="estado">' + estadoObj.estado + '</span>' +
+    '</div>';
+  }
+
+  function valorOND(v) {
+    return (v === null || v === undefined) ? "N/D" : v;
+  }
+
+  function perfilResumenHtml(perfil, etiqueta) {
+    if (!perfil || typeof perfil !== "object") {
+      return '<div class="fe-perfil">' +
+        '<div class="fe-perfil-tit">' + etiqueta + '</div>' +
+        '<div class="fe-perfil-linea">Sin perfil (NO_CONFIRMADO)</div>' +
+      '</div>';
+    }
+
+    var u5 = perfil.ultimos_5 ? (perfil.ultimos_5.ganados + '-' + perfil.ultimos_5.perdidos + ' (' + perfil.ultimos_5.juegos + 'j)') : 'N/D';
+    var u6 = perfil.ultimos_6 ? (perfil.ultimos_6.ganados + '-' + perfil.ultimos_6.perdidos + ' (' + perfil.ultimos_6.juegos + 'j)') : 'N/D';
+    var u10 = perfil.ultimos_10 ? (perfil.ultimos_10.ganados + '-' + perfil.ultimos_10.perdidos + ' (' + perfil.ultimos_10.juegos + 'j)') : 'N/D';
+    var rl = perfil.record_local ? (perfil.record_local.ganados + '-' + perfil.record_local.perdidos) : 'N/D';
+    var rv = perfil.record_visitante ? (perfil.record_visitante.ganados + '-' + perfil.record_visitante.perdidos) : 'N/D';
+
+    return '<div class="fe-perfil">' +
+      '<div class="fe-perfil-tit">' + etiqueta + ' — ' + valorOND(perfil.equipo) + '</div>' +
+      '<div class="fe-perfil-linea">confirmado: ' + (perfil.confirmado ? 'sí' : 'no') + ' · juegos_totales: ' + valorOND(perfil.juegos_totales) + ' · % victorias: ' + valorOND(perfil.porcentaje_victorias) + '</div>' +
+      '<div class="fe-perfil-linea">Últimos 5: ' + u5 + ' · Últimos 6: ' + u6 + ' · Últimos 10: ' + u10 + '</div>' +
+      '<div class="fe-perfil-linea">Récord local: ' + rl + ' · Récord visitante: ' + rv + '</div>' +
+    '</div>';
+  }
+
+  function filaSenalHtml(nombre, obj) {
+    if (!obj || typeof obj !== "object") {
+      return '<div class="fe-perfil-linea">' + nombre + ': N/D</div>';
+    }
+
+    var extra = "";
+    if (obj.ventana_completa !== undefined) {
+      extra = " (ventana completa: " + (obj.ventana_completa ? "sí" : "no") + ")";
+    }
+
+    return '<div class="fe-perfil-linea">' + nombre + extra + ': home=' + valorOND(obj.home) +
+      ' away=' + valorOND(obj.away) +
+      ' → ' + (obj.prediccion || 'sin predicción') + '</div>';
+  }
+
+  function fuerzaEquipoDetalleHtml(fe) {
+    if (!fe || typeof fe !== "object") {
+      return '<div class="fe-box"><div class="fe-hdr">Fuerza de Equipo: <b style="color:#8b949e;">NO_CONFIRMADO (sin datos)</b></div></div>';
+    }
+
+    var confirmadoTxt = fe.confirmado
+      ? '<b style="color:#3fb950;">CONFIRMADO</b>'
+      : '<b style="color:#8b949e;">' + (fe.estado || 'NO_CONFIRMADO') + '</b>';
+
+    var ventana = fe.ventana_reciente ? fe.ventana_reciente : 'N/D';
+
+    var unanimidadTxt;
+    if (fe.senal_unanimidad === "home" || fe.senal_unanimidad === "away") {
+      unanimidadTxt = '<b style="color:#3fb950;">' + String(fe.senal_unanimidad).toUpperCase() + '</b>';
+    } else {
+      unanimidadTxt = '<b style="color:#8b949e;">SIN UNANIMIDAD</b>';
+    }
+
+    var detalleHtml = "";
+    if (fe.detalle_unanimidad && typeof fe.detalle_unanimidad === "object") {
+      var du = fe.detalle_unanimidad;
+      detalleHtml =
+        filaSenalHtml('Récord general', du.record_general) +
+        filaSenalHtml('Local/Visitante', du.record_local_visitante) +
+        filaSenalHtml('Últimos 10', du.ultimos_10);
+    }
+
+    return '<div class="fe-box">' +
+      '<div class="fe-hdr">Fuerza de Equipo: ' + confirmadoTxt + ' · ventana_reciente: <b>' + ventana + '</b></div>' +
+      perfilResumenHtml(fe.home, 'HOME') +
+      perfilResumenHtml(fe.away, 'AWAY') +
+      '<div class="fe-perfil" style="border-top-color:#5b3da8;">' +
+        '<div class="fe-perfil-tit" style="color:#c9a6ff;">UNANIMIDAD (récord general + local/visitante + últimos 10)</div>' +
+        '<div class="fe-perfil-linea">confirmado_unanimidad: <b>' + (fe.confirmado_unanimidad ? 'true' : 'false') + '</b> · senal_unanimidad: ' + unanimidadTxt + '</div>' +
+        detalleHtml +
+      '</div>' +
     '</div>';
   }
 
@@ -170,6 +330,17 @@
     var chips = "";
     for (var nombre in bloques) {
       if (bloques.hasOwnProperty(nombre)) chips += bloqueChipHtml(nombre, bloques[nombre]);
+    }
+
+    // Verificación de coherencia entre cobertura.detalle.fuerza_equipo y
+    // data.fuerza_equipo — deben coincidir siempre. Solo diagnóstico de
+    // esta pantalla, no cambia moneyline-data.js.
+    if (bloques.fuerza_equipo) {
+      var confirmadoEnCobertura = bloques.fuerza_equipo.confirmado === true;
+      var confirmadoEnBloque = !!(data.fuerza_equipo && data.fuerza_equipo.confirmado === true);
+      if (confirmadoEnCobertura !== confirmadoEnBloque) {
+        log("AVISO coherencia (juego " + idx + "): cobertura.detalle.fuerza_equipo.confirmado (" + confirmadoEnCobertura + ") no coincide con fuerza_equipo.confirmado (" + confirmadoEnBloque + ").");
+      }
     }
 
     var lineaHtml;
@@ -189,6 +360,7 @@
       '<div class="estadio">' + venue + '</div>' +
       '<div class="cobertura-bar">Cobertura: <b>' + data.cobertura.confirmados + '/' + data.cobertura.total + '</b> (' + data.cobertura.porcentaje + '%) · moneylineData estado: <b>' + data.estado + '</b></div>' +
       '<div class="bloques-grid">' + chips + '</div>' +
+      fuerzaEquipoDetalleHtml(data.fuerza_equipo) +
       lineaHtml +
       (data.notas.length ? '<div style="font-size:11px;color:#8b949e;">Notas: ' + data.notas.join(', ') + '</div>' : '') +
       '<div id="motor_' + idx + '"></div>' +
@@ -206,6 +378,10 @@
     document.getElementById("goMotor").disabled = true;
 
     try {
+      var calcDisponible = typeof window.calcularFuerzaEquipo === "function";
+      var coreDisponible = typeof window.MLBPRO_CORE !== "undefined" && typeof window.MLBPRO_CORE.hoyISO === "function";
+      log("Fuerza de Equipo — calcularFuerzaEquipo disponible: " + calcDisponible + " · MLBPRO_CORE.hoyISO disponible: " + coreDisponible);
+
       log("Jalando clima (histórico + hoy)...");
       await jalarClima(log);
 
@@ -247,9 +423,10 @@
           status: g.status && g.status.detailedState ? g.status.detailedState : null
         };
 
-        // Sin resolvers de roster/lineup/pitcheo/arsenal/fuerza_equipo a
-        // propósito (ver aviso al inicio del archivo). moneyline-data.js
-        // los deja en null/NO_CONFIRMADO por su propia cuenta.
+        // Sin resolvers de roster/lineup/pitcheo/arsenal a propósito (ver
+        // aviso al inicio del archivo). fuerza_equipo NO necesita
+        // resolver aquí: moneyline-data.js lo resuelve automáticamente
+        // llamando a calcularFuerzaEquipo(home, away, MLBPRO_CORE.hoyISO()).
         var data = await moneylineData(juegoEntrada, {});
 
         datosJuegos.push({ juegoRaw: g, data: data });
@@ -265,6 +442,68 @@
     } finally {
       btn.disabled = false;
       btn.textContent = "CARGAR JUEGOS DE HOY (moneyline-data)";
+    }
+  });
+
+  // Diagnóstico aislado: confirma que, si faltan las dependencias
+  // globales de Fuerza de Equipo (calcularFuerzaEquipo / MLBPRO_CORE /
+  // MLBPRO_CORE.hoyISO), moneyline-data.js deja fuerza_equipo como
+  // DEPENDENCIA_FALTANTE — nunca 1.0 ni un valor neutral inventado.
+  // Restaura ambas dependencias globales en un finally, sin afectar el
+  // resto de la página.
+  document.getElementById("goDiagFaltante").addEventListener("click", async function () {
+    var btn = this;
+    var resultadoEl = document.getElementById("diagResultado");
+    btn.disabled = true;
+    resultadoEl.innerHTML = "";
+
+    var originalCalc = window.calcularFuerzaEquipo;
+    var originalCore = window.MLBPRO_CORE;
+
+    try {
+      delete window.calcularFuerzaEquipo;
+      delete window.MLBPRO_CORE;
+
+      var juegoSintetico = {
+        gamePk: null,
+        away_team: "Equipo Prueba Away",
+        home_team: "Equipo Prueba Home",
+        venue: "Estadio de Prueba",
+        game_date: null,
+        status: null
+      };
+
+      var data = await moneylineData(juegoSintetico, {});
+
+      var fe = data.fuerza_equipo;
+      var esperado = fe && fe.estado === "DEPENDENCIA_FALTANTE" && fe.confirmado === false;
+      var senalNula = data.senal_unanimidad === null;
+      var confirmadoUnanimidadFalso = data.confirmado_unanimidad === false;
+      var detalleNulo = data.detalle_unanimidad === null;
+
+      var pasoTxt = (esperado && senalNula && confirmadoUnanimidadFalso && detalleNulo)
+        ? '<b style="color:#3fb950;">PASÓ</b>'
+        : '<b style="color:#e05252;">FALLÓ</b>';
+
+      resultadoEl.innerHTML =
+        '<div class="fe-box">' +
+          '<div class="fe-hdr">Resultado diagnóstico: ' + pasoTxt + '</div>' +
+          '<div class="fe-perfil-linea">fuerza_equipo.estado: ' + (fe ? fe.estado : 'N/D') + '</div>' +
+          '<div class="fe-perfil-linea">fuerza_equipo.confirmado: ' + (fe ? fe.confirmado : 'N/D') + '</div>' +
+          '<div class="fe-perfil-linea">senal_unanimidad: ' + data.senal_unanimidad + '</div>' +
+          '<div class="fe-perfil-linea">confirmado_unanimidad: ' + data.confirmado_unanimidad + '</div>' +
+          '<div class="fe-perfil-linea">detalle_unanimidad: ' + data.detalle_unanimidad + '</div>' +
+          '<details class="fold"><summary>Ver resultado completo (JSON crudo)</summary><pre class="raw">' + JSON.stringify(data, null, 2) + '</pre></details>' +
+        '</div>';
+
+      log("Diagnóstico dependencia faltante: " + (esperado && senalNula && confirmadoUnanimidadFalso && detalleNulo ? "PASÓ" : "FALLÓ"));
+    } catch (e) {
+      resultadoEl.innerHTML = '<div class="fe-box"><div class="fe-hdr"><b style="color:#e05252;">ERROR en diagnóstico</b></div><div class="fe-perfil-linea">' + (e && e.message ? e.message : e) + '</div></div>';
+      log("ERROR en diagnóstico dependencia faltante: " + (e && e.message ? e.message : e));
+    } finally {
+      window.calcularFuerzaEquipo = originalCalc;
+      window.MLBPRO_CORE = originalCore;
+      btn.disabled = false;
     }
   });
 
