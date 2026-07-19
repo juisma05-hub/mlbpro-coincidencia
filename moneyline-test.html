@@ -527,7 +527,9 @@
   // W/L Streak (W1, W2, W3… / L1, L2…) junto al favorito del mercado.
   // No inventa el dato: busca la racha real en el perfil de fuerza de
   // equipo (varios nombres posibles) y, si no existe todavía, muestra
-  // "Pendiente de integración".
+  // "Pendiente de integración". Si el valor real viene como objeto en
+  // vez de texto, se interpreta con formatearStreak() en vez de
+  // imprimirlo directamente (lo que producía "[object Object]").
   function streakLinea(data, awayNombre, homeNombre) {
     var fe = data.fuerza_equipo;
     var perfilAway = fe && fe.away;
@@ -537,10 +539,72 @@
     var streakAway = buscarCampo(perfilAway, candidatos);
     var streakHome = buscarCampo(perfilHome, candidatos);
 
-    var awayTxt = (streakAway === null || streakAway === undefined || streakAway === "") ? "Pendiente de integración" : streakAway;
-    var homeTxt = (streakHome === null || streakHome === undefined || streakHome === "") ? "Pendiente de integración" : streakHome;
+    var awayFormateado = formatearStreak(streakAway);
+    var homeFormateado = formatearStreak(streakHome);
+
+    var awayTxt = (awayFormateado === null) ? "Pendiente de integración" : awayFormateado;
+    var homeTxt = (homeFormateado === null) ? "Pendiente de integración" : homeFormateado;
 
     return '<div class="favorito-linea" style="margin-top:6px;">W/L Streak — ' + awayNombre + ': <span class="tag">' + awayTxt + '</span> &nbsp; ' + homeNombre + ': <span class="tag">' + homeTxt + '</span></div>';
+  }
+
+  // Convierte el valor real de racha a texto seguro para mostrar.
+  // - Si ya es texto o número, se muestra tal cual.
+  // - Si es un objeto, se buscan sus campos reales (tipo, resultado,
+  //   letra, racha, cantidad, juegos, numero, length, wins, losses) y
+  //   se arma el formato W1/W2/W3.../L1/L2/L3...
+  // - Si no se puede interpretar el objeto con seguridad, devuelve
+  //   null (streakLinea lo convierte en "Pendiente de integración").
+  // Nunca devuelve el objeto crudo, para no imprimir "[object Object]".
+  function formatearStreak(valor) {
+    if (valor === null || valor === undefined || valor === "") return null;
+
+    if (typeof valor === "string" || typeof valor === "number") {
+      return String(valor);
+    }
+
+    if (typeof valor !== "object") return null;
+
+    // Letra W/L a partir de campos como tipo, resultado o letra.
+    var letraCandidata = buscarCampo(valor, ["letra", "tipo", "resultado"]);
+    var letra = null;
+    if (typeof letraCandidata === "string" && letraCandidata.trim() !== "") {
+      var lc = letraCandidata.trim().toUpperCase();
+      if (lc === "W" || lc === "WIN" || lc === "WINS" || lc === "GANADA" || lc === "GANADO" || lc === "GANA" || lc === "V" || lc === "VICTORIA") letra = "W";
+      else if (lc === "L" || lc === "LOSS" || lc === "LOSSES" || lc === "PERDIDA" || lc === "PERDIDO" || lc === "PIERDE" || lc === "DERROTA") letra = "L";
+      else if (lc.charAt(0) === "W" || lc.charAt(0) === "L") letra = lc.charAt(0);
+    }
+
+    // Cantidad de juegos en la racha, a partir de campos como racha,
+    // cantidad, juegos, numero o length.
+    var cantidadCandidata = buscarCampo(valor, ["cantidad", "racha", "juegos", "numero", "length"]);
+    var cantidad = null;
+    if (typeof cantidadCandidata === "number" && Number.isFinite(cantidadCandidata)) {
+      cantidad = cantidadCandidata;
+    } else if (typeof cantidadCandidata === "string" && cantidadCandidata.trim() !== "" && Number.isFinite(Number(cantidadCandidata))) {
+      cantidad = Number(cantidadCandidata);
+    }
+
+    // Si no hay letra explícita pero sí wins/losses numéricos, se
+    // deduce la racha del lado con valor positivo (y el otro en 0).
+    if (letra === null) {
+      var wins = (typeof valor.wins === "number" && Number.isFinite(valor.wins)) ? valor.wins : null;
+      var losses = (typeof valor.losses === "number" && Number.isFinite(valor.losses)) ? valor.losses : null;
+      if (wins !== null && wins > 0 && (losses === null || losses === 0)) {
+        letra = "W";
+        if (cantidad === null) cantidad = wins;
+      } else if (losses !== null && losses > 0 && (wins === null || wins === 0)) {
+        letra = "L";
+        if (cantidad === null) cantidad = losses;
+      }
+    }
+
+    if (letra !== null && cantidad !== null && Number.isFinite(cantidad) && cantidad > 0) {
+      return letra + cantidad;
+    }
+
+    // No se pudo interpretar el objeto con seguridad.
+    return null;
   }
 
   function mercadoConfirmadoTxt(favMercado, lp, awayNombre, homeNombre) {
