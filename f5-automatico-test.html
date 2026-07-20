@@ -123,6 +123,20 @@
     padding: 10px 6px;
   }
 
+  .equipo-col.favorito-mercado {
+    border-color: #d29922;
+    box-shadow: inset 0 0 0 1px rgba(210, 153, 34, 0.25);
+  }
+
+  .equipo-col.favorito-mlbpro {
+    box-shadow: inset 0 0 0 1px rgba(121, 192, 255, 0.3);
+  }
+
+  .equipo-col.favorito-mercado.favorito-mlbpro {
+    border-color: #3fb950;
+    box-shadow: inset 0 0 0 1px rgba(63, 185, 80, 0.35);
+  }
+
   .equipo-col .nombre {
     font-size: 14px;
     font-weight: 800;
@@ -158,6 +172,32 @@
     margin-top: 5px;
   }
 
+  .etiquetas-equipo {
+    min-height: 48px;
+    margin-top: 6px;
+  }
+
+  .etiqueta-equipo {
+    display: inline-block;
+    margin: 3px 2px 0;
+    padding: 3px 7px;
+    border-radius: 20px;
+    font-size: 9px;
+    font-weight: 900;
+  }
+
+  .etiqueta-equipo.mercado {
+    color: #e3b341;
+    border: 1px solid #9e6a03;
+    background: #2d2208;
+  }
+
+  .etiqueta-equipo.mlbpro {
+    color: #79c0ff;
+    border: 1px solid #1f6feb;
+    background: #0c2d6b;
+  }
+
   .fav {
     display: inline-block;
     margin-top: 7px;
@@ -183,6 +223,56 @@
     background: #21262d;
     color: #6e7681;
     border: 1px solid #30363d;
+  }
+
+  .resumen-decision {
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 10px;
+    padding: 10px;
+    margin-bottom: 10px;
+  }
+
+  .decision-fila {
+    display: grid;
+    grid-template-columns: 145px 1fr;
+    gap: 8px;
+    align-items: center;
+    padding: 7px 0;
+    border-bottom: 1px solid #21262d;
+  }
+
+  .decision-fila:last-child {
+    border-bottom: 0;
+  }
+
+  .decision-titulo {
+    font-size: 10px;
+    font-weight: 800;
+    color: #8b949e;
+    text-transform: uppercase;
+  }
+
+  .decision-valor {
+    font-size: 13px;
+    font-weight: 900;
+    color: #e6edf3;
+  }
+
+  .decision-valor.mercado {
+    color: #e3b341;
+  }
+
+  .decision-valor.mlbpro {
+    color: #79c0ff;
+  }
+
+  .decision-valor.valor {
+    color: #3fb950;
+  }
+
+  .decision-valor.sin-valor {
+    color: #8b949e;
   }
 
   .empate-f5 {
@@ -316,6 +406,13 @@
     font-size: 12px;
     margin-top: 6px;
   }
+
+  @media (max-width: 520px) {
+    .decision-fila {
+      grid-template-columns: 1fr;
+      gap: 3px;
+    }
+  }
 </style>
 </head>
 
@@ -433,6 +530,117 @@ function detalleCarreraje(c) {
   return partes.join("<br>");
 }
 
+function probabilidadAmericana(cuota) {
+  if (!esNumero(cuota) || cuota === 0) {
+    return null;
+  }
+
+  if (cuota < 0) {
+    return (-cuota) / ((-cuota) + 100);
+  }
+
+  return 100 / (cuota + 100);
+}
+
+function favoritoMercado(
+  awayNombre,
+  homeNombre,
+  awayPrice,
+  homePrice
+) {
+  var probAway = probabilidadAmericana(awayPrice);
+  var probHome = probabilidadAmericana(homePrice);
+
+  if (
+    !esNumero(probAway) ||
+    !esNumero(probHome)
+  ) {
+    return {
+      lado: null,
+      nombre: "NO_CONFIRMADO"
+    };
+  }
+
+  if (probAway > probHome) {
+    return {
+      lado: "VISITANTE",
+      nombre: awayNombre
+    };
+  }
+
+  if (probHome > probAway) {
+    return {
+      lado: "LOCAL",
+      nombre: homeNombre
+    };
+  }
+
+  return {
+    lado: "EMPATE",
+    nombre: "PAREJO"
+  };
+}
+
+function favoritoMlbPro(
+  awayNombre,
+  homeNombre,
+  pctAway,
+  pctHome
+) {
+  if (
+    !esNumero(pctAway) ||
+    !esNumero(pctHome)
+  ) {
+    return {
+      lado: null,
+      nombre: "NO_CONFIRMADO"
+    };
+  }
+
+  if (pctAway > pctHome) {
+    return {
+      lado: "VISITANTE",
+      nombre: awayNombre
+    };
+  }
+
+  if (pctHome > pctAway) {
+    return {
+      lado: "LOCAL",
+      nombre: homeNombre
+    };
+  }
+
+  return {
+    lado: "EMPATE",
+    nombre: "PAREJO"
+  };
+}
+
+function equipoSeleccionado(
+  seleccion,
+  awayNombre,
+  homeNombre
+) {
+  if (seleccion === "VISITANTE") {
+    return awayNombre;
+  }
+
+  if (seleccion === "LOCAL") {
+    return homeNombre;
+  }
+
+  if (seleccion === "SIN_VALOR_CONFIRMADO") {
+    return "SIN APUESTA CON VALOR";
+  }
+
+  if (seleccion === "PAREJO_SIN_VENTAJA") {
+    return "PAREJO — SIN VENTAJA";
+  }
+
+  return "NO_CONFIRMADO";
+}
+
 async function correrTodo() {
   if (corriendo) return;
 
@@ -477,6 +685,84 @@ async function correrTodo() {
 
       var valorAway = propio.seleccion === "VISITANTE";
       var valorHome = propio.seleccion === "LOCAL";
+
+      var favoritoMercadoObj =
+        favoritoMercado(
+          awayNombre,
+          homeNombre,
+          awayPrice,
+          homePrice
+        );
+
+      var favoritoMlbProObj =
+        favoritoMlbPro(
+          awayNombre,
+          homeNombre,
+          pctAway,
+          pctHome
+        );
+
+      var seleccionNombre =
+        equipoSeleccionado(
+          propio.seleccion,
+          awayNombre,
+          homeNombre
+        );
+
+      var awayFavoritoMercado =
+        favoritoMercadoObj.lado === "VISITANTE";
+
+      var homeFavoritoMercado =
+        favoritoMercadoObj.lado === "LOCAL";
+
+      var awayFavoritoMlbPro =
+        favoritoMlbProObj.lado === "VISITANTE";
+
+      var homeFavoritoMlbPro =
+        favoritoMlbProObj.lado === "LOCAL";
+
+      var awayClases = "equipo-col";
+      var homeClases = "equipo-col";
+
+      if (awayFavoritoMercado) {
+        awayClases += " favorito-mercado";
+      }
+
+      if (awayFavoritoMlbPro) {
+        awayClases += " favorito-mlbpro";
+      }
+
+      if (homeFavoritoMercado) {
+        homeClases += " favorito-mercado";
+      }
+
+      if (homeFavoritoMlbPro) {
+        homeClases += " favorito-mlbpro";
+      }
+
+      var etiquetasAway = "";
+
+      if (awayFavoritoMercado) {
+        etiquetasAway +=
+          '<span class="etiqueta-equipo mercado">FAVORITO MERCADO</span>';
+      }
+
+      if (awayFavoritoMlbPro) {
+        etiquetasAway +=
+          '<span class="etiqueta-equipo mlbpro">FAVORITO MLBPRO</span>';
+      }
+
+      var etiquetasHome = "";
+
+      if (homeFavoritoMercado) {
+        etiquetasHome +=
+          '<span class="etiqueta-equipo mercado">FAVORITO MERCADO</span>';
+      }
+
+      if (homeFavoritoMlbPro) {
+        etiquetasHome +=
+          '<span class="etiqueta-equipo mlbpro">FAVORITO MLBPRO</span>';
+      }
 
       var estadoPropio =
         propio.estado === "PORCENTAJE_EMPIRICO"
@@ -534,6 +820,12 @@ async function correrTodo() {
       var grados = tieneDireccion ? r.direccionViento : 0;
       var vaHacia = tieneDireccion ? (grados + 180) % 360 : 0;
 
+      var seleccionClase =
+        propio.seleccion === "LOCAL" ||
+        propio.seleccion === "VISITANTE"
+          ? "valor"
+          : "sin-valor";
+
       var brujulaSvg =
         '<svg width="150" height="150" viewBox="0 0 150 150">' +
           '<circle cx="75" cy="75" r="70" fill="#0d1117" stroke="#30363d" stroke-width="2"/>' +
@@ -562,9 +854,10 @@ async function correrTodo() {
 
           '<div class="equipos-cabecera">' +
 
-            '<div class="equipo-col">' +
+            '<div class="' + awayClases + '">' +
               '<div class="nombre">' + escapar(awayNombre) + '</div>' +
               '<div class="cuota">' + fmtAmerican(awayPrice) + '</div>' +
+              '<div class="etiquetas-equipo">' + etiquetasAway + '</div>' +
               '<div class="porcentaje">' + fmtPct(pctAway) + '</div>' +
               '<div class="porcentaje-label">MLBPro visitante</div>' +
               '<div class="ventaja">Ventaja mercado: ' + fmtPct(ventajaAway) + '</div>' +
@@ -573,15 +866,41 @@ async function correrTodo() {
               '</span>' +
             '</div>' +
 
-            '<div class="equipo-col">' +
+            '<div class="' + homeClases + '">' +
               '<div class="nombre">' + escapar(homeNombre) + '</div>' +
               '<div class="cuota">' + fmtAmerican(homePrice) + '</div>' +
+              '<div class="etiquetas-equipo">' + etiquetasHome + '</div>' +
               '<div class="porcentaje">' + fmtPct(pctHome) + '</div>' +
               '<div class="porcentaje-label">MLBPro local</div>' +
               '<div class="ventaja">Ventaja mercado: ' + fmtPct(ventajaHome) + '</div>' +
               '<span class="fav ' + (valorHome ? "si" : "no") + '">' +
                 (valorHome ? "VALOR" : "SIN VALOR") +
               '</span>' +
+            '</div>' +
+
+          '</div>' +
+
+          '<div class="resumen-decision">' +
+
+            '<div class="decision-fila">' +
+              '<div class="decision-titulo">Favorito del mercado</div>' +
+              '<div class="decision-valor mercado">' +
+                escapar(favoritoMercadoObj.nombre) +
+              '</div>' +
+            '</div>' +
+
+            '<div class="decision-fila">' +
+              '<div class="decision-titulo">Favorito MLBPro</div>' +
+              '<div class="decision-valor mlbpro">' +
+                escapar(favoritoMlbProObj.nombre) +
+              '</div>' +
+            '</div>' +
+
+            '<div class="decision-fila">' +
+              '<div class="decision-titulo">Selección con valor</div>' +
+              '<div class="decision-valor ' + seleccionClase + '">' +
+                escapar(seleccionNombre) +
+              '</div>' +
             '</div>' +
 
           '</div>' +
@@ -616,7 +935,7 @@ async function correrTodo() {
 
             '<div class="medicion">' +
               '<div class="t">Selección</div>' +
-              '<div class="v">' + escapar(propio.seleccion || "NO_CONFIRMADO") + '</div>' +
+              '<div class="v">' + escapar(seleccionNombre) + '</div>' +
             '</div>' +
 
             '<div class="medicion">' +
@@ -670,13 +989,16 @@ async function correrTodo() {
 
           '<details class="detalle">' +
             '<summary>Ver detalle completo</summary>' +
+            '<div><b>Favorito mercado:</b> ' + escapar(favoritoMercadoObj.nombre) + '</div>' +
+            '<div><b>Favorito MLBPro:</b> ' + escapar(favoritoMlbProObj.nombre) + '</div>' +
+            '<div><b>Selección con valor:</b> ' + escapar(seleccionNombre) + '</div>' +
             '<div><b>Estado:</b> ' + estadoPropio + '</div>' +
             '<div><b>Local bruto:</b> ' + fmtPct(propio.porcentajeLocal) + '</div>' +
             '<div><b>Visitante bruto:</b> ' + fmtPct(propio.porcentajeVisitante) + '</div>' +
             '<div><b>Empate:</b> ' + fmtPct(propio.porcentajeEmpate) + '</div>' +
             '<div><b>Local dos vías:</b> ' + fmtPct(propio.porcentajeLocalDosVias) + '</div>' +
             '<div><b>Visitante dos vías:</b> ' + fmtPct(propio.porcentajeVisitanteDosVias) + '</div>' +
-            '<div><b>Selección:</b> ' + escapar(propio.seleccion || "NO_CONFIRMADO") + '</div>' +
+            '<div><b>Selección interna:</b> ' + escapar(propio.seleccion || "NO_CONFIRMADO") + '</div>' +
             '<div><b>Detalle:</b> ' + escapar(propio.detalle || "") + '</div>' +
           '</details>' +
 
