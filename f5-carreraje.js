@@ -15,10 +15,11 @@
   lineaCarreraje (number, opcional, default 0.5)
 
   SALIDAS / MODIFICACIONES:
-  Devuelve { pieza, estado, linea, dominioPitcher?, wobaEsperado?, detalle }.
+  Devuelve { pieza, estado, linea, dominioPitcher?, wobaEsperado?, proyeccionNumerica?, detalle }.
   estado puede ser: "SIN_DATOS" (falta cruce o woba_esperado real),
-  "PENDIENTE" (lineup rival no confirmado), o "PENDIENTE POR ACCESO"
-  (dominio real calculado, pero sin fórmula numérica calibrada todavía).
+  "PENDIENTE" (lineup rival no confirmado), o "DOMINIO_CALCULADO"
+  (dominio real calculado; incluye proyeccionNumerica: "NO_VALIDADA"
+  porque no hay fórmula numérica calibrada todavía).
   No escribe ninguna caché ni localStorage.
 
   DEPENDENCIAS:
@@ -46,21 +47,26 @@
   Ninguna de las tres alcanza un R² que justifique publicar una fórmula
   de proyección numérica (RMSE ~2.3 carreras de error típico, sobre un
   rango de 0 a 16 carreras reales — demasiado grande para confiar). Por
-  eso este archivo SIGUE devolviendo "PENDIENTE POR ACCESO" con el
-  dominio cualitativo (DOMINA/PAREJO/LE_PEGAN), tal como ya hacía. No se
-  escribió ningún coeficiente ni proyección numérica — la evidencia real
-  dice que no corresponde todavía. Los archivos de las tres pruebas
+  eso este archivo SIGUE devolviendo "DOMINIO_CALCULADO" con el dominio
+  cualitativo (DOMINA/PAREJO/LE_PEGAN) y proyeccionNumerica: "NO_VALIDADA",
+  tal como ya hacía bajo el nombre anterior. No se escribió ningún
+  coeficiente ni proyección numérica — la evidencia real dice que no
+  corresponde todavía. Los archivos de las tres pruebas
   (f5-calibracion-carreraje.js, f5-calibracion-xera.js,
   f5-calibracion-combinado.js) quedan como constancia de esa evidencia.
 
   ESTADO:
-  CONFIRMADO — la lógica no cambió (cero modificaciones de cálculo). Lo
-  que se agregó es este prólogo, con la evidencia de backtest que
-  respalda por qué sigue en PENDIENTE POR ACCESO y no con una fórmula
-  inventada.
+  CONFIRMADO — la lógica no cambió (cero modificaciones de cálculo, cero
+  cambios de umbral). Corrección aplicada: el estado que antes se llamaba
+  "PENDIENTE POR ACCESO" se renombró a "DOMINIO_CALCULADO" porque el
+  acceso y el cálculo ya habían ocurrido — el nombre anterior contradecía
+  la propia evidencia del archivo. Se agregó el campo explícito
+  proyeccionNumerica: "NO_VALIDADA" para separar "ya sé el dominio" de
+  "no tengo número validado contra la línea".
 
   FECHA:
-  12 jul 2026.
+  20 jul 2026 (corrección de nombre de estado; cálculo sin cambios desde
+  12 jul 2026).
 */
 
 // f5-carreraje.js — MLBPro F5 · Carreraje (línea 0.5)
@@ -73,8 +79,8 @@
 // en cruce-arsenal.js / viento-pitcher-test.html: woba_esperado del cruce).
 // Ya se ejecutaron tres backtests reales (woba solo, xERA solo, combinado)
 // y ninguno alcanzó calidad suficiente (ver CIERRE DE RAMA F5 arriba) —
-// por eso sigue en PENDIENTE POR ACCESO, con evidencia real, no por falta
-// de haber probado.
+// por eso el dominio calculado va marcado con proyeccionNumerica: "NO_VALIDADA",
+// con evidencia real, no por falta de haber probado.
 function f5Carreraje(cruceArsenal, lineaCarreraje) {
   const LINEA_DEFECTO = 0.5;
   const linea = (lineaCarreraje !== undefined && lineaCarreraje !== null) ? lineaCarreraje : LINEA_DEFECTO;
@@ -114,10 +120,11 @@ function f5Carreraje(cruceArsenal, lineaCarreraje) {
 
   return {
     pieza: "F5_CARRERAJE",
-    estado: "PENDIENTE POR ACCESO",
+    estado: "DOMINIO_CALCULADO",
     linea: linea,
     dominioPitcher: dominio,
     wobaEsperado: woba,
+    proyeccionNumerica: "NO_VALIDADA",
     detalle: "Dominio del pitcher: " + dominio + " (woba esperado " + woba.toFixed(3) + "). " +
       "Ya se ejecutaron tres backtests reales (woba solo, xERA solo, woba+xERA combinado) " +
       "sobre 1,427 juegos historicos, y ninguno alcanzo calidad suficiente para traducir esto " +
