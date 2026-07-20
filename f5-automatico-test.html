@@ -3,68 +3,347 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<title>MLBPro · F5 Automático (juegos reales de hoy)</title>
+
+<title>MLBPro · F5 Automático</title>
+
 <style>
   :root { color-scheme: dark; }
-  * { box-sizing:border-box; }
-  body { margin:0; font-family:-apple-system,system-ui,sans-serif; background:#0d1117; color:#e6edf3; }
-  header { padding:14px 16px; border-bottom:1px solid #30363d; }
-  h1 { font-size:15px; margin:0; }
-  main { padding:14px; max-width:900px; margin:0 auto; }
-  .go { width:100%; border:0; border-radius:10px; padding:16px; font-size:15px; font-weight:800; color:#fff; background:#2563eb; cursor:pointer; margin-bottom:10px; }
-  .go:disabled { background:#30363d; color:#8b949e; }
-  .go-auto { width:100%; border:0; border-radius:10px; padding:12px; font-size:13px; font-weight:800; color:#fff; background:#30363d; cursor:pointer; margin-bottom:10px; }
-  .go-auto.activo { background:#238636; }
-  #console { margin-top:10px; background:#010409; border:1px solid #30363d; border-radius:8px; padding:12px; min-height:60px; max-height:70vh; overflow:auto; font-family:ui-monospace,monospace; font-size:12px; white-space:pre-wrap; word-break:break-word; }
-  .juego { background:#161b22; border:1px solid #30363d; border-radius:10px; padding:12px; margin-bottom:10px; }
-  .juego h3 { margin:0 0 6px; font-size:14px; color:#79c0ff; }
-  .detalle summary { cursor:pointer; color:#79c0ff; font-size:12px; margin-top:6px; }
-  .venue { font-size:11.5px; color:#8b949e; margin-bottom:8px; text-align:center; }
-  .congelada { font-size:11.5px; color:#79c0ff; margin-bottom:8px; text-align:center; }
 
-  /* ── 1. Equipos + Moneyline F5 + favorito ── */
-  .equipos-cabecera { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:10px; }
-  .equipo-col { flex:1; text-align:center; background:#0d1117; border:1px solid #30363d; border-radius:10px; padding:10px 6px; }
-  .equipo-col .nombre { font-size:14px; font-weight:800; color:#e6edf3; line-height:1.2; min-height:34px; display:flex; align-items:center; justify-content:center; }
-  .equipo-col .cuota { font-size:20px; font-weight:800; color:#79c0ff; margin-top:6px; }
-  .equipo-col .fav { display:inline-block; margin-top:6px; font-size:10px; font-weight:800; letter-spacing:0.4px; padding:3px 8px; border-radius:20px; }
-  .equipo-col .fav.si { background:#0d2818; color:#3fb950; border:1px solid #238636; }
-  .equipo-col .fav.no { background:#21262d; color:#8b949e; border:1px solid #30363d; }
-  .equipo-col .fav.nc { background:#21262d; color:#6e7681; border:1px solid #30363d; }
+  * { box-sizing: border-box; }
 
-  /* ── 2. Total F5 central ── */
-  .total-central { background:#0d1117; border:1px solid #30363d; border-radius:10px; padding:8px 10px; margin-bottom:10px; }
-  .total-central .tit { text-align:center; font-size:10.5px; text-transform:uppercase; letter-spacing:0.4px; color:#8b949e; font-weight:700; margin-bottom:4px; }
-  .total-central .filas { display:flex; justify-content:center; gap:18px; }
-  .total-central .fila { text-align:center; font-size:13px; }
-  .total-central .fila b { color:#e6edf3; }
+  body {
+    margin: 0;
+    font-family: -apple-system, system-ui, sans-serif;
+    background: #0d1117;
+    color: #e6edf3;
+  }
 
-  /* ── 3. Clima horizontal ── */
-  .clima-fila { display:flex; justify-content:space-between; gap:6px; background:#0d1117; border:1px solid #30363d; border-radius:10px; padding:8px 6px; margin-bottom:10px; }
-  .clima-item { flex:1; text-align:center; font-size:11px; color:#8b949e; }
-  .clima-item .v { display:block; font-size:13px; font-weight:800; color:#e6edf3; margin-top:2px; }
-  .clima-item .v.nc { color:#6e7681; font-weight:700; }
+  header {
+    padding: 14px 16px;
+    border-bottom: 1px solid #30363d;
+  }
 
-  /* ── 4. Brújula grande ── */
-  .brujula-wrap { display:flex; justify-content:center; margin:6px 0 10px; }
-  .brujula-cap { text-align:center; font-size:11px; color:#6e7681; margin-top:4px; }
+  h1 {
+    font-size: 15px;
+    margin: 0;
+  }
 
-  /* ── 5. Panel de mediciones alrededor de la brújula ── */
-  .mediciones { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:6px; }
-  .medicion { background:#0d1117; border:1px solid #30363d; border-radius:8px; padding:8px 10px; }
-  .medicion .t { font-size:10px; text-transform:uppercase; letter-spacing:0.4px; color:#8b949e; font-weight:700; margin-bottom:3px; }
-  .medicion .v { font-size:12.5px; font-weight:700; color:#e6edf3; }
-  .medicion .v.nc { color:#6e7681; font-weight:600; }
+  main {
+    padding: 14px;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  .go {
+    width: 100%;
+    border: 0;
+    border-radius: 10px;
+    padding: 16px;
+    font-size: 15px;
+    font-weight: 800;
+    color: #fff;
+    background: #2563eb;
+    cursor: pointer;
+    margin-bottom: 10px;
+  }
+
+  .go:disabled {
+    background: #30363d;
+    color: #8b949e;
+  }
+
+  .go-auto {
+    width: 100%;
+    border: 0;
+    border-radius: 10px;
+    padding: 12px;
+    font-size: 13px;
+    font-weight: 800;
+    color: #fff;
+    background: #30363d;
+    cursor: pointer;
+    margin-bottom: 10px;
+  }
+
+  .go-auto.activo {
+    background: #238636;
+  }
+
+  #console {
+    margin-top: 10px;
+    background: #010409;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 12px;
+    min-height: 60px;
+    max-height: 70vh;
+    overflow: auto;
+    font-family: ui-monospace, monospace;
+    font-size: 12px;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .juego {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 10px;
+  }
+
+  .venue {
+    font-size: 11.5px;
+    color: #8b949e;
+    margin-bottom: 8px;
+    text-align: center;
+  }
+
+  .congelada {
+    font-size: 11.5px;
+    color: #79c0ff;
+    margin-bottom: 8px;
+    text-align: center;
+  }
+
+  .equipos-cabecera {
+    display: flex;
+    justify-content: space-between;
+    align-items: stretch;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .equipo-col {
+    flex: 1;
+    text-align: center;
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 10px;
+    padding: 10px 6px;
+  }
+
+  .equipo-col .nombre {
+    font-size: 14px;
+    font-weight: 800;
+    min-height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .equipo-col .cuota {
+    font-size: 20px;
+    font-weight: 800;
+    color: #79c0ff;
+    margin-top: 6px;
+  }
+
+  .equipo-col .porcentaje {
+    font-size: 28px;
+    font-weight: 900;
+    color: #e6edf3;
+    margin-top: 8px;
+  }
+
+  .equipo-col .porcentaje-label {
+    font-size: 10px;
+    color: #8b949e;
+    margin-top: 2px;
+  }
+
+  .equipo-col .ventaja {
+    font-size: 11px;
+    color: #8b949e;
+    margin-top: 5px;
+  }
+
+  .fav {
+    display: inline-block;
+    margin-top: 7px;
+    font-size: 10px;
+    font-weight: 800;
+    padding: 4px 9px;
+    border-radius: 20px;
+  }
+
+  .fav.si {
+    background: #0d2818;
+    color: #3fb950;
+    border: 1px solid #238636;
+  }
+
+  .fav.no {
+    background: #21262d;
+    color: #8b949e;
+    border: 1px solid #30363d;
+  }
+
+  .fav.nc {
+    background: #21262d;
+    color: #6e7681;
+    border: 1px solid #30363d;
+  }
+
+  .empate-f5 {
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 10px;
+    padding: 9px;
+    margin-bottom: 10px;
+    text-align: center;
+  }
+
+  .empate-f5 .t {
+    font-size: 10px;
+    color: #8b949e;
+    text-transform: uppercase;
+    font-weight: 800;
+  }
+
+  .empate-f5 .v {
+    font-size: 18px;
+    font-weight: 900;
+    margin-top: 3px;
+  }
+
+  .total-central {
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 10px;
+    padding: 8px 10px;
+    margin-bottom: 10px;
+  }
+
+  .total-central .tit {
+    text-align: center;
+    font-size: 10.5px;
+    text-transform: uppercase;
+    color: #8b949e;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+
+  .total-central .filas {
+    display: flex;
+    justify-content: center;
+    gap: 18px;
+  }
+
+  .total-central .fila {
+    text-align: center;
+    font-size: 13px;
+  }
+
+  .clima-fila {
+    display: flex;
+    justify-content: space-between;
+    gap: 6px;
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 10px;
+    padding: 8px 6px;
+    margin-bottom: 10px;
+  }
+
+  .clima-item {
+    flex: 1;
+    text-align: center;
+    font-size: 11px;
+    color: #8b949e;
+  }
+
+  .clima-item .v {
+    display: block;
+    font-size: 13px;
+    font-weight: 800;
+    color: #e6edf3;
+    margin-top: 2px;
+  }
+
+  .clima-item .v.nc {
+    color: #6e7681;
+  }
+
+  .mediciones {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .medicion {
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 8px 10px;
+  }
+
+  .medicion .t {
+    font-size: 10px;
+    text-transform: uppercase;
+    color: #8b949e;
+    font-weight: 700;
+    margin-bottom: 3px;
+  }
+
+  .medicion .v {
+    font-size: 12.5px;
+    font-weight: 700;
+    color: #e6edf3;
+  }
+
+  .medicion .v.nc {
+    color: #6e7681;
+  }
+
+  .brujula-wrap {
+    display: flex;
+    justify-content: center;
+    margin: 8px 0 4px;
+  }
+
+  .brujula-cap {
+    text-align: center;
+    font-size: 11px;
+    color: #6e7681;
+    margin-bottom: 8px;
+  }
+
+  .detalle summary {
+    cursor: pointer;
+    color: #79c0ff;
+    font-size: 12px;
+    margin-top: 6px;
+  }
 </style>
 </head>
+
 <body>
-<header><h1>MLBPro · F5 Automático — juegos reales de hoy</h1></header>
+
+<header>
+  <h1>MLBPro · F5 Automático — juegos reales de hoy</h1>
+</header>
+
 <main>
-  <a href="index.html" style="display:inline-block;margin-bottom:10px;color:#79c0ff;font-size:13px;text-decoration:none;">← Volver al inicio</a>
-  <button id="btnCorrer" class="go">CORRER F5 AUTOMÁTICO (juegos de hoy)</button>
-  <button id="btnAuto" class="go-auto">🔄 Auto-actualizar cada 30 min: OFF (necesita esta pestaña abierta)</button>
+
+  <a href="index.html"
+     style="display:inline-block;margin-bottom:10px;color:#79c0ff;font-size:13px;text-decoration:none;">
+    ← Volver al inicio
+  </a>
+
+  <button id="btnCorrer" class="go">
+    CORRER F5 AUTOMÁTICO (juegos de hoy)
+  </button>
+
+  <button id="btnAuto" class="go-auto">
+    🔄 Auto-actualizar cada 30 min: OFF
+  </button>
+
   <div id="lista"></div>
+
   <div id="console">Pulsa el botón.</div>
+
 </main>
 
 <script src="mlb-routes.js"></script>
@@ -92,232 +371,357 @@
 <script src="f5-automatico.js"></script>
 
 <script>
-  // CORRECCIÓN (20 jul 2026): la caja "Línea MLBPro" estaba hardcodeada
-  // como "PENDIENTE" y nunca leía r.moneyline, aunque f5-automatico.js ya
-  // lo entregaba calculado. Ahora lee el estado real de f5-moneyline.js
-  // ("SIN_DATOS", "PENDIENTE" o "VENTAJA_CUALITATIVA" con
-  // probabilidad: "NO_VALIDADA") y lo muestra honestamente, sin inventar
-  // cuota ni porcentaje. detalleCarreraje() no cambió: al recibir el
-  // estado renombrado "DOMINIO_CALCULADO" desde f5-carreraje.js lo
-  // imprime igual que antes, sin necesitar ajuste aquí.
-  var consoleEl = document.getElementById("console");
-  var listaEl = document.getElementById("lista");
-  function log(t){ var d=document.createElement("div"); d.textContent=t; consoleEl.appendChild(d); consoleEl.scrollTop=consoleEl.scrollHeight; }
+var consoleEl = document.getElementById("console");
+var listaEl = document.getElementById("lista");
+var corriendo = false;
 
-  async function correrTodo(){
-    var btn=document.getElementById("btnCorrer");
-    btn.disabled=true; btn.textContent="TRABAJANDO…";
-    consoleEl.textContent=""; listaEl.innerHTML="";
-    try {
-      var resultados = await f5AutomaticoHoy(log);
-      var html = "";
-      resultados.forEach(function(r){
-        var lm = r.lineaMercadoF5;
-        var congelTxt = (lm && lm.congelada) ? " 🧊 (línea CONGELADA pre-juego)" : "";
-        var mlTxt = (lm && lm.moneylineF5) ? ('Home '+lm.moneylineF5.home_price+' / Away '+lm.moneylineF5.away_price) : 'N/C';
-        var ouTxt = (lm && lm.totalF5) ? (lm.totalF5.point+' (O '+lm.totalF5.over_price+' / U '+lm.totalF5.under_price+')') : 'N/C';
-        var rlTxt = (lm && lm.runlineF5) ? lm.runlineF5.point : 'N/C';
+function log(t) {
+  var d = document.createElement("div");
+  d.textContent = t;
+  consoleEl.appendChild(d);
+  consoleEl.scrollTop = consoleEl.scrollHeight;
+}
 
-        var partes = r.juego.split(" @ ");
-        var awayNombre = partes[0] || "Away";
-        var homeNombre = partes[1] || "Home";
+function esNumero(v) {
+  return typeof v === "number" && Number.isFinite(v);
+}
 
-        function fmtAmerican(n) {
-          if (typeof n !== "number" || isNaN(n)) return "N/C";
-          return (n > 0 ? "+" : "") + n;
-        }
-        function fmtPoint(n) {
-          if (typeof n !== "number" || isNaN(n)) return "N/C";
-          return (n > 0 ? "+" : "") + n;
-        }
-        function nc(v) { return (v === null || v === undefined || v === "" || (typeof v === "number" && isNaN(v))); }
+function fmtAmerican(n) {
+  if (!esNumero(n)) return "N/C";
+  return (n > 0 ? "+" : "") + n;
+}
 
-        // Detalle real de Carreraje F5, tal cual lo devuelve f5-carreraje.js
-        // (no se toca ni se reinterpreta ese archivo). Se muestran solo los
-        // campos que el objeto realmente trae en cada estado: estado siempre
-        // existe; dominioPitcher/wobaEsperado solo cuando llegó a
-        // "DOMINIO_CALCULADO"; detalle casi siempre viene.
-        function detalleCarreraje(c) {
-          if (!c) return "NO_CONFIRMADO";
-          var partes = [c.estado];
-          if (typeof c.dominioPitcher === "string" && c.dominioPitcher) partes.push("Dominio: " + c.dominioPitcher);
-          if (typeof c.wobaEsperado === "number" && !isNaN(c.wobaEsperado)) partes.push("wOBA esp.: " + c.wobaEsperado.toFixed(3));
-          if (typeof c.detalle === "string" && c.detalle) partes.push(c.detalle);
-          return partes.join("<br>");
-        }
+function fmtPct(n) {
+  if (!esNumero(n)) return "N/C";
+  return n.toFixed(1) + "%";
+}
 
-        // Detalle real de la proyección temprana F5, tal cual la devuelve
-        // proyeccion-pitcher-temprana.js (no se toca ni se reinterpreta ese
-        // archivo). Solo se muestran campos que el objeto realmente trae;
-        // si no hay estado utilizable, se marca NO_CONFIRMADO.
-        function detalleProyeccion(p) {
-          if (!p || typeof p.estado !== "string" || p.estado === "SIN_DATOS") return "NO_CONFIRMADO";
-          var partes = [p.estado];
-          if (typeof p.detalle === "string" && p.detalle) partes.push(p.detalle);
-          return partes.join("<br>");
-        }
+function nc(v) {
+  return v === null ||
+    v === undefined ||
+    v === "" ||
+    (typeof v === "number" && !Number.isFinite(v));
+}
 
-        var mlAwayTxt = (lm && lm.moneylineF5) ? fmtAmerican(lm.moneylineF5.away_price) : "N/C";
-        var mlHomeTxt = (lm && lm.moneylineF5) ? fmtAmerican(lm.moneylineF5.home_price) : "N/C";
+function escapar(v) {
+  if (v === null || v === undefined) return "NO_CONFIRMADO";
 
-        // ── 1. FAVORITO / NO FAVORITO por equipo, usando Moneyline F5 real ──
-        var favAwayTxt = "NO_CONFIRMADO", favHomeTxt = "NO_CONFIRMADO";
-        var favAwayClase = "nc", favHomeClase = "nc";
-        if (lm && lm.moneylineF5 && typeof lm.moneylineF5.home_price === "number" && typeof lm.moneylineF5.away_price === "number") {
-          var hp = lm.moneylineF5.home_price, ap = lm.moneylineF5.away_price;
-          var favHome = hp < ap;
-          favAwayTxt = favHome ? "NO FAVORITO" : "FAVORITO";
-          favHomeTxt = favHome ? "FAVORITO" : "NO FAVORITO";
-          favAwayClase = favHome ? "no" : "si";
-          favHomeClase = favHome ? "si" : "no";
-        }
+  return String(v).replace(/[&<>"']/g, function(c) {
+    return {
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#039;"
+    }[c];
+  });
+}
 
-        // ── 2. Total F5 (Over/Under con línea y cuota) ──
-        var totalPointTxt = (lm && lm.totalF5 && typeof lm.totalF5.point === "number") ? lm.totalF5.point : "N/C";
-        var totalOverTxt = (lm && lm.totalF5) ? fmtAmerican(lm.totalF5.over_price) : "N/C";
-        var totalUnderTxt = (lm && lm.totalF5) ? fmtAmerican(lm.totalF5.under_price) : "N/C";
+function detalleCarreraje(c) {
+  if (!c) return "NO_CONFIRMADO";
 
-        // ── 3. Clima horizontal ──
-        // f5-automatico.js ya entrega tempF, humedad, vientoMph,
-        // direccionViento y roof directamente en cada objeto de resultado
-        // (resultados.push(...)). Si algún campo falta en un juego puntual
-        // (p.ej. sin hit de clima para esa hora), sale NO_CONFIRMADO abajo.
-        var tempTxt = !nc(r.tempF) ? (r.tempF + "°F") : "NO_CONFIRMADO";
-        var humedadTxt = !nc(r.humedad) ? (r.humedad + "%") : "NO_CONFIRMADO";
-        var vientoMphTxt = !nc(r.vientoMph) ? (r.vientoMph + " mph") : "NO_CONFIRMADO";
-        var direccionTxt = !nc(r.direccionViento) ? (r.direccionViento + "°") : "NO_CONFIRMADO";
-        var techoTxt = !nc(r.roof) ? r.roof : "NO_CONFIRMADO";
+  var partes = [escapar(c.estado)];
 
-        // ── 4. Brújula grande ──
-        // Sin dirección de viento confirmada (ver punto 3), la brújula se
-        // dibuja neutra (sin aguja activa) pero al tamaño grande pedido —
-        // el tamaño no depende de si hay dato, solo la aguja.
-        var tieneDireccion = !nc(r.direccionViento) && typeof r.direccionViento === "number";
-        var grados = tieneDireccion ? r.direccionViento : 0;
-        var vaHacia = tieneDireccion ? (grados + 180) % 360 : 0;
-        var brujulaSvg =
-          '<svg width="150" height="150" viewBox="0 0 150 150">'+
-            '<circle cx="75" cy="75" r="70" fill="#0d1117" stroke="#30363d" stroke-width="2"/>'+
-            '<text x="75" y="18" text-anchor="middle" fill="#8b949e" font-size="12" font-weight="800">N</text>'+
-            '<text x="132" y="79" text-anchor="middle" fill="#8b949e" font-size="12" font-weight="800">E</text>'+
-            '<text x="75" y="140" text-anchor="middle" fill="#8b949e" font-size="12" font-weight="800">S</text>'+
-            '<text x="18" y="79" text-anchor="middle" fill="#8b949e" font-size="12" font-weight="800">O</text>'+
-            (tieneDireccion
-              ? '<g transform="rotate('+vaHacia+' 75 75)"><line x1="75" y1="75" x2="75" y2="24" stroke="#79c0ff" stroke-width="4" stroke-linecap="round"/><circle cx="75" cy="75" r="5" fill="#79c0ff"/></g>'
-              : '<circle cx="75" cy="75" r="5" fill="#30363d"/>')+
-          '</svg>';
-        var brujulaHtml =
-          '<div class="brujula-wrap">'+brujulaSvg+'</div>'+
-          '<div class="brujula-cap">'+(tieneDireccion ? ('viene de '+grados+'° → va hacia '+vaHacia+'°') : 'Dirección de viento: NO_CONFIRMADO')+'</div>';
-
-        // ── 5. Mediciones alrededor de la brújula ──
-        // Línea MLBPro F5 — lee r.moneyline real (f5-moneyline.js), sin
-        // inventar cuota ni probabilidad. estado puede ser: "SIN_DATOS",
-        // "PENDIENTE" o "VENTAJA_CUALITATIVA" (con probabilidad: "NO_VALIDADA").
-        var mlbproLineaTxt = "NO_CONFIRMADO";
-        var mlbproLineaEsNc = true;
-        if (r.moneyline && typeof r.moneyline.estado === "string") {
-          if (r.moneyline.estado === "VENTAJA_CUALITATIVA" && typeof r.moneyline.ventaja === "string") {
-            var ventajaLegible = (r.moneyline.ventaja === "PAREJO_SIN_VENTAJA")
-              ? "PAREJO — SIN VENTAJA"
-              : ("VENTAJA: " + r.moneyline.ventaja);
-            mlbproLineaTxt = ventajaLegible + "<br>SIN CUOTA/PROBABILIDAD VALIDADA";
-            mlbproLineaEsNc = false;
-          } else if (r.moneyline.estado === "PENDIENTE") {
-            mlbproLineaTxt = "PENDIENTE";
-            mlbproLineaEsNc = true;
-          } else {
-            mlbproLineaTxt = "NO_CONFIRMADO";
-            mlbproLineaEsNc = true;
-          }
-        }
-        var scoreProyectadoTxt = detalleProyeccion(r.proyeccionTemprana);
-        var trayectoriaTxt = "PENDIENTE"; // viento-trayectoria-7h.js no está conectado a este flujo todavía
-
-        var medicionesHtml =
-          '<div class="mediciones">'+
-            '<div class="medicion"><div class="t">Coincidencia</div><div class="v">'+r.coincidencia.estado+' ('+r.coincidencia.confirmados+')</div></div>'+
-            '<div class="medicion"><div class="t">Carreraje Home</div><div class="v">'+detalleCarreraje(r.carrerajeHome)+'</div></div>'+
-            '<div class="medicion"><div class="t">Carreraje Away</div><div class="v">'+detalleCarreraje(r.carrerajeAway)+'</div></div>'+
-            '<div class="medicion"><div class="t">Línea MLBPro</div><div class="v'+(mlbproLineaEsNc?" nc":"")+'">'+mlbproLineaTxt+'</div></div>'+
-            '<div class="medicion"><div class="t">Score proyectado</div><div class="v'+(scoreProyectadoTxt==="NO_CONFIRMADO"?" nc":"")+'">'+scoreProyectadoTxt+'</div></div>'+
-            '<div class="medicion"><div class="t">Trayectoria del viento</div><div class="v nc">'+trayectoriaTxt+'</div></div>'+
-          '</div>';
-
-        var resumenHtml =
-          '<div class="venue">'+(r.venue||"?")+'</div>'+
-          (congelTxt ? '<div class="congelada">🧊 línea CONGELADA pre-juego</div>' : '')+
-
-          '<div class="equipos-cabecera">'+
-            '<div class="equipo-col">'+
-              '<div class="nombre">'+awayNombre+'</div>'+
-              '<div class="cuota">'+mlAwayTxt+'</div>'+
-              '<div class="fav '+favAwayClase+'">'+favAwayTxt+'</div>'+
-            '</div>'+
-            '<div class="equipo-col">'+
-              '<div class="nombre">'+homeNombre+'</div>'+
-              '<div class="cuota">'+mlHomeTxt+'</div>'+
-              '<div class="fav '+favHomeClase+'">'+favHomeTxt+'</div>'+
-            '</div>'+
-          '</div>'+
-
-          '<div class="total-central">'+
-            '<div class="tit">Total F5</div>'+
-            '<div class="filas">'+
-              '<div class="fila">OVER <b>'+totalPointTxt+'</b><br>'+totalOverTxt+'</div>'+
-              '<div class="fila">UNDER <b>'+totalPointTxt+'</b><br>'+totalUnderTxt+'</div>'+
-            '</div>'+
-          '</div>'+
-
-          '<div class="clima-fila">'+
-            '<div class="clima-item">Temp.<span class="v'+(tempTxt==="NO_CONFIRMADO"?" nc":"")+'">'+tempTxt+'</span></div>'+
-            '<div class="clima-item">Humedad<span class="v'+(humedadTxt==="NO_CONFIRMADO"?" nc":"")+'">'+humedadTxt+'</span></div>'+
-            '<div class="clima-item">Viento<span class="v'+(vientoMphTxt==="NO_CONFIRMADO"?" nc":"")+'">'+vientoMphTxt+'</span></div>'+
-            '<div class="clima-item">Dirección<span class="v'+(direccionTxt==="NO_CONFIRMADO"?" nc":"")+'">'+direccionTxt+'</span></div>'+
-            '<div class="clima-item">Techo<span class="v'+(techoTxt==="NO_CONFIRMADO"?" nc":"")+'">'+techoTxt+'</span></div>'+
-          '</div>'+
-
-          medicionesHtml+
-          brujulaHtml;
-
-        html += '<div class="juego">'+
-          resumenHtml+
-          '<details class="detalle"><summary>Ver detalle completo</summary>'+
-          '<div><b>Coincidencia:</b> '+r.coincidencia.estado+' ('+r.coincidencia.confirmados+')</div>'+
-          '<div><b>Carreraje home:</b> '+r.carrerajeHome.estado+'</div>'+
-          '<div><b>Carreraje away:</b> '+r.carrerajeAway.estado+'</div>'+
-          '<div><b>MoneyLine F5 (propio):</b> '+r.moneyline.estado+(r.moneyline.ventaja?(' — '+r.moneyline.ventaja):'')+'</div>'+
-          '<div><b>Línea mercado F5 (Run Line):</b> '+rlTxt+'</div>'+
-          '<div><b>Línea mercado F5 (Money Line):</b> '+mlTxt+'</div>'+
-          '<div><b>Línea mercado F5 (Over/Under):</b> '+ouTxt+'</div>'+
-          '</details>'+
-        '</div>';
-      });
-      listaEl.innerHTML = html;
-      log(JSON.stringify(resultados, null, 2));
-    } catch(e) {
-      log("ERROR: "+(e&&e.message?e.message:e));
-    } finally {
-      btn.disabled=false; btn.textContent="CORRER F5 AUTOMÁTICO (juegos de hoy)";
-    }
+  if (typeof c.dominioPitcher === "string") {
+    partes.push("Dominio: " + escapar(c.dominioPitcher));
   }
 
-  document.getElementById("btnCorrer").addEventListener("click", correrTodo);
+  if (esNumero(c.wobaEsperado)) {
+    partes.push("wOBA esp.: " + c.wobaEsperado.toFixed(3));
+  }
 
-  var autoIntervalId = null;
-  document.getElementById("btnAuto").addEventListener("click", function(){
+  return partes.join("<br>");
+}
+
+async function correrTodo() {
+  if (corriendo) return;
+
+  corriendo = true;
+
+  var btn = document.getElementById("btnCorrer");
+
+  btn.disabled = true;
+  btn.textContent = "TRABAJANDO…";
+
+  consoleEl.textContent = "";
+  listaEl.innerHTML = "";
+
+  try {
+    var resultados = await f5AutomaticoHoy(log);
+    var html = "";
+
+    resultados.forEach(function(r) {
+      var lm = r.lineaMercadoF5;
+      var propio = r.moneyline || {};
+
+      var partesJuego = String(r.juego || "").split(" @ ");
+      var awayNombre = partesJuego[0] || "Away";
+      var homeNombre = partesJuego[1] || "Home";
+
+      var awayPrice =
+        lm && lm.moneylineF5
+          ? lm.moneylineF5.away_price
+          : null;
+
+      var homePrice =
+        lm && lm.moneylineF5
+          ? lm.moneylineF5.home_price
+          : null;
+
+      var pctAway = propio.porcentajeVisitanteDosVias;
+      var pctHome = propio.porcentajeLocalDosVias;
+      var pctEmpate = propio.porcentajeEmpate;
+
+      var ventajaAway = propio.ventajaVisitantePct;
+      var ventajaHome = propio.ventajaLocalPct;
+
+      var valorAway = propio.seleccion === "VISITANTE";
+      var valorHome = propio.seleccion === "LOCAL";
+
+      var estadoPropio =
+        propio.estado === "PORCENTAJE_EMPIRICO"
+          ? "PORCENTAJE EMPÍRICO"
+          : escapar(propio.estado || "NO_CONFIRMADO");
+
+      var congelTxt =
+        lm && lm.congelada
+          ? '<div class="congelada">🧊 línea congelada pregame</div>'
+          : "";
+
+      var totalPoint =
+        lm &&
+        lm.totalF5 &&
+        esNumero(lm.totalF5.point)
+          ? lm.totalF5.point
+          : "N/C";
+
+      var totalOver =
+        lm && lm.totalF5
+          ? fmtAmerican(lm.totalF5.over_price)
+          : "N/C";
+
+      var totalUnder =
+        lm && lm.totalF5
+          ? fmtAmerican(lm.totalF5.under_price)
+          : "N/C";
+
+      var tempTxt =
+        esNumero(r.tempF)
+          ? r.tempF + "°F"
+          : "NO_CONFIRMADO";
+
+      var humedadTxt =
+        esNumero(r.humedad)
+          ? r.humedad + "%"
+          : "NO_CONFIRMADO";
+
+      var vientoTxt =
+        esNumero(r.vientoMph)
+          ? r.vientoMph + " mph"
+          : "NO_CONFIRMADO";
+
+      var direccionTxt =
+        esNumero(r.direccionViento)
+          ? r.direccionViento + "°"
+          : "NO_CONFIRMADO";
+
+      var techoTxt =
+        nc(r.roof)
+          ? "NO_CONFIRMADO"
+          : escapar(r.roof);
+
+      var tieneDireccion = esNumero(r.direccionViento);
+      var grados = tieneDireccion ? r.direccionViento : 0;
+      var vaHacia = tieneDireccion ? (grados + 180) % 360 : 0;
+
+      var brujulaSvg =
+        '<svg width="150" height="150" viewBox="0 0 150 150">' +
+          '<circle cx="75" cy="75" r="70" fill="#0d1117" stroke="#30363d" stroke-width="2"/>' +
+          '<text x="75" y="18" text-anchor="middle" fill="#8b949e" font-size="12" font-weight="800">N</text>' +
+          '<text x="132" y="79" text-anchor="middle" fill="#8b949e" font-size="12" font-weight="800">E</text>' +
+          '<text x="75" y="140" text-anchor="middle" fill="#8b949e" font-size="12" font-weight="800">S</text>' +
+          '<text x="18" y="79" text-anchor="middle" fill="#8b949e" font-size="12" font-weight="800">O</text>' +
+          (
+            tieneDireccion
+              ? '<g transform="rotate(' + vaHacia + ' 75 75)">' +
+                  '<line x1="75" y1="75" x2="75" y2="24" stroke="#79c0ff" stroke-width="4" stroke-linecap="round"/>' +
+                  '<circle cx="75" cy="75" r="5" fill="#79c0ff"/>' +
+                '</g>'
+              : '<circle cx="75" cy="75" r="5" fill="#30363d"/>'
+          ) +
+        '</svg>';
+
+      html +=
+        '<div class="juego">' +
+
+          '<div class="venue">' +
+            escapar(r.venue || "?") +
+          '</div>' +
+
+          congelTxt +
+
+          '<div class="equipos-cabecera">' +
+
+            '<div class="equipo-col">' +
+              '<div class="nombre">' + escapar(awayNombre) + '</div>' +
+              '<div class="cuota">' + fmtAmerican(awayPrice) + '</div>' +
+              '<div class="porcentaje">' + fmtPct(pctAway) + '</div>' +
+              '<div class="porcentaje-label">MLBPro visitante</div>' +
+              '<div class="ventaja">Ventaja mercado: ' + fmtPct(ventajaAway) + '</div>' +
+              '<span class="fav ' + (valorAway ? "si" : "no") + '">' +
+                (valorAway ? "VALOR" : "SIN VALOR") +
+              '</span>' +
+            '</div>' +
+
+            '<div class="equipo-col">' +
+              '<div class="nombre">' + escapar(homeNombre) + '</div>' +
+              '<div class="cuota">' + fmtAmerican(homePrice) + '</div>' +
+              '<div class="porcentaje">' + fmtPct(pctHome) + '</div>' +
+              '<div class="porcentaje-label">MLBPro local</div>' +
+              '<div class="ventaja">Ventaja mercado: ' + fmtPct(ventajaHome) + '</div>' +
+              '<span class="fav ' + (valorHome ? "si" : "no") + '">' +
+                (valorHome ? "VALOR" : "SIN VALOR") +
+              '</span>' +
+            '</div>' +
+
+          '</div>' +
+
+          '<div class="empate-f5">' +
+            '<div class="t">Empate después de cinco entradas</div>' +
+            '<div class="v">' + fmtPct(pctEmpate) + '</div>' +
+          '</div>' +
+
+          '<div class="total-central">' +
+            '<div class="tit">Total F5 de mercado</div>' +
+            '<div class="filas">' +
+              '<div class="fila">OVER <b>' + totalPoint + '</b><br>' + totalOver + '</div>' +
+              '<div class="fila">UNDER <b>' + totalPoint + '</b><br>' + totalUnder + '</div>' +
+            '</div>' +
+          '</div>' +
+
+          '<div class="clima-fila">' +
+            '<div class="clima-item">Temp.<span class="v">' + tempTxt + '</span></div>' +
+            '<div class="clima-item">Humedad<span class="v">' + humedadTxt + '</span></div>' +
+            '<div class="clima-item">Viento<span class="v">' + vientoTxt + '</span></div>' +
+            '<div class="clima-item">Dirección<span class="v">' + direccionTxt + '</span></div>' +
+            '<div class="clima-item">Techo<span class="v">' + techoTxt + '</span></div>' +
+          '</div>' +
+
+          '<div class="mediciones">' +
+
+            '<div class="medicion">' +
+              '<div class="t">Estado MLBPro</div>' +
+              '<div class="v">' + estadoPropio + '</div>' +
+            '</div>' +
+
+            '<div class="medicion">' +
+              '<div class="t">Selección</div>' +
+              '<div class="v">' + escapar(propio.seleccion || "NO_CONFIRMADO") + '</div>' +
+            '</div>' +
+
+            '<div class="medicion">' +
+              '<div class="t">Muestra histórica</div>' +
+              '<div class="v">' + (esNumero(propio.muestra) ? propio.muestra : "N/C") + '</div>' +
+            '</div>' +
+
+            '<div class="medicion">' +
+              '<div class="t">Base histórica</div>' +
+              '<div class="v">' + (esNumero(propio.base_historica) ? propio.base_historica : "N/C") + '</div>' +
+            '</div>' +
+
+            '<div class="medicion">' +
+              '<div class="t">Coincidencia</div>' +
+              '<div class="v">' +
+                escapar(r.coincidencia && r.coincidencia.estado) +
+                ' (' +
+                escapar(r.coincidencia && r.coincidencia.confirmados) +
+                ')' +
+              '</div>' +
+            '</div>' +
+
+            '<div class="medicion">' +
+              '<div class="t">Bucket</div>' +
+              '<div class="v">' + escapar(propio.bucket || "NO_CONFIRMADO") + '</div>' +
+            '</div>' +
+
+            '<div class="medicion">' +
+              '<div class="t">Carreraje Home</div>' +
+              '<div class="v">' + detalleCarreraje(r.carrerajeHome) + '</div>' +
+            '</div>' +
+
+            '<div class="medicion">' +
+              '<div class="t">Carreraje Away</div>' +
+              '<div class="v">' + detalleCarreraje(r.carrerajeAway) + '</div>' +
+            '</div>' +
+
+          '</div>' +
+
+          '<div class="brujula-wrap">' +
+            brujulaSvg +
+          '</div>' +
+
+          '<div class="brujula-cap">' +
+            (
+              tieneDireccion
+                ? 'viene de ' + grados + '° → va hacia ' + vaHacia + '°'
+                : 'Dirección de viento: NO_CONFIRMADO'
+            ) +
+          '</div>' +
+
+          '<details class="detalle">' +
+            '<summary>Ver detalle completo</summary>' +
+            '<div><b>Estado:</b> ' + estadoPropio + '</div>' +
+            '<div><b>Local bruto:</b> ' + fmtPct(propio.porcentajeLocal) + '</div>' +
+            '<div><b>Visitante bruto:</b> ' + fmtPct(propio.porcentajeVisitante) + '</div>' +
+            '<div><b>Empate:</b> ' + fmtPct(propio.porcentajeEmpate) + '</div>' +
+            '<div><b>Local dos vías:</b> ' + fmtPct(propio.porcentajeLocalDosVias) + '</div>' +
+            '<div><b>Visitante dos vías:</b> ' + fmtPct(propio.porcentajeVisitanteDosVias) + '</div>' +
+            '<div><b>Selección:</b> ' + escapar(propio.seleccion || "NO_CONFIRMADO") + '</div>' +
+            '<div><b>Detalle:</b> ' + escapar(propio.detalle || "") + '</div>' +
+          '</details>' +
+
+        '</div>';
+    });
+
+    listaEl.innerHTML = html;
+
+  } catch (e) {
+    log("ERROR: " + (e && e.message ? e.message : e));
+  } finally {
+    corriendo = false;
+    btn.disabled = false;
+    btn.textContent = "CORRER F5 AUTOMÁTICO (juegos de hoy)";
+  }
+}
+
+document
+  .getElementById("btnCorrer")
+  .addEventListener("click", correrTodo);
+
+var autoIntervalId = null;
+
+document
+  .getElementById("btnAuto")
+  .addEventListener("click", function() {
     var btn = this;
+
     if (autoIntervalId) {
       clearInterval(autoIntervalId);
       autoIntervalId = null;
+
       btn.classList.remove("activo");
-      btn.textContent = "🔄 Auto-actualizar cada 30 min: OFF (necesita esta pestaña abierta)";
+      btn.textContent = "🔄 Auto-actualizar cada 30 min: OFF";
     } else {
-      autoIntervalId = setInterval(correrTodo, 30*60*1000);
+      autoIntervalId = setInterval(
+        correrTodo,
+        30 * 60 * 1000
+      );
+
       btn.classList.add("activo");
-      btn.textContent = "🔄 Auto-actualizar cada 30 min: ON (no cierres esta pestaña)";
+      btn.textContent = "🔄 Auto-actualizar cada 30 min: ON";
     }
   });
 </script>
+
 </body>
 </html>
