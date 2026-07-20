@@ -92,6 +92,14 @@
 <script src="f5-automatico.js"></script>
 
 <script>
+  // CORRECCIÓN (20 jul 2026): la caja "Línea MLBPro" estaba hardcodeada
+  // como "PENDIENTE" y nunca leía r.moneyline, aunque f5-automatico.js ya
+  // lo entregaba calculado. Ahora lee el estado real de f5-moneyline.js
+  // ("SIN_DATOS", "PENDIENTE" o "VENTAJA_CUALITATIVA" con
+  // probabilidad: "NO_VALIDADA") y lo muestra honestamente, sin inventar
+  // cuota ni porcentaje. detalleCarreraje() no cambió: al recibir el
+  // estado renombrado "DOMINIO_CALCULADO" desde f5-carreraje.js lo
+  // imprime igual que antes, sin necesitar ajuste aquí.
   var consoleEl = document.getElementById("console");
   var listaEl = document.getElementById("lista");
   function log(t){ var d=document.createElement("div"); d.textContent=t; consoleEl.appendChild(d); consoleEl.scrollTop=consoleEl.scrollHeight; }
@@ -128,7 +136,7 @@
         // (no se toca ni se reinterpreta ese archivo). Se muestran solo los
         // campos que el objeto realmente trae en cada estado: estado siempre
         // existe; dominioPitcher/wobaEsperado solo cuando llegó a
-        // "PENDIENTE POR ACCESO"; detalle casi siempre viene.
+        // "DOMINIO_CALCULADO"; detalle casi siempre viene.
         function detalleCarreraje(c) {
           if (!c) return "NO_CONFIRMADO";
           var partes = [c.estado];
@@ -203,7 +211,26 @@
           '<div class="brujula-cap">'+(tieneDireccion ? ('viene de '+grados+'° → va hacia '+vaHacia+'°') : 'Dirección de viento: NO_CONFIRMADO')+'</div>';
 
         // ── 5. Mediciones alrededor de la brújula ──
-        var mlbproLineaTxt = "PENDIENTE"; // no existe todavía ninguna pieza "Línea MLBPro"
+        // Línea MLBPro F5 — lee r.moneyline real (f5-moneyline.js), sin
+        // inventar cuota ni probabilidad. estado puede ser: "SIN_DATOS",
+        // "PENDIENTE" o "VENTAJA_CUALITATIVA" (con probabilidad: "NO_VALIDADA").
+        var mlbproLineaTxt = "NO_CONFIRMADO";
+        var mlbproLineaEsNc = true;
+        if (r.moneyline && typeof r.moneyline.estado === "string") {
+          if (r.moneyline.estado === "VENTAJA_CUALITATIVA" && typeof r.moneyline.ventaja === "string") {
+            var ventajaLegible = (r.moneyline.ventaja === "PAREJO_SIN_VENTAJA")
+              ? "PAREJO — SIN VENTAJA"
+              : ("VENTAJA: " + r.moneyline.ventaja);
+            mlbproLineaTxt = ventajaLegible + "<br>SIN CUOTA/PROBABILIDAD VALIDADA";
+            mlbproLineaEsNc = false;
+          } else if (r.moneyline.estado === "PENDIENTE") {
+            mlbproLineaTxt = "PENDIENTE";
+            mlbproLineaEsNc = true;
+          } else {
+            mlbproLineaTxt = "NO_CONFIRMADO";
+            mlbproLineaEsNc = true;
+          }
+        }
         var scoreProyectadoTxt = detalleProyeccion(r.proyeccionTemprana);
         var trayectoriaTxt = "PENDIENTE"; // viento-trayectoria-7h.js no está conectado a este flujo todavía
 
@@ -212,7 +239,7 @@
             '<div class="medicion"><div class="t">Coincidencia</div><div class="v">'+r.coincidencia.estado+' ('+r.coincidencia.confirmados+')</div></div>'+
             '<div class="medicion"><div class="t">Carreraje Home</div><div class="v">'+detalleCarreraje(r.carrerajeHome)+'</div></div>'+
             '<div class="medicion"><div class="t">Carreraje Away</div><div class="v">'+detalleCarreraje(r.carrerajeAway)+'</div></div>'+
-            '<div class="medicion"><div class="t">Línea MLBPro</div><div class="v nc">'+mlbproLineaTxt+'</div></div>'+
+            '<div class="medicion"><div class="t">Línea MLBPro</div><div class="v'+(mlbproLineaEsNc?" nc":"")+'">'+mlbproLineaTxt+'</div></div>'+
             '<div class="medicion"><div class="t">Score proyectado</div><div class="v'+(scoreProyectadoTxt==="NO_CONFIRMADO"?" nc":"")+'">'+scoreProyectadoTxt+'</div></div>'+
             '<div class="medicion"><div class="t">Trayectoria del viento</div><div class="v nc">'+trayectoriaTxt+'</div></div>'+
           '</div>';
