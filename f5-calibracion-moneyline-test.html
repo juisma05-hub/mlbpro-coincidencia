@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+
+<title>MLBPro · Calibración Moneyline F5</title>
+
+<style>
+  :root {
+    color-scheme: dark;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    background: #0d1117;
+    color: #e6edf3;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+
+  header {
+    padding: 14px 16px;
+    border-bottom: 1px solid #30363d;
+  }
+
+  h1 {
+    margin: 0;
+    font-size: 16px;
+  }
+
+  main {
+    max-width: 950px;
+    margin: 0 auto;
+    padding: 14px;
+  }
+
+  .volver {
+    display: inline-block;
+    margin-bottom: 12px;
+    color: #79c0ff;
+    text-decoration: none;
+    font-size: 13px;
+  }
+
+  button {
+    width: 100%;
+    border: 0;
+    border-radius: 10px;
+    padding: 16px;
+    background: #2563eb;
+    color: white;
+    font-size: 15px;
+    font-weight: 900;
+    cursor: pointer;
+    margin-bottom: 12px;
+  }
+
+  button:disabled {
+    background: #30363d;
+    color: #8b949e;
+  }
+
+  .resumen {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .caja {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 10px;
+    padding: 10px;
+  }
+
+  .caja .titulo {
+    color: #8b949e;
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+    margin-bottom: 5px;
+  }
+
+  .caja .valor {
+    font-size: 18px;
+    font-weight: 900;
+  }
+
+  .ok {
+    color: #3fb950;
+  }
+
+  .mal {
+    color: #f85149;
+  }
+
+  .tabla-wrap {
+    overflow-x: auto;
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 10px;
+    margin-bottom: 12px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 760px;
+  }
+
+  th,
+  td {
+    padding: 9px;
+    border-bottom: 1px solid #30363d;
+    text-align: center;
+    font-size: 12px;
+  }
+
+  th {
+    background: #0d1117;
+    color: #8b949e;
+    font-size: 10px;
+    text-transform: uppercase;
+  }
+
+  #console {
+    background: #010409;
+    border: 1px solid #30363d;
+    border-radius: 10px;
+    min-height: 100px;
+    max-height: 420px;
+    overflow: auto;
+    padding: 12px;
+    font-family: ui-monospace, monospace;
+    font-size: 12px;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+</style>
+</head>
+
+<body>
+
+<header>
+  <h1>MLBPro · Calibración Moneyline F5</h1>
+</header>
+
+<main>
+
+  <a class="volver" href="index.html">← Volver al inicio</a>
+
+  <button id="btnCorrer">
+    CORRER CALIBRACIÓN MONEYLINE F5
+  </button>
+
+  <div id="salida"></div>
+
+  <div id="console">
+    Pulsa el botón.
+  </div>
+
+</main>
+
+<script src="arsenal-master.js"></script>
+<script src="batters-vspitch.js"></script>
+<script src="factor-arsenal-lineup.js"></script>
+<script src="f5-carreraje.js"></script>
+<script src="f5-moneyline.js"></script>
+<script src="f5-calibracion-moneyline.js"></script>
+
+<script>
+  var salidaEl = document.getElementById("salida");
+  var consoleEl = document.getElementById("console");
+  var btnEl = document.getElementById("btnCorrer");
+
+  function log(texto) {
+    var linea = document.createElement("div");
+    linea.textContent = texto;
+    consoleEl.appendChild(linea);
+    consoleEl.scrollTop = consoleEl.scrollHeight;
+  }
+
+  function numero(v) {
+    return typeof v === "number" && Number.isFinite(v);
+  }
+
+  function porcentaje(v) {
+    return numero(v)
+      ? (v * 100).toFixed(1) + "%"
+      : "N/C";
+  }
+
+  function porcentajeDirecto(v) {
+    return numero(v)
+      ? v.toFixed(1) + "%"
+      : "N/C";
+  }
+
+  function texto(v) {
+    if (v === null || v === undefined || v === "") {
+      return "N/C";
+    }
+
+    return String(v);
+  }
+
+  function escapar(v) {
+    return texto(v).replace(/[&<>"']/g, function(c) {
+      return {
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#039;"
+      }[c];
+    });
+  }
+
+  function pintarResultado(r) {
+    var conteos = r.conteos || {};
+    var modelo = r.modelo || {};
+    var baseline = r.baseline || {};
+    var buckets = r.tablaBuckets || {};
+    var globalDev = r.distribucionGlobalDev || {};
+    var globalPct = globalDev.porcentajes || {};
+
+    var filas = "";
+
+    Object.keys(buckets).sort().forEach(function(clave) {
+      var b = buckets[clave];
+      var dev = b.desarrollo || {};
+      var val = b.validacion || {};
+      var pctDev = dev.porcentajes || {};
+      var pctVal = val.porcentajes || {};
+
+      filas +=
+        "<tr>" +
+          "<td>" + escapar(clave) + "</td>" +
+          "<td>" + texto(dev.n) + "</td>" +
+          "<td>" + porcentajeDirecto(pctDev.LOCAL) + "</td>" +
+          "<td>" + porcentajeDirecto(pctDev.VISITANTE) + "</td>" +
+          "<td>" + porcentajeDirecto(pctDev.EMPATE) + "</td>" +
+          "<td>" + texto(val.n) + "</td>" +
+          "<td>" + porcentajeDirecto(pctVal.LOCAL) + "</td>" +
+          "<td>" + porcentajeDirecto(pctVal.VISITANTE) + "</td>" +
+          "<td>" + porcentajeDirecto(pctVal.EMPATE) + "</td>" +
+          "<td>" + escapar(b.estadoDesarrollo) + "</td>" +
+        "</tr>";
+    });
+
+    salidaEl.innerHTML =
+      '<div class="resumen">' +
+
+        '<div class="caja">' +
+          '<div class="titulo">Carreraje cargado</div>' +
+          '<div class="valor">' + texto(conteos.carrerajeCargado) + '</div>' +
+        '</div>' +
+
+        '<div class="caja">' +
+          '<div class="titulo">Lineups cargados</div>' +
+          '<div class="valor">' + texto(conteos.lineupsCargados) + '</div>' +
+        '</div>' +
+
+        '<div class="caja">' +
+          '<div class="titulo">Elegibles</div>' +
+          '<div class="valor">' + texto(conteos.elegibles) + '</div>' +
+        '</div>' +
+
+        '<div class="caja">' +
+          '<div class="titulo">Estado final</div>' +
+          '<div class="valor ' + (r.validado ? "ok" : "mal") + '">' +
+            (r.validado ? "VALIDADO" : "NO VALIDADO") +
+          '</div>' +
+        '</div>' +
+
+        '<div class="caja">' +
+          '<div class="titulo">Modelo accuracy</div>' +
+          '<div class="valor">' + porcentaje(modelo.accuracy) + '</div>' +
+        '</div>' +
+
+        '<div class="caja">' +
+          '<div class="titulo">Baseline accuracy</div>' +
+          '<div class="valor">' + porcentaje(baseline.accuracy) + '</div>' +
+        '</div>' +
+
+        '<div class="caja">' +
+          '<div class="titulo">Modelo Brier</div>' +
+          '<div class="valor">' + texto(modelo.brier) + '</div>' +
+        '</div>' +
+
+        '<div class="caja">' +
+          '<div class="titulo">Baseline Brier</div>' +
+          '<div class="valor">' + texto(baseline.brier) + '</div>' +
+        '</div>' +
+
+        '<div class="caja">' +
+          '<div class="titulo">Global Local</div>' +
+          '<div class="valor">' + porcentajeDirecto(globalPct.LOCAL) + '</div>' +
+        '</div>' +
+
+        '<div class="caja">' +
+          '<div class="titulo">Global Visitante</div>' +
+          '<div class="valor">' + porcentajeDirecto(globalPct.VISITANTE) + '</div>' +
+        '</div>' +
+
+        '<div class="caja">' +
+          '<div class="titulo">Global Empate</div>' +
+          '<div class="valor">' + porcentajeDirecto(globalPct.EMPATE) + '</div>' +
+        '</div>' +
+
+        '<div class="caja">' +
+          '<div class="titulo">Prueba Moneyline</div>' +
+          '<div class="valor">' +
+            escapar(
+              r.pruebaMoneyline &&
+              r.pruebaMoneyline.estado
+            ) +
+          '</div>' +
+        '</div>' +
+
+      '</div>' +
+
+      '<div class="tabla-wrap">' +
+        '<table>' +
+          '<thead>' +
+            '<tr>' +
+              '<th>Bucket</th>' +
+              '<th>N Dev</th>' +
+              '<th>Local Dev</th>' +
+              '<th>Visitante Dev</th>' +
+              '<th>Empate Dev</th>' +
+              '<th>N Val</th>' +
+              '<th>Local Val</th>' +
+              '<th>Visitante Val</th>' +
+              '<th>Empate Val</th>' +
+              '<th>Estado</th>' +
+            '</tr>' +
+          '</thead>' +
+          '<tbody>' +
+            filas +
+          '</tbody>' +
+        '</table>' +
+      '</div>';
+  }
+
+  btnEl.addEventListener("click", function() {
+    btnEl.disabled = true;
+    btnEl.textContent = "CALCULANDO…";
+
+    consoleEl.textContent = "";
+    salidaEl.innerHTML = "";
+
+    try {
+      var resultado =
+        calcularF5CalibracionMoneyline(log);
+
+      pintarResultado(resultado);
+
+      log("");
+      log("RESULTADO COMPLETO:");
+      log(JSON.stringify(resultado, null, 2));
+    } catch (e) {
+      log(
+        "ERROR: " +
+        (
+          e && e.message
+            ? e.message
+            : e
+        )
+      );
+    } finally {
+      btnEl.disabled = false;
+      btnEl.textContent =
+        "CORRER CALIBRACIÓN MONEYLINE F5";
+    }
+  });
+</script>
+
+</body>
+</html>
