@@ -1,0 +1,170 @@
+<!--
+  MLBPro · f5-fuerza-equipo-test.html
+
+  FUNCIÓN:
+  Página de prueba independiente. Pide team_id local, team_id visitante,
+  pitcher_id local, pitcher_id visitante (opcionales) y una fecha de
+  corte, y ejecuta calcularFuerzaEquipoF5ParaJuego() (de
+  f5-fuerza-equipo.js) contra F5_HISTORICO_CARRERAJE_2026 ya capturado en
+  localStorage. No calcula nada por su cuenta ni define ninguna fórmula:
+  solo llama a la pieza de medición y pinta el resultado crudo.
+
+  CORREGIDO 20 jul 2026: si un campo de pitcher_id queda vacío, ya no se
+  pasa `NaN`/`undefined` a calcularHistorialAbridorF5() ni se imprime la
+  palabra "undefined" en el resumen de consola -- se pasa `null`
+  explícitamente (que la función ya maneja devolviendo
+  estado: "SIN_PITCHER_ID") y el resumen en pantalla dice
+  "(sin pitcher_id)" en vez de mostrar el valor crudo.
+
+  DEPENDENCIAS:
+  f5-fuerza-equipo.js (único <script> que carga, además de este mismo
+  archivo). No carga f5-historico-lineup.js, f5-carreraje.js,
+  f5-moneyline.js, f5-automatico.js, clima-cache.js ni ningún archivo de
+  K6 o brújula — a propósito, para que esta prueba no se cruce con esas
+  cadenas.
+
+  ESTADO:
+  Página de prueba de una pieza de medición, no de una fórmula de
+  selección.
+
+  FECHA:
+  20 jul 2026.
+-->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MLBPro · Prueba Fuerza de Equipo F5</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:-apple-system,system-ui,sans-serif; background:#0d1117; color:#e6edf3; }
+  header { padding:14px 16px; border-bottom:1px solid #30363d; }
+  h1 { font-size:15px; margin:0; }
+  main { padding:14px; max-width:900px; margin:0 auto; }
+  label { font-size:12px; color:#8b949e; display:block; margin:10px 0 4px; }
+  input { width:100%; background:#0d1117; border:1px solid #30363d; border-radius:8px; padding:9px; color:#e6edf3; font-size:14px; }
+  .fila2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .nota-campo { font-size:10.5px; color:#6e7681; margin-top:3px; }
+  .go { width:100%; border:0; border-radius:10px; padding:16px; font-size:15px; font-weight:800; color:#fff; background:#2563eb; cursor:pointer; margin-top:14px; margin-bottom:10px; }
+  .go:disabled { background:#30363d; color:#8b949e; }
+  #console { margin-top:10px; background:#010409; border:1px solid #30363d; border-radius:8px; padding:12px; min-height:60px; max-height:35vh; overflow:auto; font-family:ui-monospace,monospace; font-size:11.5px; white-space:pre-wrap; word-break:break-word; }
+  section.bloque { background:#161b22; border:1px solid #30363d; border-radius:10px; padding:14px; margin-top:14px; overflow-x:auto; }
+  section.bloque h2 { font-size:13.5px; margin:0 0 10px; color:#79c0ff; }
+  pre { font-family:ui-monospace,monospace; font-size:11px; white-space:pre-wrap; word-break:break-word; color:#c9d1d9; margin:0; }
+</style>
+</head>
+<body>
+<header><h1>MLBPro · Prueba Fuerza de Equipo F5</h1></header>
+<main>
+  <div class="fila2">
+    <div>
+      <label for="homeTeamId">team_id LOCAL (obligatorio)</label>
+      <input type="number" id="homeTeamId" placeholder="ej. 147 (Yankees)" />
+    </div>
+    <div>
+      <label for="awayTeamId">team_id VISITANTE (obligatorio)</label>
+      <input type="number" id="awayTeamId" placeholder="ej. 111 (Red Sox)" />
+    </div>
+  </div>
+
+  <div class="fila2">
+    <div>
+      <label for="homePitcherId">pitcher_id abridor LOCAL (opcional)</label>
+      <input type="number" id="homePitcherId" placeholder="player_id" />
+      <div class="nota-campo">Vacío = SIN_PITCHER_ID, no se inventa nada.</div>
+    </div>
+    <div>
+      <label for="awayPitcherId">pitcher_id abridor VISITANTE (opcional)</label>
+      <input type="number" id="awayPitcherId" placeholder="player_id" />
+      <div class="nota-campo">Vacío = SIN_PITCHER_ID, no se inventa nada.</div>
+    </div>
+  </div>
+
+  <label for="fechaCorte">Fecha de corte (YYYY-MM-DD) — solo usa juegos ANTERIORES a esta fecha</label>
+  <input type="date" id="fechaCorte" />
+
+  <button id="btnCorrer" class="go">CALCULAR FUERZA F5</button>
+  <div id="console">Completa los campos y pulsa el botón.</div>
+
+  <div id="resultados"></div>
+</main>
+
+<script src="f5-fuerza-equipo.js"></script>
+<script>
+  var consoleEl = document.getElementById("console");
+  function log(t) { var d = document.createElement("div"); d.textContent = t; consoleEl.appendChild(d); consoleEl.scrollTop = consoleEl.scrollHeight; }
+
+  // Lee un input numérico y devuelve un numero finito o null -- nunca
+  // NaN/undefined hacia adelante.
+  function leerIdOpcional(elId) {
+    var raw = document.getElementById(elId).value;
+    if (raw === "" || raw === null || raw === undefined) return null;
+    var n = parseInt(raw, 10);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  // Texto de muestra seguro para consola: nunca imprime "undefined" ni
+  // "NaN" -- si el campo falta, dice explícitamente que falta.
+  function txtMuestra(v) {
+    return (v === null || v === undefined) ? "N/C" : String(v);
+  }
+
+  (function () {
+    var d = new Date();
+    var iso = d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2) + "-" + ("0" + d.getDate()).slice(-2);
+    document.getElementById("fechaCorte").value = iso;
+  })();
+
+  document.getElementById("btnCorrer").addEventListener("click", function () {
+    var btn = this;
+    consoleEl.textContent = "";
+    document.getElementById("resultados").innerHTML = "";
+
+    var homeTeamId = leerIdOpcional("homeTeamId");
+    var awayTeamId = leerIdOpcional("awayTeamId");
+    var homePitcherId = leerIdOpcional("homePitcherId");
+    var awayPitcherId = leerIdOpcional("awayPitcherId");
+    var fechaCorte = document.getElementById("fechaCorte").value;
+
+    if (homeTeamId === null || awayTeamId === null) {
+      log("ERROR: team_id local y visitante son obligatorios y deben ser numéricos.");
+      return;
+    }
+    if (!fechaCorte) {
+      log("ERROR: fecha de corte obligatoria.");
+      return;
+    }
+
+    if (homePitcherId === null) log("Aviso: no se dio pitcher_id local — se pasa null, calcularHistorialAbridorF5 devolverá SIN_PITCHER_ID (no undefined).");
+    if (awayPitcherId === null) log("Aviso: no se dio pitcher_id visitante — se pasa null, calcularHistorialAbridorF5 devolverá SIN_PITCHER_ID (no undefined).");
+
+    btn.disabled = true; btn.textContent = "CALCULANDO…";
+
+    try {
+      var reporte = calcularFuerzaEquipoF5ParaJuego(
+        homeTeamId, awayTeamId, homePitcherId, awayPitcherId, fechaCorte
+      );
+
+      log("Local (" + homeTeamId + "): " + reporte.local.estado + " — muestra general: " + (reporte.local.general ? txtMuestra(reporte.local.general.muestra) : "N/C"));
+      log("Visitante (" + awayTeamId + "): " + reporte.visitante.estado + " — muestra general: " + (reporte.visitante.general ? txtMuestra(reporte.visitante.general.muestra) : "N/C"));
+      log("Enfrentamientos: " + reporte.enfrentamientos.estado);
+      log("Abridor local: " + reporte.abridorLocal.estado + " — muestra: " + txtMuestra(reporte.abridorLocal.muestra));
+      log("Abridor visitante: " + reporte.abridorVisitante.estado + " — muestra: " + txtMuestra(reporte.abridorVisitante.muestra));
+      log("LISTO.");
+
+      var html = '<section class="bloque"><h2>Resultado completo (JSON crudo)</h2><pre>' +
+        JSON.stringify(reporte, null, 2).replace(/</g, "&lt;") +
+        '</pre></section>';
+      document.getElementById("resultados").innerHTML = html;
+    } catch (e) {
+      log("ERROR: " + (e && e.message ? e.message : e));
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "CALCULAR FUERZA F5";
+    }
+  });
+</script>
+</body>
+</html>
