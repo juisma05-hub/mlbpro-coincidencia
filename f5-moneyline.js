@@ -21,16 +21,29 @@
   La comparación contra mercado es opcional mediante:
     f5MoneyLine(carrerajeLocal, carrerajeVisitante, lineaMercadoF5)
 
+  La línea de mercado solo produce una comparación numérica sin vig.
+  Este archivo NO fija umbral de valor, NO selecciona LOCAL/VISITANTE
+  y NO elige ganador. La selección final pertenece a otra pieza futura.
+
   CORREGIDO 20 jul 2026:
   - Primero lee los históricos cargados como variables globales.
   - Usa localStorage únicamente como respaldo.
   - Admite cachés directas o envueltas en juegos/registros/data.
 
+  REESTRUCTURADO 21 jul 2026:
+  - Conserva intacta la calibración empírica validada.
+  - Eliminada la selección automática LOCAL/VISITANTE.
+  - Eliminado el umbral fijo de valor de 3%.
+  - La comparación con mercado queda únicamente como diferencia numérica.
+  - No integra todavía f5-fuerza-equipo.js.
+  - No usa pesos ni fórmula final.
+
   FECHA:
-  20 jul 2026.
+  21 jul 2026.
 
   ESTADO:
-  CONECTADO A CALIBRACIÓN EMPÍRICA VALIDADA.
+  PORCENTAJES EMPÍRICOS VALIDADOS.
+  SIN SELECCIÓN FINAL.
 */
 
 var F5_ML_MIN_MUESTRA_BUCKET = 20;
@@ -52,10 +65,6 @@ function _f5MlLeerCache(llave) {
   /*
     Fuente principal:
     históricos cargados como variables globales por sus archivos JS.
-
-    Ejemplos:
-      globalThis.F5_HISTORICO_CARRERAJE_2026
-      globalThis.F5_HISTORICO_LINEUP_2026
   */
   try {
     if (
@@ -123,10 +132,7 @@ function _f5MlNormId(v) {
     : s;
 }
 
-function _f5MlResultado(
-  homeRuns,
-  awayRuns
-) {
+function _f5MlResultado(homeRuns, awayRuns) {
   if (homeRuns > awayRuns) {
     return "LOCAL";
   }
@@ -138,9 +144,7 @@ function _f5MlResultado(
   return "EMPATE";
 }
 
-function _f5MlProbabilidadAmericana(
-  cuota
-) {
+function _f5MlProbabilidadAmericana(cuota) {
   if (
     !_f5MlEsNumero(cuota) ||
     cuota === 0
@@ -167,9 +171,7 @@ function _f5MlProbabilidadAmericana(
   );
 }
 
-function _f5MlMercadoSinVig(
-  lineaMercadoF5
-) {
+function _f5MlMercadoSinVig(lineaMercadoF5) {
   if (
     !lineaMercadoF5 ||
     !lineaMercadoF5.moneylineF5
@@ -213,11 +215,8 @@ function _f5MlMercadoSinVig(
   }
 
   return {
-    cuotaHome:
-      cuotaHome,
-
-    cuotaAway:
-      cuotaAway,
+    cuotaHome: cuotaHome,
+    cuotaAway: cuotaAway,
 
     porcentajeHome:
       _f5MlRedondear(
@@ -249,11 +248,8 @@ function _f5MlConstruirModelo() {
     "function"
   ) {
     return {
-      estado:
-        "SIN_DEPENDENCIA",
-
-      detalle:
-        "Falta calcularFactorArsenalLineup()."
+      estado: "SIN_DEPENDENCIA",
+      detalle: "Falta calcularFactorArsenalLineup()."
     };
   }
 
@@ -262,11 +258,8 @@ function _f5MlConstruirModelo() {
     "function"
   ) {
     return {
-      estado:
-        "SIN_DEPENDENCIA",
-
-      detalle:
-        "Falta f5Carreraje()."
+      estado: "SIN_DEPENDENCIA",
+      detalle: "Falta f5Carreraje()."
     };
   }
 
@@ -283,149 +276,130 @@ function _f5MlConstruirModelo() {
   var lineupPorJuego =
     new Map();
 
-  lineupRaw.forEach(
-    function (r) {
-      var key =
-        _f5MlNormId(
-          r &&
-          r.gamePk
-        );
+  lineupRaw.forEach(function (r) {
+    var key =
+      _f5MlNormId(
+        r &&
+        r.gamePk
+      );
 
-      if (
-        key &&
-        Array.isArray(
-          r.lineup_home
-        ) &&
-        r.lineup_home.length === 9 &&
-        Array.isArray(
-          r.lineup_away
-        ) &&
-        r.lineup_away.length === 9
-      ) {
-        lineupPorJuego.set(
-          key,
-          r
-        );
-      }
+    if (
+      key &&
+      Array.isArray(r.lineup_home) &&
+      r.lineup_home.length === 9 &&
+      Array.isArray(r.lineup_away) &&
+      r.lineup_away.length === 9
+    ) {
+      lineupPorJuego.set(
+        key,
+        r
+      );
     }
-  );
+  });
 
   var registros = [];
   var descartados = 0;
 
-  carrerajeRaw.forEach(
-    function (rc) {
-      var key =
-        _f5MlNormId(
-          rc &&
-          rc.gamePk
+  carrerajeRaw.forEach(function (rc) {
+    var key =
+      _f5MlNormId(
+        rc &&
+        rc.gamePk
+      );
+
+    if (!key) {
+      descartados++;
+      return;
+    }
+
+    var lineup =
+      lineupPorJuego.get(
+        key
+      );
+
+    if (!lineup) {
+      descartados++;
+      return;
+    }
+
+    if (
+      !_f5MlEsNumero(rc.f5_runs_home) ||
+      !_f5MlEsNumero(rc.f5_runs_away)
+    ) {
+      descartados++;
+      return;
+    }
+
+    var cruceHome;
+    var cruceAway;
+
+    try {
+      cruceHome =
+        calcularFactorArsenalLineup(
+          rc.home_pitcher_id,
+          lineup.lineup_away
         );
 
-      if (!key) {
-        descartados++;
-        return;
-      }
-
-      var lineup =
-        lineupPorJuego.get(
-          key
+      cruceAway =
+        calcularFactorArsenalLineup(
+          rc.away_pitcher_id,
+          lineup.lineup_home
         );
+    } catch (e) {
+      descartados++;
+      return;
+    }
 
-      if (!lineup) {
-        descartados++;
-        return;
-      }
+    var carrHome =
+      f5Carreraje(
+        cruceHome,
+        null
+      );
 
-      if (
-        !_f5MlEsNumero(
-          rc.f5_runs_home
-        ) ||
-        !_f5MlEsNumero(
+    var carrAway =
+      f5Carreraje(
+        cruceAway,
+        null
+      );
+
+    if (
+      !carrHome ||
+      carrHome.estado !== "DOMINIO_CALCULADO" ||
+      !carrAway ||
+      carrAway.estado !== "DOMINIO_CALCULADO"
+    ) {
+      descartados++;
+      return;
+    }
+
+    registros.push({
+      gamePk: key,
+
+      date:
+        rc.date ||
+        lineup.date ||
+        "",
+
+      dominioLocal:
+        carrHome.dominioPitcher,
+
+      dominioVisitante:
+        carrAway.dominioPitcher,
+
+      resultado:
+        _f5MlResultado(
+          rc.f5_runs_home,
           rc.f5_runs_away
         )
-      ) {
-        descartados++;
-        return;
-      }
+    });
+  });
 
-      var cruceHome;
-      var cruceAway;
-
-      try {
-        cruceHome =
-          calcularFactorArsenalLineup(
-            rc.home_pitcher_id,
-            lineup.lineup_away
-          );
-
-        cruceAway =
-          calcularFactorArsenalLineup(
-            rc.away_pitcher_id,
-            lineup.lineup_home
-          );
-      } catch (e) {
-        descartados++;
-        return;
-      }
-
-      var carrHome =
-        f5Carreraje(
-          cruceHome,
-          null
-        );
-
-      var carrAway =
-        f5Carreraje(
-          cruceAway,
-          null
-        );
-
-      if (
-        !carrHome ||
-        carrHome.estado !==
-          "DOMINIO_CALCULADO" ||
-        !carrAway ||
-        carrAway.estado !==
-          "DOMINIO_CALCULADO"
-      ) {
-        descartados++;
-        return;
-      }
-
-      registros.push({
-        gamePk:
-          key,
-
-        date:
-          rc.date ||
-          lineup.date ||
-          "",
-
-        dominioLocal:
-          carrHome
-            .dominioPitcher,
-
-        dominioVisitante:
-          carrAway
-            .dominioPitcher,
-
-        resultado:
-          _f5MlResultado(
-            rc.f5_runs_home,
-            rc.f5_runs_away
-          )
-      });
-    }
-  );
-
-  registros.sort(
-    function (a, b) {
-      return String(a.date)
-        .localeCompare(
-          String(b.date)
-        );
-    }
-  );
+  registros.sort(function (a, b) {
+    return String(a.date)
+      .localeCompare(
+        String(b.date)
+      );
+  });
 
   var corte =
     Math.floor(
@@ -441,94 +415,84 @@ function _f5MlConstruirModelo() {
 
   var buckets = {};
 
-  desarrollo.forEach(
-    function (r) {
-      var key =
-        r.dominioLocal +
-        "|" +
-        r.dominioVisitante;
+  desarrollo.forEach(function (r) {
+    var key =
+      r.dominioLocal +
+      "|" +
+      r.dominioVisitante;
 
-      if (!buckets[key]) {
-        buckets[key] = {
-          n: 0,
-          LOCAL: 0,
-          VISITANTE: 0,
-          EMPATE: 0
-        };
-      }
-
-      buckets[key].n++;
-
-      buckets[key][
-        r.resultado
-      ]++;
+    if (!buckets[key]) {
+      buckets[key] = {
+        n: 0,
+        LOCAL: 0,
+        VISITANTE: 0,
+        EMPATE: 0
+      };
     }
-  );
 
-  Object.keys(buckets)
-    .forEach(
-      function (key) {
-        var b =
-          buckets[key];
+    buckets[key].n++;
+    buckets[key][r.resultado]++;
+  });
 
-        b.porcentajeLocal =
-          _f5MlRedondear(
+  Object.keys(buckets).forEach(function (key) {
+    var b = buckets[key];
+
+    b.porcentajeLocal =
+      _f5MlRedondear(
+        (
+          b.LOCAL /
+          b.n
+        ) * 100,
+        1
+      );
+
+    b.porcentajeVisitante =
+      _f5MlRedondear(
+        (
+          b.VISITANTE /
+          b.n
+        ) * 100,
+        1
+      );
+
+    b.porcentajeEmpate =
+      _f5MlRedondear(
+        (
+          b.EMPATE /
+          b.n
+        ) * 100,
+        1
+      );
+
+    var decisiones =
+      b.LOCAL +
+      b.VISITANTE;
+
+    b.porcentajeLocalDosVias =
+      decisiones > 0
+        ? _f5MlRedondear(
             (
               b.LOCAL /
-              b.n
+              decisiones
             ) * 100,
             1
-          );
+          )
+        : null;
 
-        b.porcentajeVisitante =
-          _f5MlRedondear(
+    b.porcentajeVisitanteDosVias =
+      decisiones > 0
+        ? _f5MlRedondear(
             (
               b.VISITANTE /
-              b.n
+              decisiones
             ) * 100,
             1
-          );
-
-        b.porcentajeEmpate =
-          _f5MlRedondear(
-            (
-              b.EMPATE /
-              b.n
-            ) * 100,
-            1
-          );
-
-        var decisiones =
-          b.LOCAL +
-          b.VISITANTE;
-
-        b.porcentajeLocalDosVias =
-          decisiones > 0
-            ? _f5MlRedondear(
-                (
-                  b.LOCAL /
-                  decisiones
-                ) * 100,
-                1
-              )
-            : null;
-
-        b.porcentajeVisitanteDosVias =
-          decisiones > 0
-            ? _f5MlRedondear(
-                (
-                  b.VISITANTE /
-                  decisiones
-                ) * 100,
-                1
-              )
-            : null;
-      }
-    );
+          )
+        : null;
+  });
 
   _f5MlModeloCache = {
-    estado:
-      "MODELO_LISTO",
+    estado: "MODELO_LISTO",
 
     historicosCarreraje:
       carrerajeRaw.length,
@@ -562,29 +526,19 @@ function f5MoneyLine(
     !carrerajeVisitante
   ) {
     return {
-      pieza:
-        "F5_MONEYLINE",
-
-      estado:
-        "SIN_DATOS",
-
-      detalle:
-        "Falta Carreraje de uno o ambos lados."
+      pieza: "F5_MONEYLINE",
+      estado: "SIN_DATOS",
+      detalle: "Falta Carreraje de uno o ambos lados."
     };
   }
 
   if (
-    carrerajeLocal.estado !==
-      "DOMINIO_CALCULADO" ||
-    carrerajeVisitante.estado !==
-      "DOMINIO_CALCULADO"
+    carrerajeLocal.estado !== "DOMINIO_CALCULADO" ||
+    carrerajeVisitante.estado !== "DOMINIO_CALCULADO"
   ) {
     return {
-      pieza:
-        "F5_MONEYLINE",
-
-      estado:
-        "PENDIENTE",
+      pieza: "F5_MONEYLINE",
+      estado: "PENDIENTE",
 
       local:
         carrerajeLocal,
@@ -598,12 +552,10 @@ function f5MoneyLine(
   }
 
   var dominioLocal =
-    carrerajeLocal
-      .dominioPitcher;
+    carrerajeLocal.dominioPitcher;
 
   var dominioVisitante =
-    carrerajeVisitante
-      .dominioPitcher;
+    carrerajeVisitante.dominioPitcher;
 
   var dominiosValidos = [
     "DOMINA",
@@ -612,19 +564,12 @@ function f5MoneyLine(
   ];
 
   if (
-    dominiosValidos.indexOf(
-      dominioLocal
-    ) === -1 ||
-    dominiosValidos.indexOf(
-      dominioVisitante
-    ) === -1
+    dominiosValidos.indexOf(dominioLocal) === -1 ||
+    dominiosValidos.indexOf(dominioVisitante) === -1
   ) {
     return {
-      pieza:
-        "F5_MONEYLINE",
-
-      estado:
-        "SIN_DATOS",
+      pieza: "F5_MONEYLINE",
+      estado: "SIN_DATOS",
 
       dominioLocal:
         dominioLocal,
@@ -642,15 +587,11 @@ function f5MoneyLine(
 
   if (
     !modelo ||
-    modelo.estado !==
-      "MODELO_LISTO"
+    modelo.estado !== "MODELO_LISTO"
   ) {
     return {
-      pieza:
-        "F5_MONEYLINE",
-
-      estado:
-        "SIN_DATOS",
+      pieza: "F5_MONEYLINE",
+      estado: "SIN_DATOS",
 
       detalle:
         modelo &&
@@ -676,11 +617,8 @@ function f5MoneyLine(
       F5_ML_MIN_MUESTRA_BUCKET
   ) {
     return {
-      pieza:
-        "F5_MONEYLINE",
-
-      estado:
-        "MUESTRA_INSUFICIENTE",
+      pieza: "F5_MONEYLINE",
+      estado: "MUESTRA_INSUFICIENTE",
 
       dominioLocal:
         dominioLocal,
@@ -709,90 +647,31 @@ function f5MoneyLine(
       lineaMercadoF5
     );
 
-  var ventajaLocalPct =
+  var diferenciaLocalMercadoPct =
     null;
 
-  var ventajaVisitantePct =
+  var diferenciaVisitanteMercadoPct =
     null;
 
   if (mercado) {
-    ventajaLocalPct =
+    diferenciaLocalMercadoPct =
       _f5MlRedondear(
-        bucket
-          .porcentajeLocalDosVias -
-        mercado
-          .porcentajeHome,
+        bucket.porcentajeLocalDosVias -
+        mercado.porcentajeHome,
         1
       );
 
-    ventajaVisitantePct =
+    diferenciaVisitanteMercadoPct =
       _f5MlRedondear(
-        bucket
-          .porcentajeVisitanteDosVias -
-        mercado
-          .porcentajeAway,
+        bucket.porcentajeVisitanteDosVias -
+        mercado.porcentajeAway,
         1
       );
-  }
-
-  var ventaja;
-
-  if (
-    bucket
-      .porcentajeLocalDosVias >
-    bucket
-      .porcentajeVisitanteDosVias
-  ) {
-    ventaja =
-      "LOCAL";
-  } else if (
-    bucket
-      .porcentajeVisitanteDosVias >
-    bucket
-      .porcentajeLocalDosVias
-  ) {
-    ventaja =
-      "VISITANTE";
-  } else {
-    ventaja =
-      "PAREJO_SIN_VENTAJA";
-  }
-
-  var seleccion =
-    ventaja;
-
-  var umbralValorPct =
-    3;
-
-  if (mercado) {
-    seleccion =
-      "SIN_VALOR_CONFIRMADO";
-
-    if (
-      ventajaLocalPct >=
-        umbralValorPct &&
-      ventajaLocalPct >
-        ventajaVisitantePct
-    ) {
-      seleccion =
-        "LOCAL";
-    } else if (
-      ventajaVisitantePct >=
-        umbralValorPct &&
-      ventajaVisitantePct >
-        ventajaLocalPct
-    ) {
-      seleccion =
-        "VISITANTE";
-    }
   }
 
   return {
-    pieza:
-      "F5_MONEYLINE",
-
-    estado:
-      "PORCENTAJE_EMPIRICO",
+    pieza: "F5_MONEYLINE",
+    estado: "PORCENTAJE_EMPIRICO",
 
     bucket:
       bucketKey,
@@ -802,12 +681,6 @@ function f5MoneyLine(
 
     dominioVisitante:
       dominioVisitante,
-
-    ventaja:
-      ventaja,
-
-    seleccion:
-      seleccion,
 
     muestra:
       bucket.n,
@@ -819,43 +692,39 @@ function f5MoneyLine(
       modelo.desarrollo,
 
     porcentajeLocal:
-      bucket
-        .porcentajeLocal,
+      bucket.porcentajeLocal,
 
     porcentajeVisitante:
-      bucket
-        .porcentajeVisitante,
+      bucket.porcentajeVisitante,
 
     porcentajeEmpate:
-      bucket
-        .porcentajeEmpate,
+      bucket.porcentajeEmpate,
 
     porcentajeLocalDosVias:
-      bucket
-        .porcentajeLocalDosVias,
+      bucket.porcentajeLocalDosVias,
 
     porcentajeVisitanteDosVias:
-      bucket
-        .porcentajeVisitanteDosVias,
+      bucket.porcentajeVisitanteDosVias,
 
     mercadoSinVig:
       mercado,
 
-    ventajaLocalPct:
-      ventajaLocalPct,
+    diferenciaLocalMercadoPct:
+      diferenciaLocalMercadoPct,
 
-    ventajaVisitantePct:
-      ventajaVisitantePct,
+    diferenciaVisitanteMercadoPct:
+      diferenciaVisitanteMercadoPct,
 
-    umbralValorPct:
-      umbralValorPct,
+    seleccion:
+      null,
 
     detalle:
       "Porcentajes reales del bucket " +
       bucketKey +
       " sobre " +
       bucket.n +
-      " juegos históricos de desarrollo."
+      " juegos históricos de desarrollo. " +
+      "Esta pieza no selecciona ganador."
   };
 }
 
