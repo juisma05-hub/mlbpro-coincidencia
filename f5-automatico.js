@@ -4,12 +4,45 @@
   FUNCIÓN:
   Pieza automática de F5 (primeras 5 entradas). Junta, para cada juego real
   de HOY: schedule + clima de hoy + histórico del mismo parque + línea F5 de
-  mercado + lineup rival + cruce arsenal-vs-lineup + Carreraje + MoneyLine
-  propio de F5.
+  mercado + lineup rival + cruce arsenal-vs-lineup + Carreraje + porcentajes
+  empíricos de Moneyline F5 + Fuerza de Equipo F5.
 
-  CORRECCIÓN 20 JUL 2026:
+  MONEYLINE F5:
   f5MoneyLine() recibe lineaF5Juego como tercer parámetro para calcular los
-  porcentajes propios y compararlos contra la Moneyline F5 real de mercado.
+  porcentajes empíricos validados y compararlos numéricamente contra la
+  Moneyline F5 real de mercado.
+
+  FUERZA DE EQUIPO F5:
+  calcularFuerzaEquipoF5ParaJuego() mide, como bloque independiente:
+  - fuerza histórica del equipo local;
+  - fuerza histórica del equipo visitante;
+  - enfrentamientos directos;
+  - historial F5 del abridor local;
+  - historial F5 del abridor visitante.
+
+  La fecha de hoy se usa como fecha de corte. Por tanto, el juego de hoy
+  no entra en los históricos.
+
+  REGLAS:
+  - No fija pesos.
+  - No combina Fuerza de Equipo con Moneyline.
+  - No elige ganador.
+  - No produce selección final.
+  - Mantiene todos los bloques separados dentro del resultado.
+
+  DEPENDENCIAS:
+  f5-fuerza-equipo.js debe cargarse antes de f5-automatico.js.
+
+  CORREGIDO 21 jul 2026:
+  - histCandidatos ahora exige explícitamente x.date < hoy además de
+    mismo parque + status Final + temperature_f numérica. Antes confiaba
+    únicamente en que el caché de clima ya excluyera el juego de hoy; con
+    este corte explícito, la Regla Madre (el juego de hoy nunca entra al
+    histórico) queda garantizada dentro de esta función también, no solo
+    en la pieza que llena el caché.
+
+  REESTRUCTURADO:
+  21 jul 2026.
 */
 
 function diagnosticoArsenalLineup(pitcherId, lineupRival, etiqueta, logFn) {
@@ -260,26 +293,22 @@ async function f5AutomaticoHoy(logFn) {
 
         if (hit) {
           today.tempF =
-            typeof hit.temperature_f ===
-            "number"
+            typeof hit.temperature_f === "number"
               ? hit.temperature_f
               : null;
 
           today.humedad =
-            typeof hit.humidity_pct ===
-            "number"
+            typeof hit.humidity_pct === "number"
               ? hit.humidity_pct
               : null;
 
           today.vientoMph =
-            typeof hit.windspeed_mph ===
-            "number"
+            typeof hit.windspeed_mph === "number"
               ? hit.windspeed_mph
               : null;
 
           today.direccionViento =
-            typeof hit.wind_dir ===
-            "number"
+            typeof hit.wind_dir === "number"
               ? hit.wind_dir
               : null;
         }
@@ -298,6 +327,8 @@ async function f5AutomaticoHoy(logFn) {
         return (
           x &&
           x.venue &&
+          typeof x.date === "string" &&
+          x.date < hoy &&
           stadiumNorm(
             stadiumCanonName(x.venue)
           ) ===
@@ -305,8 +336,7 @@ async function f5AutomaticoHoy(logFn) {
               stadiumCanonName(venue)
             ) &&
           x.status === "Final" &&
-          typeof x.temperature_f ===
-            "number"
+          typeof x.temperature_f === "number"
         );
       });
 
@@ -318,24 +348,21 @@ async function f5AutomaticoHoy(logFn) {
       histCandidatos[0] || null;
 
     var perfilPitcherHoy =
-      typeof armarPerfilPitcher ===
-      "function"
+      typeof armarPerfilPitcher === "function"
         ? armarPerfilPitcher(
             pitcherHomeId
           )
         : null;
 
     var perfilPitcherAwayHoy =
-      typeof armarPerfilPitcher ===
-      "function"
+      typeof armarPerfilPitcher === "function"
         ? armarPerfilPitcher(
             pitcherAwayId
           )
         : null;
 
     var perfilPitcherHist =
-      typeof armarPerfilPitcher ===
-        "function" && hist
+      typeof armarPerfilPitcher === "function" && hist
         ? armarPerfilPitcher(
             hist.home_pitcher_id
           )
@@ -365,15 +392,13 @@ async function f5AutomaticoHoy(logFn) {
     );
 
     var proyeccionTemprana =
-      typeof proyectarF5DesdePitcher ===
-      "function"
+      typeof proyectarF5DesdePitcher === "function"
         ? proyectarF5DesdePitcher(
             perfilPitcherHoy,
             perfilPitcherAwayHoy
           )
         : {
-            pieza:
-              "F5_PROYECCION_TEMPRANA",
+            pieza: "F5_PROYECCION_TEMPRANA",
             estado: "SIN_DATOS",
             detalle:
               "Función de proyección no cargada."
@@ -383,18 +408,15 @@ async function f5AutomaticoHoy(logFn) {
       ? {
           venue: hist.venue,
           roof: hist.roof || null,
-          tempF:
-            hist.temperature_f,
+          tempF: hist.temperature_f,
 
           vientoMph:
-            typeof hist.windspeed_mph ===
-            "number"
+            typeof hist.windspeed_mph === "number"
               ? hist.windspeed_mph
               : null,
 
           direccionViento:
-            typeof hist.wind_dir ===
-            "number"
+            typeof hist.wind_dir === "number"
               ? hist.wind_dir
               : null,
 
@@ -417,12 +439,9 @@ async function f5AutomaticoHoy(logFn) {
       venue: venue,
       roof: today.roof,
       tempF: today.tempF,
-      vientoMph:
-        today.vientoMph,
-      direccionViento:
-        today.direccionViento,
-      perfilPitcher:
-        perfilPitcherHoy
+      vientoMph: today.vientoMph,
+      direccionViento: today.direccionViento,
+      perfilPitcher: perfilPitcherHoy
     };
 
     var coincidencia =
@@ -460,10 +479,8 @@ async function f5AutomaticoHoy(logFn) {
     var lineaCarreraje =
       lineaF5Juego &&
       lineaF5Juego.runlineF5 &&
-      typeof lineaF5Juego
-        .runlineF5.point === "number"
-        ? lineaF5Juego
-            .runlineF5.point
+      typeof lineaF5Juego.runlineF5.point === "number"
+        ? lineaF5Juego.runlineF5.point
         : null;
 
     var carrerajeHome = {
@@ -535,9 +552,7 @@ async function f5AutomaticoHoy(logFn) {
             }
           : {
               estado:
-                cruceHome
-                  .bateadores_usados >
-                0
+                cruceHome.bateadores_usados > 0
                   ? "PENDIENTE"
                   : "NO_CONFIRMADO",
 
@@ -604,9 +619,7 @@ async function f5AutomaticoHoy(logFn) {
             }
           : {
               estado:
-                cruceAway
-                  .bateadores_usados >
-                0
+                cruceAway.bateadores_usados > 0
                   ? "PENDIENTE"
                   : "NO_CONFIRMADO",
 
@@ -651,12 +664,73 @@ async function f5AutomaticoHoy(logFn) {
         lineaF5Juego
       );
 
+    var fuerzaEquipoF5;
+
+    if (
+      typeof calcularFuerzaEquipoF5ParaJuego === "function"
+    ) {
+      fuerzaEquipoF5 =
+        calcularFuerzaEquipoF5ParaJuego(
+          homeTeamId,
+          awayTeamId,
+          pitcherHomeId,
+          pitcherAwayId,
+          hoy
+        );
+    } else {
+      fuerzaEquipoF5 = {
+        estado: "SIN_DEPENDENCIA",
+        detalle:
+          "Falta cargar f5-fuerza-equipo.js antes de f5-automatico.js."
+      };
+    }
+
+    log(
+      "  FUERZA EQUIPO F5 [" +
+        away +
+        " @ " +
+        home +
+        "] local=" +
+        (
+          fuerzaEquipoF5.local
+            ? fuerzaEquipoF5.local.estado
+            : "N/C"
+        ) +
+        " | visitante=" +
+        (
+          fuerzaEquipoF5.visitante
+            ? fuerzaEquipoF5.visitante.estado
+            : "N/C"
+        ) +
+        " | abridorLocal=" +
+        (
+          fuerzaEquipoF5.abridorLocal
+            ? fuerzaEquipoF5.abridorLocal.estado
+            : "N/C"
+        ) +
+        " | abridorVisitante=" +
+        (
+          fuerzaEquipoF5.abridorVisitante
+            ? fuerzaEquipoF5.abridorVisitante.estado
+            : "N/C"
+        )
+    );
+
     resultados.push({
       juego:
         away + " @ " + home,
 
-      venue: venue,
-      gamePk: g.gamePk,
+      venue:
+        venue,
+
+      gamePk:
+        g.gamePk,
+
+      homeTeamId:
+        homeTeamId,
+
+      awayTeamId:
+        awayTeamId,
 
       pitcherHomeId:
         pitcherHomeId,
@@ -675,6 +749,9 @@ async function f5AutomaticoHoy(logFn) {
 
       moneyline:
         moneyline,
+
+      fuerzaEquipoF5:
+        fuerzaEquipoF5,
 
       lineaMercadoF5:
         lineaF5Juego,
