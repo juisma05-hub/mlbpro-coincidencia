@@ -70,11 +70,62 @@
     techo), coincidencia, bucket, muestra histórica, base histórica,
     carreraje local/visitante, brújula, auto-actualización.
 
+  CORRECCIÓN 21 jul 2026 (segunda pasada — favorito / empate / over-under
+  / brújula):
+  - Se reemplazó el bloque único "Empate después de cinco entradas" por
+    una fila de TRES cajas en la misma posición (entre las columnas de
+    equipo y "Total F5 de mercado"): Favorito, Empate, Over/Under.
+  - Favorito: el lado con mayor % empírico propio
+    (porcentajeLocalDosVias / porcentajeVisitanteDosVias, ya calculados
+    por f5-moneyline.js). Se muestra el % tal cual, sin umbral mínimo —
+    si el % es bajo, se muestra bajo, nunca se oculta ni se redondea a
+    "sin favorito". Si ambos % son exactamente iguales, se declara
+    "EMPATE EXACTO" en vez de forzar un lado. Esto NO reintroduce el
+    campo propio.seleccion ni el umbral de valor de 3% que se eliminó
+    antes — es una etiqueta de lectura sobre datos que ya existían.
+  - Over/Under: probabilidad implícita sin vig calculada localmente en
+    esta página (funciones probabilidadAmericana() / overUnderSinVig())
+    a partir de lm.totalF5.over_price / under_price — las mismas cuotas
+    que ya se muestran en "Total F5 de mercado". Es 100% mercado, no un
+    modelo propio de MLBPro; se etiqueta así en pantalla para no
+    confundirlo con el % empírico propio. Si falta cualquiera de las dos
+    cuotas, muestra N/C.
+  - La consola de diagnóstico (antes siempre visible debajo de los
+    botones) ahora está detrás de un <details> colapsable ("Ver registro
+    / diagnóstico"). La brújula de viento sigue siempre visible, sin
+    cambios (ver corrección de alcance más abajo).
+
+  CORRECCIÓN 21 jul 2026 (tercera pasada — corrección de alcance):
+  - La pieza que se esconde detrás de un botón es la CONSOLA DE
+    DIAGNÓSTICO (#console, donde salen todos los logs "DIAGNOSTICO...",
+    "LISTO...", etc.) — ahora vive dentro de un <details> ("Ver registro
+    / diagnóstico"), colapsada por defecto. NO es la brújula: la brújula
+    de viento se revirtió a su comportamiento original, siempre visible
+    en cada juego, sin botón. La pasada anterior de esta corrección había
+    escondido la brújula por error de interpretación; queda corregido
+    aquí.
+
+  CORRECCIÓN 21 jul 2026 (cuarta pasada — simplificar la vista por
+  defecto):
+  - Visible siempre, sin botón: venue, línea congelada (si aplica),
+    columnas de equipo, Favorito/Empate/Over-Under, Total F5 de mercado,
+    y clima solo hasta Viento (Temp., Humedad, Viento).
+  - Detrás de UN solo botón ("Ver más (dirección, techo, mediciones,
+    fuerza F5, brújula)"): Dirección, Techo, el bloque de mediciones
+    (Estado MLBPro, Muestra histórica, Base histórica, Coincidencia,
+    Bucket, Carreraje Home/Away), Fuerza de Equipo F5 completa, la
+    brújula de viento, y — anidado dentro de ese mismo botón — el
+    "Ver detalle completo" que ya existía. Nada de esto se eliminó ni se
+    recalculó: solo se movió de posición dentro del mismo HTML.
+
   NO TOCA:
   f5-automatico.js, f5-moneyline.js (no cambia calibración ni
   porcentajes empíricos), f5-carreraje.js, f5-coincidencia.js,
   f5-fuerza-equipo.js. Esta página solo consume y muestra lo que esos
-  archivos ya calculan.
+  archivos ya calculan. El cálculo de Over/Under sin vig es puramente de
+  presentación (misma fórmula que f5-moneyline.js usa internamente,
+  repetida aquí solo para mostrar), no se escribió en ningún archivo de
+  lógica.
 
   ESTADO:
   CONFIRMADO EN CÓDIGO — pendiente de correr en el navegador con datos
@@ -410,7 +461,10 @@
 
   <div id="lista"></div>
 
-  <div id="console">Pulsa el botón.</div>
+  <details class="detalle" style="margin-top:6px;">
+    <summary>Ver registro / diagnóstico</summary>
+    <div id="console">Pulsa el botón.</div>
+  </details>
 
 </main>
 
@@ -858,70 +912,75 @@ async function correrTodo() {
             '<div class="clima-item">Temp.<span class="v">' + tempTxt + '</span></div>' +
             '<div class="clima-item">Humedad<span class="v">' + humedadTxt + '</span></div>' +
             '<div class="clima-item">Viento<span class="v">' + vientoTxt + '</span></div>' +
-            '<div class="clima-item">Dirección<span class="v">' + direccionTxt + '</span></div>' +
-            '<div class="clima-item">Techo<span class="v">' + techoTxt + '</span></div>' +
-          '</div>' +
-
-          '<div class="mediciones">' +
-
-            '<div class="medicion">' +
-              '<div class="t">Estado MLBPro</div>' +
-              '<div class="v">' + estadoPropio + '</div>' +
-            '</div>' +
-
-            '<div class="medicion">' +
-              '<div class="t">Muestra histórica</div>' +
-              '<div class="v">' + (esNumero(propio.muestra) ? propio.muestra : "N/C") + '</div>' +
-            '</div>' +
-
-            '<div class="medicion">' +
-              '<div class="t">Base histórica</div>' +
-              '<div class="v">' + (esNumero(propio.base_historica) ? propio.base_historica : "N/C") + '</div>' +
-            '</div>' +
-
-            '<div class="medicion">' +
-              '<div class="t">Coincidencia</div>' +
-              '<div class="v">' +
-                escapar(r.coincidencia && r.coincidencia.estado) +
-                ' (' +
-                escapar(r.coincidencia && r.coincidencia.confirmados) +
-                ')' +
-              '</div>' +
-            '</div>' +
-
-            '<div class="medicion">' +
-              '<div class="t">Bucket</div>' +
-              '<div class="v">' + escapar(propio.bucket || "NO_CONFIRMADO") + '</div>' +
-            '</div>' +
-
-            '<div class="medicion">' +
-              '<div class="t">Carreraje Home</div>' +
-              '<div class="v">' + detalleCarreraje(r.carrerajeHome) + '</div>' +
-            '</div>' +
-
-            '<div class="medicion">' +
-              '<div class="t">Carreraje Away</div>' +
-              '<div class="v">' + detalleCarreraje(r.carrerajeAway) + '</div>' +
-            '</div>' +
-
-          '</div>' +
-
-          '<div class="total-central">' +
-            '<div class="tit">Fuerza de Equipo F5</div>' +
-            '<div class="mediciones" style="margin-bottom:0;">' +
-              bloqueFuerzaEquipo("Fuerza F5 visitante", fuerzaVisitante) +
-              bloqueFuerzaEquipo("Fuerza F5 local", fuerzaLocal) +
-              bloqueEnfrentamientos(enfrentamientos) +
-              bloqueAbridor("Abridor visitante", abridorVisitante) +
-              bloqueAbridor("Abridor local", abridorLocal) +
-            '</div>' +
           '</div>' +
 
           '<details class="detalle">' +
-            '<summary>Ver brújula de viento</summary>' +
+            '<summary>Ver más (dirección, techo, mediciones, fuerza F5, brújula)</summary>' +
+
+            '<div class="clima-fila">' +
+              '<div class="clima-item">Dirección<span class="v">' + direccionTxt + '</span></div>' +
+              '<div class="clima-item">Techo<span class="v">' + techoTxt + '</span></div>' +
+            '</div>' +
+
+            '<div class="mediciones">' +
+
+              '<div class="medicion">' +
+                '<div class="t">Estado MLBPro</div>' +
+                '<div class="v">' + estadoPropio + '</div>' +
+              '</div>' +
+
+              '<div class="medicion">' +
+                '<div class="t">Muestra histórica</div>' +
+                '<div class="v">' + (esNumero(propio.muestra) ? propio.muestra : "N/C") + '</div>' +
+              '</div>' +
+
+              '<div class="medicion">' +
+                '<div class="t">Base histórica</div>' +
+                '<div class="v">' + (esNumero(propio.base_historica) ? propio.base_historica : "N/C") + '</div>' +
+              '</div>' +
+
+              '<div class="medicion">' +
+                '<div class="t">Coincidencia</div>' +
+                '<div class="v">' +
+                  escapar(r.coincidencia && r.coincidencia.estado) +
+                  ' (' +
+                  escapar(r.coincidencia && r.coincidencia.confirmados) +
+                  ')' +
+                '</div>' +
+              '</div>' +
+
+              '<div class="medicion">' +
+                '<div class="t">Bucket</div>' +
+                '<div class="v">' + escapar(propio.bucket || "NO_CONFIRMADO") + '</div>' +
+              '</div>' +
+
+              '<div class="medicion">' +
+                '<div class="t">Carreraje Home</div>' +
+                '<div class="v">' + detalleCarreraje(r.carrerajeHome) + '</div>' +
+              '</div>' +
+
+              '<div class="medicion">' +
+                '<div class="t">Carreraje Away</div>' +
+                '<div class="v">' + detalleCarreraje(r.carrerajeAway) + '</div>' +
+              '</div>' +
+
+            '</div>' +
+
+            '<div class="total-central">' +
+              '<div class="tit">Fuerza de Equipo F5</div>' +
+              '<div class="mediciones" style="margin-bottom:0;">' +
+                bloqueFuerzaEquipo("Fuerza F5 visitante", fuerzaVisitante) +
+                bloqueFuerzaEquipo("Fuerza F5 local", fuerzaLocal) +
+                bloqueEnfrentamientos(enfrentamientos) +
+                bloqueAbridor("Abridor visitante", abridorVisitante) +
+                bloqueAbridor("Abridor local", abridorLocal) +
+              '</div>' +
+            '</div>' +
+
             '<div class="brujula-wrap">' +
               brujulaSvg +
             '</div>' +
+
             '<div class="brujula-cap">' +
               (
                 tieneDireccion
@@ -929,17 +988,18 @@ async function correrTodo() {
                   : 'Dirección de viento: NO_CONFIRMADO'
               ) +
             '</div>' +
-          '</details>' +
 
-          '<details class="detalle">' +
-            '<summary>Ver detalle completo</summary>' +
-            '<div><b>Estado:</b> ' + estadoPropio + '</div>' +
-            '<div><b>Local bruto:</b> ' + fmtPct(propio.porcentajeLocal) + '</div>' +
-            '<div><b>Visitante bruto:</b> ' + fmtPct(propio.porcentajeVisitante) + '</div>' +
-            '<div><b>Empate:</b> ' + fmtPct(propio.porcentajeEmpate) + '</div>' +
-            '<div><b>Local dos vías:</b> ' + fmtPct(propio.porcentajeLocalDosVias) + '</div>' +
-            '<div><b>Visitante dos vías:</b> ' + fmtPct(propio.porcentajeVisitanteDosVias) + '</div>' +
-            '<div><b>Detalle:</b> ' + escapar(propio.detalle || "") + '</div>' +
+            '<details class="detalle">' +
+              '<summary>Ver detalle completo</summary>' +
+              '<div><b>Estado:</b> ' + estadoPropio + '</div>' +
+              '<div><b>Local bruto:</b> ' + fmtPct(propio.porcentajeLocal) + '</div>' +
+              '<div><b>Visitante bruto:</b> ' + fmtPct(propio.porcentajeVisitante) + '</div>' +
+              '<div><b>Empate:</b> ' + fmtPct(propio.porcentajeEmpate) + '</div>' +
+              '<div><b>Local dos vías:</b> ' + fmtPct(propio.porcentajeLocalDosVias) + '</div>' +
+              '<div><b>Visitante dos vías:</b> ' + fmtPct(propio.porcentajeVisitanteDosVias) + '</div>' +
+              '<div><b>Detalle:</b> ' + escapar(propio.detalle || "") + '</div>' +
+            '</details>' +
+
           '</details>' +
 
         '</div>';
