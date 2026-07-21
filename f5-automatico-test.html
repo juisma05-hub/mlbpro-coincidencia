@@ -1,5 +1,91 @@
 <!DOCTYPE html>
 <html lang="es">
+<!--
+  MLBPro · f5-automatico-test.html
+
+  FUNCIÓN:
+  Página de prueba manual para f5AutomaticoHoy(): corre el pipeline F5
+  completo sobre los juegos reales de hoy y renderiza, por juego, el
+  resultado de cada bloque F5 por separado (clima, línea de mercado,
+  coincidencia, carreraje, moneyline empírico, fuerza de equipo F5). No
+  calcula nada aquí: solo formatea y muestra lo que ya devuelve
+  f5AutomaticoHoy() desde f5-automatico.js. Esta pantalla NO produce
+  selección final de ningún tipo — ni Moneyline F5 ni Fuerza de Equipo F5
+  eligen ganador; ambas piezas se muestran como evidencia separada.
+
+  ENTRADAS:
+  Ninguna externa directa. Depende de que todos los <script> del pipeline
+  F5 (mlb-routes.js, estadios.js, clima-cache.js, jalar-clima.js,
+  jalar-linea-f5.js, jalar-lineup.js, arsenal-master.js,
+  batters-vspitch.js, pitchers-master.js, catchers-master.js,
+  factor-arsenal-lineup.js, perfil-pitcher-builder.js,
+  proyeccion-pitcher-temprana.js, f5-estadio.js, f5-roof.js,
+  f5-temperatura.js, f5-viento.js, f5-pitcher.js, f5-coincidencia.js,
+  f5-carreraje.js, f5-moneyline.js, f5-fuerza-equipo.js,
+  f5-automatico.js) estén cargados en ese orden antes del bloque de
+  script propio de esta página.
+
+  SALIDAS / MODIFICACIONES:
+  Solo renderiza HTML en #lista y líneas de log en #console. No escribe
+  ninguna caché ni localStorage. Lee (a través de f5-automatico.js y sus
+  dependencias) F5_HISTORICO_CARRERAJE_2026 y F5_HISTORICO_LINEUP_2026,
+  pero nunca directamente — siempre a través de las funciones ya
+  cargadas.
+
+  FUERZA DE EQUIPO F5 (bloque agregado en esta corrección):
+  r.fuerzaEquipoF5 trae { local, visitante, enfrentamientos, abridorLocal,
+  abridorVisitante }, tal como lo arma calcularFuerzaEquipoF5ParaJuego()
+  en f5-fuerza-equipo.js. Los nombres de campo usados aquí son los reales
+  de ese archivo (no se inventó ningún nombre):
+    - Fuerza de equipo (local/visitante): estado, general.{muestra,
+      ganados, perdidos, empates, carrerasAnotadas, carrerasPermitidas,
+      diferencial, promedioAnotadas, promedioPermitidas}, ultimos5.{estado,
+      muestra, porcentaje_victorias_f5, diferencial_promedio}.
+    - Enfrentamientos directos: estado,
+      resumen_desde_perspectiva_a.{muestra, ganados, perdidos, empates,
+      diferencial}.
+    - Abridor (local/visitante): estado, muestra, ganados_f5, perdidos_f5,
+      empates_f5, porcentaje_victorias_f5,
+      promedio_carreras_equipo_f5_en_aperturas,
+      promedio_carreras_rival_f5_en_aperturas, diferencial_promedio_f5,
+      ultimos5.{estado, muestra, porcentaje_victorias_f5}.
+  Ningún campo faltante se convierte en 0 ni en valor neutral: si el dato
+  no existe, se muestra "N/C" o "NO_CONFIRMADO".
+
+  CORRECCIÓN 21 jul 2026:
+  - Se mantiene el orden de script: f5-moneyline.js, f5-fuerza-equipo.js,
+    f5-automatico.js (en ese orden, f5-fuerza-equipo.js antes de
+    f5-automatico.js).
+  - Se eliminaron por completo: ventajaAway, ventajaHome, valorAway,
+    valorHome, el texto "Ventaja mercado", las etiquetas VALOR / SIN
+    VALOR, el bloque "Selección" y toda referencia a propio.seleccion —
+    f5-moneyline.js no elige ganador (seleccion siempre null), así que
+    esos campos y etiquetas quedaban muertos en pantalla.
+  - Se agregaron cinco bloques de Fuerza F5 por juego: Fuerza F5
+    visitante, Fuerza F5 local, Enfrentamientos directos, Abridor
+    visitante, Abridor local — leídos de r.fuerzaEquipoF5 con los nombres
+    de campo reales de f5-fuerza-equipo.js.
+  - Se conservan intactos: porcentajes empíricos local/visitante/empate,
+    cuotas, total F5 de mercado, clima (temp/humedad/viento/dirección/
+    techo), coincidencia, bucket, muestra histórica, base histórica,
+    carreraje local/visitante, brújula, auto-actualización.
+
+  NO TOCA:
+  f5-automatico.js, f5-moneyline.js (no cambia calibración ni
+  porcentajes empíricos), f5-carreraje.js, f5-coincidencia.js,
+  f5-fuerza-equipo.js. Esta página solo consume y muestra lo que esos
+  archivos ya calculan.
+
+  ESTADO:
+  CONFIRMADO EN CÓDIGO — pendiente de correr en el navegador con datos
+  reales antes de aprobar: verificar que Fuerza F5 no devuelva
+  SIN_DEPENDENCIA, confirmar que ningún juego de hoy entra al histórico,
+  correr la función principal, revisar consola sin errores, confirmar
+  que la pantalla muestra los bloques reales.
+
+  FECHA:
+  21 jul 2026.
+-->
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
@@ -152,39 +238,6 @@
     margin-top: 2px;
   }
 
-  .equipo-col .ventaja {
-    font-size: 11px;
-    color: #8b949e;
-    margin-top: 5px;
-  }
-
-  .fav {
-    display: inline-block;
-    margin-top: 7px;
-    font-size: 10px;
-    font-weight: 800;
-    padding: 4px 9px;
-    border-radius: 20px;
-  }
-
-  .fav.si {
-    background: #0d2818;
-    color: #3fb950;
-    border: 1px solid #238636;
-  }
-
-  .fav.no {
-    background: #21262d;
-    color: #8b949e;
-    border: 1px solid #30363d;
-  }
-
-  .fav.nc {
-    background: #21262d;
-    color: #6e7681;
-    border: 1px solid #30363d;
-  }
-
   .empate-f5 {
     background: #0d1117;
     border: 1px solid #30363d;
@@ -291,6 +344,7 @@
     font-size: 12.5px;
     font-weight: 700;
     color: #e6edf3;
+    line-height: 1.5;
   }
 
   .medicion .v.nc {
@@ -434,6 +488,110 @@ function detalleCarreraje(c) {
   return partes.join("<br>");
 }
 
+function estadoTxt(v) {
+  return escapar(v || "NO_CONFIRMADO");
+}
+
+function fmtN(v) {
+  return esNumero(v) ? v : "N/C";
+}
+
+// Fuerza F5 de un equipo (local o visitante), campos reales de
+// calcularFuerzaEquipoF5() en f5-fuerza-equipo.js: estado, general.*,
+// ultimos5.*. Ningún campo faltante se rellena con 0.
+function bloqueFuerzaEquipo(titulo, datos) {
+  if (!datos || !datos.estado) {
+    return (
+      '<div class="medicion">' +
+        '<div class="t">' + escapar(titulo) + '</div>' +
+        '<div class="v nc">NO_CONFIRMADO</div>' +
+      '</div>'
+    );
+  }
+
+  var g = datos.general || {};
+  var u5 = datos.ultimos5 || {};
+
+  return (
+    '<div class="medicion">' +
+      '<div class="t">' + escapar(titulo) + '</div>' +
+      '<div class="v">' +
+        'Estado: ' + estadoTxt(datos.estado) + '<br>' +
+        'Muestra: ' + fmtN(g.muestra) + '<br>' +
+        'G/P/E: ' + fmtN(g.ganados) + '/' + fmtN(g.perdidos) + '/' + fmtN(g.empates) + '<br>' +
+        'Carreras anot./perm.: ' + fmtN(g.carrerasAnotadas) + '/' + fmtN(g.carrerasPermitidas) + '<br>' +
+        'Diferencial: ' + fmtN(g.diferencial) + '<br>' +
+        'Prom. anot./perm.: ' + fmtN(g.promedioAnotadas) + '/' + fmtN(g.promedioPermitidas) + '<br>' +
+        'Últimos 5: ' + estadoTxt(u5.estado) +
+          ' (' + fmtN(u5.muestra) + ') · %V: ' +
+          (esNumero(u5.porcentaje_victorias_f5) ? u5.porcentaje_victorias_f5 + '%' : "N/C") +
+      '</div>' +
+    '</div>'
+  );
+}
+
+// Enfrentamientos directos, campos reales de calcularEnfrentamientosF5():
+// estado, resumen_desde_perspectiva_a.*.
+function bloqueEnfrentamientos(datos) {
+  if (!datos || !datos.estado) {
+    return (
+      '<div class="medicion">' +
+        '<div class="t">Enfrentamientos directos</div>' +
+        '<div class="v nc">NO_CONFIRMADO</div>' +
+      '</div>'
+    );
+  }
+
+  var r = datos.resumen_desde_perspectiva_a || {};
+
+  return (
+    '<div class="medicion">' +
+      '<div class="t">Enfrentamientos directos</div>' +
+      '<div class="v">' +
+        'Estado: ' + estadoTxt(datos.estado) + '<br>' +
+        'Muestra: ' + fmtN(r.muestra) + '<br>' +
+        'G/P/E (local): ' + fmtN(r.ganados) + '/' + fmtN(r.perdidos) + '/' + fmtN(r.empates) + '<br>' +
+        'Diferencial: ' + fmtN(r.diferencial) +
+      '</div>' +
+    '</div>'
+  );
+}
+
+// Historial F5 de un abridor (local o visitante), campos reales de
+// calcularHistorialAbridorF5(): estado, muestra, ganados_f5/perdidos_f5/
+// empates_f5, porcentaje_victorias_f5, promedio_carreras_equipo_f5_en_
+// aperturas, promedio_carreras_rival_f5_en_aperturas,
+// diferencial_promedio_f5, ultimos5.*.
+function bloqueAbridor(titulo, datos) {
+  if (!datos || !datos.estado) {
+    return (
+      '<div class="medicion">' +
+        '<div class="t">' + escapar(titulo) + '</div>' +
+        '<div class="v nc">NO_CONFIRMADO</div>' +
+      '</div>'
+    );
+  }
+
+  var u5 = datos.ultimos5 || {};
+
+  return (
+    '<div class="medicion">' +
+      '<div class="t">' + escapar(titulo) + '</div>' +
+      '<div class="v">' +
+        'Estado: ' + estadoTxt(datos.estado) + '<br>' +
+        'Aperturas: ' + fmtN(datos.muestra) + '<br>' +
+        'G/P/E: ' + fmtN(datos.ganados_f5) + '/' + fmtN(datos.perdidos_f5) + '/' + fmtN(datos.empates_f5) + '<br>' +
+        '%V F5: ' + (esNumero(datos.porcentaje_victorias_f5) ? datos.porcentaje_victorias_f5 + '%' : "N/C") + '<br>' +
+        'Prom. equipo/rival: ' + fmtN(datos.promedio_carreras_equipo_f5_en_aperturas) + '/' + fmtN(datos.promedio_carreras_rival_f5_en_aperturas) + '<br>' +
+        'Diferencial prom.: ' + fmtN(datos.diferencial_promedio_f5) + '<br>' +
+        'Últimos 5: ' + estadoTxt(u5.estado) +
+          ' (' + fmtN(u5.muestra) + ') · %V: ' +
+          (esNumero(u5.porcentaje_victorias_f5) ? u5.porcentaje_victorias_f5 + '%' : "N/C") +
+      '</div>' +
+    '</div>'
+  );
+}
+
 async function correrTodo() {
   if (corriendo) return;
 
@@ -455,6 +613,13 @@ async function correrTodo() {
       var lm = r.lineaMercadoF5;
       var propio = r.moneyline || {};
 
+      var fuerza = r.fuerzaEquipoF5 || {};
+      var fuerzaLocal = fuerza.local || {};
+      var fuerzaVisitante = fuerza.visitante || {};
+      var enfrentamientos = fuerza.enfrentamientos || {};
+      var abridorLocal = fuerza.abridorLocal || {};
+      var abridorVisitante = fuerza.abridorVisitante || {};
+
       var partesJuego = String(r.juego || "").split(" @ ");
       var awayNombre = partesJuego[0] || "Away";
       var homeNombre = partesJuego[1] || "Home";
@@ -472,12 +637,6 @@ async function correrTodo() {
       var pctAway = propio.porcentajeVisitanteDosVias;
       var pctHome = propio.porcentajeLocalDosVias;
       var pctEmpate = propio.porcentajeEmpate;
-
-      var ventajaAway = propio.ventajaVisitantePct;
-      var ventajaHome = propio.ventajaLocalPct;
-
-      var valorAway = propio.seleccion === "VISITANTE";
-      var valorHome = propio.seleccion === "LOCAL";
 
       var estadoPropio =
         propio.estado === "PORCENTAJE_EMPIRICO"
@@ -568,10 +727,6 @@ async function correrTodo() {
               '<div class="cuota">' + fmtAmerican(awayPrice) + '</div>' +
               '<div class="porcentaje">' + fmtPct(pctAway) + '</div>' +
               '<div class="porcentaje-label">MLBPro visitante</div>' +
-              '<div class="ventaja">Ventaja mercado: ' + fmtPct(ventajaAway) + '</div>' +
-              '<span class="fav ' + (valorAway ? "si" : "no") + '">' +
-                (valorAway ? "VALOR" : "SIN VALOR") +
-              '</span>' +
             '</div>' +
 
             '<div class="equipo-col">' +
@@ -579,10 +734,6 @@ async function correrTodo() {
               '<div class="cuota">' + fmtAmerican(homePrice) + '</div>' +
               '<div class="porcentaje">' + fmtPct(pctHome) + '</div>' +
               '<div class="porcentaje-label">MLBPro local</div>' +
-              '<div class="ventaja">Ventaja mercado: ' + fmtPct(ventajaHome) + '</div>' +
-              '<span class="fav ' + (valorHome ? "si" : "no") + '">' +
-                (valorHome ? "VALOR" : "SIN VALOR") +
-              '</span>' +
             '</div>' +
 
           '</div>' +
@@ -613,11 +764,6 @@ async function correrTodo() {
             '<div class="medicion">' +
               '<div class="t">Estado MLBPro</div>' +
               '<div class="v">' + estadoPropio + '</div>' +
-            '</div>' +
-
-            '<div class="medicion">' +
-              '<div class="t">Selección</div>' +
-              '<div class="v">' + escapar(propio.seleccion || "NO_CONFIRMADO") + '</div>' +
             '</div>' +
 
             '<div class="medicion">' +
@@ -657,6 +803,17 @@ async function correrTodo() {
 
           '</div>' +
 
+          '<div class="total-central">' +
+            '<div class="tit">Fuerza de Equipo F5</div>' +
+            '<div class="mediciones" style="margin-bottom:0;">' +
+              bloqueFuerzaEquipo("Fuerza F5 visitante", fuerzaVisitante) +
+              bloqueFuerzaEquipo("Fuerza F5 local", fuerzaLocal) +
+              bloqueEnfrentamientos(enfrentamientos) +
+              bloqueAbridor("Abridor visitante", abridorVisitante) +
+              bloqueAbridor("Abridor local", abridorLocal) +
+            '</div>' +
+          '</div>' +
+
           '<div class="brujula-wrap">' +
             brujulaSvg +
           '</div>' +
@@ -677,7 +834,6 @@ async function correrTodo() {
             '<div><b>Empate:</b> ' + fmtPct(propio.porcentajeEmpate) + '</div>' +
             '<div><b>Local dos vías:</b> ' + fmtPct(propio.porcentajeLocalDosVias) + '</div>' +
             '<div><b>Visitante dos vías:</b> ' + fmtPct(propio.porcentajeVisitanteDosVias) + '</div>' +
-            '<div><b>Selección:</b> ' + escapar(propio.seleccion || "NO_CONFIRMADO") + '</div>' +
             '<div><b>Detalle:</b> ' + escapar(propio.detalle || "") + '</div>' +
           '</details>' +
 
