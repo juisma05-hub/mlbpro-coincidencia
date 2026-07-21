@@ -238,26 +238,40 @@
     margin-top: 2px;
   }
 
-  .empate-f5 {
+  .resumen-fila {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .resumen-caja {
     background: #0d1117;
     border: 1px solid #30363d;
     border-radius: 10px;
-    padding: 9px;
-    margin-bottom: 10px;
+    padding: 9px 6px;
     text-align: center;
   }
 
-  .empate-f5 .t {
-    font-size: 10px;
+  .resumen-caja .t {
+    font-size: 9px;
     color: #8b949e;
     text-transform: uppercase;
     font-weight: 800;
+    line-height: 1.3;
   }
 
-  .empate-f5 .v {
-    font-size: 18px;
+  .resumen-caja .v {
+    font-size: 15px;
     font-weight: 900;
-    margin-top: 3px;
+    margin-top: 4px;
+    color: #e6edf3;
+  }
+
+  .resumen-caja .v2 {
+    font-size: 10px;
+    color: #8b949e;
+    margin-top: 2px;
   }
 
   .total-central {
@@ -592,6 +606,38 @@ function bloqueAbridor(titulo, datos) {
   );
 }
 
+// Probabilidad implícita de una cuota americana. Misma fórmula que ya usa
+// f5-moneyline.js internamente (_f5MlProbabilidadAmericana) — se repite
+// aquí solo para mostrar en pantalla, sin tocar ese archivo.
+function probabilidadAmericana(cuota) {
+  if (!esNumero(cuota) || cuota === 0) return null;
+  if (cuota < 0) return (-cuota) / (-cuota + 100);
+  return 100 / (cuota + 100);
+}
+
+// Over/Under de mercado sin vig, calculado a partir de las cuotas reales
+// de lm.totalF5 (over_price / under_price) que ya trae la línea de
+// mercado. Esto NO es un modelo propio de MLBPro — es el mismo mercado
+// que ya se muestra en "Total F5 de mercado", solo expresado en % en vez
+// de cuota americana. Si falta cualquiera de las dos cuotas, null (nunca
+// se completa con un valor neutral).
+function overUnderSinVig(lm) {
+  if (!lm || !lm.totalF5) return null;
+
+  var probOver = probabilidadAmericana(lm.totalF5.over_price);
+  var probUnder = probabilidadAmericana(lm.totalF5.under_price);
+
+  if (!esNumero(probOver) || !esNumero(probUnder)) return null;
+
+  var suma = probOver + probUnder;
+  if (suma <= 0) return null;
+
+  return {
+    over: (probOver / suma) * 100,
+    under: (probUnder / suma) * 100
+  };
+}
+
 async function correrTodo() {
   if (corriendo) return;
 
@@ -637,6 +683,43 @@ async function correrTodo() {
       var pctAway = propio.porcentajeVisitanteDosVias;
       var pctHome = propio.porcentajeLocalDosVias;
       var pctEmpate = propio.porcentajeEmpate;
+
+      // Favorito: el lado con % empírico propio más alto (porcentajeLocal/
+      // VisitanteDosVias, ya calculados por f5-moneyline.js). Se muestra el
+      // % tal cual salga, sin importar qué tan bajo sea, sin umbral de
+      // "empate técnico". Si ambos % son exactamente iguales, no hay
+      // favorito real y se declara así en vez de forzar uno.
+      var favoritoNombre = null;
+      var favoritoPct = null;
+
+      if (esNumero(pctHome) && esNumero(pctAway)) {
+        if (pctHome > pctAway) {
+          favoritoNombre = homeNombre;
+          favoritoPct = pctHome;
+        } else if (pctAway > pctHome) {
+          favoritoNombre = awayNombre;
+          favoritoPct = pctAway;
+        }
+      }
+
+      var favoritoTxt;
+      if (favoritoNombre) {
+        favoritoTxt = escapar(favoritoNombre);
+      } else if (esNumero(pctHome) && esNumero(pctAway)) {
+        favoritoTxt = "EMPATE EXACTO";
+      } else {
+        favoritoTxt = "NO_CONFIRMADO";
+      }
+
+      var favoritoPctTxt =
+        esNumero(favoritoPct)
+          ? favoritoPct.toFixed(1) + "%"
+          : "N/C";
+
+      // Over/Under de mercado sin vig (ver overUnderSinVig arriba). NO es
+      // un modelo propio: sale de las mismas cuotas de lm.totalF5 que ya
+      // se muestran en "Total F5 de mercado".
+      var ouSinVig = overUnderSinVig(lm);
 
       var estadoPropio =
         propio.estado === "PORCENTAJE_EMPIRICO"
@@ -738,9 +821,29 @@ async function correrTodo() {
 
           '</div>' +
 
-          '<div class="empate-f5">' +
-            '<div class="t">Empate después de cinco entradas</div>' +
-            '<div class="v">' + fmtPct(pctEmpate) + '</div>' +
+          '<div class="resumen-fila">' +
+
+            '<div class="resumen-caja">' +
+              '<div class="t">Favorito (modelo propio F5)</div>' +
+              '<div class="v">' + favoritoTxt + '</div>' +
+              '<div class="v2">' + favoritoPctTxt + '</div>' +
+            '</div>' +
+
+            '<div class="resumen-caja">' +
+              '<div class="t">Empate F5</div>' +
+              '<div class="v">' + fmtPct(pctEmpate) + '</div>' +
+            '</div>' +
+
+            '<div class="resumen-caja">' +
+              '<div class="t">Over/Under (mercado, sin vig)</div>' +
+              '<div class="v">' +
+                (ouSinVig ? ouSinVig.over.toFixed(1) + '%' : "N/C") +
+                ' / ' +
+                (ouSinVig ? ouSinVig.under.toFixed(1) + '%' : "N/C") +
+              '</div>' +
+              '<div class="v2">Over / Under</div>' +
+            '</div>' +
+
           '</div>' +
 
           '<div class="total-central">' +
@@ -814,17 +917,19 @@ async function correrTodo() {
             '</div>' +
           '</div>' +
 
-          '<div class="brujula-wrap">' +
-            brujulaSvg +
-          '</div>' +
-
-          '<div class="brujula-cap">' +
-            (
-              tieneDireccion
-                ? 'viene de ' + grados + '° → va hacia ' + vaHacia + '°'
-                : 'Dirección de viento: NO_CONFIRMADO'
-            ) +
-          '</div>' +
+          '<details class="detalle">' +
+            '<summary>Ver brújula de viento</summary>' +
+            '<div class="brujula-wrap">' +
+              brujulaSvg +
+            '</div>' +
+            '<div class="brujula-cap">' +
+              (
+                tieneDireccion
+                  ? 'viene de ' + grados + '° → va hacia ' + vaHacia + '°'
+                  : 'Dirección de viento: NO_CONFIRMADO'
+              ) +
+            '</div>' +
+          '</details>' +
 
           '<details class="detalle">' +
             '<summary>Ver detalle completo</summary>' +
