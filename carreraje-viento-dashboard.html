@@ -173,21 +173,36 @@ function promedio(arr) {
 
 function poblarSelectorParques() {
   const sel = document.getElementById("selParque");
-  const vistos = new Map(); // clave canónica -> nombre crudo más frecuente
+  // clave canónica -> { nombresParque: {nombreCrudo: conteo}, equipos: {equipoLocal: conteo} }
+  const vistos = new Map();
 
   historico.forEach(h => {
     const clave = claveCanonica(h.venue);
-    if (!vistos.has(clave)) vistos.set(clave, {});
-    const conteo = vistos.get(clave);
-    conteo[h.venue] = (conteo[h.venue] || 0) + 1;
+    if (!vistos.has(clave)) vistos.set(clave, { nombresParque: {}, equipos: {} });
+    const info = vistos.get(clave);
+    info.nombresParque[h.venue] = (info.nombresParque[h.venue] || 0) + 1;
+    if (h.home) info.equipos[h.home] = (info.equipos[h.home] || 0) + 1;
   });
 
-  const opciones = [...vistos.entries()].map(([clave, conteo]) => {
-    const nombreMasFrecuente = Object.entries(conteo).sort((a, b) => b[1] - a[1])[0][0];
-    return { clave, nombre: nombreMasFrecuente };
-  }).sort((a, b) => a.nombre.localeCompare(b.nombre));
+  const opciones = [...vistos.entries()].map(([clave, info]) => {
+    const nombreParque = Object.entries(info.nombresParque).sort((a, b) => b[1] - a[1])[0][0];
+    const equipoEntries = Object.entries(info.equipos).sort((a, b) => b[1] - a[1]);
+    // Normalmente un solo equipo local por parque; si aparece más de uno
+    // (ej. datos mezclados o parque compartido), se listan todos.
+    const equipos = equipoEntries.map(e => e[0]).join(" / ") || "Equipo local N/C";
+    return { clave, nombreParque, equipos };
+  }).sort((a, b) => a.equipos.localeCompare(b.equipos));
 
-  sel.innerHTML = opciones.map(o => `<option value="${o.clave}">${o.nombre}</option>`).join("");
+  if (!opciones.length) {
+    sel.innerHTML = `<option value="" disabled selected>Sin parques disponibles — falta histórico</option>`;
+    sel.disabled = true;
+    return;
+  }
+
+  sel.disabled = false;
+  sel.innerHTML = opciones
+    .map(o => `<option value="${o.clave}">${o.equipos} — ${o.nombreParque}</option>`)
+    .join("");
 }
 
 function cargarHistorico() {
@@ -206,6 +221,11 @@ function cargarHistorico() {
   aviso.className = "aviso";
   aviso.textContent = "Histórico en caché: " + historico.length + " juegos.";
   poblarSelectorParques();
+
+  if (document.getElementById("selParque").disabled) {
+    aviso.className = "aviso bad";
+    aviso.textContent += " Pero ninguna fila tiene un campo 'venue' usable — revisá el formato del histórico.";
+  }
 }
 
 function buscarManual() {
