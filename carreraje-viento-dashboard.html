@@ -205,9 +205,39 @@ function poblarSelectorParques() {
     .join("");
 }
 
+function diagnosticarDependencias() {
+  const faltantes = [];
+  if (typeof window.MLBPRO_CORE === "undefined") faltantes.push("mlbpro-core.js (window.MLBPRO_CORE)");
+  if (typeof window.MLBPRO_VIENTO === "undefined") faltantes.push("mlbpro-viento.js (window.MLBPRO_VIENTO)");
+  if (typeof stadiumCanonName !== "function") faltantes.push("estadios.js (función stadiumCanonName)");
+  if (typeof stadiumNorm !== "function") faltantes.push("estadios.js (función stadiumNorm)");
+  if (typeof getOrientacionParque !== "function") faltantes.push("parques-orientacion.js (función getOrientacionParque)");
+  return faltantes;
+}
+
 function cargarHistorico() {
-  historico = CORE.leerHistoricoCache();
   const aviso = document.getElementById("avisoOrigen");
+
+  const faltantes = diagnosticarDependencias();
+  if (faltantes.length) {
+    aviso.className = "aviso bad";
+    aviso.innerHTML =
+      "NO SE PUDO CARGAR: falta encontrar " + faltantes.join(", ") + ". " +
+      "Revisá que esos archivos existan EXACTAMENTE con ese nombre (mayúsculas/minúsculas incluidas) " +
+      "en la misma carpeta que este HTML dentro del repo, y que no haya dado error 404. " +
+      "En el navegador del celular podés confirmarlo abriendo la URL del archivo directo, ej: " +
+      "<br><code>" + location.href.replace(/[^/]+$/, "") + "mlbpro-core.js</code>" +
+      " — si te muestra el código JS, existe; si da 404, ese es el problema.";
+    return;
+  }
+
+  try {
+    historico = CORE.leerHistoricoCache();
+  } catch (e) {
+    aviso.className = "aviso bad";
+    aviso.textContent = "ERROR leyendo el histórico: " + (e && e.message ? e.message : e);
+    return;
+  }
 
   if (!historico.length) {
     aviso.className = "aviso bad";
